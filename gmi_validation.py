@@ -13,6 +13,9 @@ PROGRAMMER
 REVISION HISTORY
     07022018 -- initial version created
     08022018 -- functions 'find_commensurate_t2m' and 'load_t2m' added
+    09022018 -- functions 'get_merged_csv', 'read_aqs', and 'trace_gas_atgmi'
+                added to extract AQS CO, NO2, and O3 observations co-located
+                with GMI sites
     """
 def open_castnet_gmi(case, year, sampling_months, sampling_hours):
     """function opens hourly CASTNET ozone observations for the specified 
@@ -402,7 +405,7 @@ def gmi_castnet_dailyavg_multiyear(case, gmi_sites_fr, regavg):
         print('extracting trace gases for %s!' %year)
         # open observed/modeled trace gases for year
         castnet_o3, gmi_o3, gmi_co, gmi_no, gmi_no2, gmi_lat_at, \
-        gmi_lon_at, castnet_lat_at, castnet_lon_at = gmi_castnet_dailyavg_singleyear(gmi_siteid_fr, case, year, 'yes')
+        gmi_lon_at, castnet_lat_at, castnet_lon_at = gmi_castnet_dailyavg_singleyear(gmi_sites_fr, case, year, 'yes')
         # append to multi-year list
         castnet_o3_all.append(castnet_o3)
         gmi_o3_all.append(gmi_o3)
@@ -576,4 +579,241 @@ def find_commensurate_t2m(castnet_lon_at_all, castnet_lat_at_all, regavg):
     if regavg == 'yes': 
         t2m_fr = np.mean(t2m_fr, axis = 1)
     return t2m_fr
+# # # # # # # # # # # # #
+def get_merged_csv(flist, **kwargs):
+    """function reads CSV files in the list comprehension loop, this list of
+    DataFrames will be passed to the pd.concat() function which will return 
+    single concatenated DataFrame
+    From https://stackoverflow.com/questions/35973782/reading-multiple-csv-files-concatenate-list-of-file-names-them-into-a-singe-dat
+    """
+    import pandas as pd
+    return pd.concat([pd.read_csv(f, **kwargs) for f in flist], 
+                      ignore_index = True)
+# # # # # # # # # # # # #
+def read_aqs(): 
+    """function opens daily summary files for NO2, CO, and O3 from AQS
+    
+    Parameters
+    ---------- 
+    None
+        
+    Returns
+    ----------    
+    COdf : pandas.core.frame.DataFrame
+        Raw AQS daily summary CO observations for U.S., (no. obs, 29)
+    NO2df : pandas.core.frame.DataFrame
+        Raw AQS daily summary NO2 observations for U.S., (no. obs, 29)   
+    O3df : pandas.core.frame.DataFrame
+        Raw AQS daily summary O3 observations for U.S., (no. obs, 29)   
+    """
+    import numpy as np
+    import os, glob, sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # column names for files of daily summary data for criteria gases
+    cols = ['State Code', 'County Code', 'Site Num', 'Parameter Code',
+            'POC', 'Latitude', 'Longitude', 'Datum', 'Parameter Name',
+            'Sample Duration', 'Pollutant Standard', 'Date Local', 
+            'Units of Measure', 'Event Type', 'Observation Count',
+            'Observation Percent', 'Arithmetic Mean', '1st Max Value',
+            '1st Max Hour', 'AQI', 'Method Code', 'Method Name',
+            'Local Site Name', 'Address', 'State Name', 'County Name',
+            'City Name', 'CBSA Name', 'Date of Last Change']
+    # specificy data types for columns to avoid DtypeWarning being raised
+    dtype = {'State Code' : np.str, 'County Code' : np.str, 'Site Num' : np.str, 
+             'Parameter Code' : np.str, 'POC' : np.int64, 'Latitude' : np.float64, 
+             'Longitude' : np.float64, 'Datum' : np.str, 'Parameter Name' : np.str,
+             'Sample Duration' : np.str, 'Pollutant Standard' : np.str, 
+             'Date Local' : np.str, 'Units of Measure' : np.str, 
+             'Event Type' : np.str, 'Observation Count' : np.int64,
+             'Observation Percent' : np.float64, 'Arithmetic Mean' : np.float64, 
+             '1st Max Value' : np.float64, '1st Max Hour' : np.int64, 
+             'AQI' : np.str, 'Method Code' : np.str, 'Method Name' : np.str,
+             'Local Site Name' : np.str, 'Address' : np.str, 'State Name' : np.str, 
+             'County Name' : np.str, 'City Name' : np.str, 'CBSA Name' : np.str, 
+             'Date of Last Change' : np.str}
+    # read multiple CSV files (yearly) into Pandas dataframe for CO
+    COfmask = os.path.join(pollutants_constants.PATH_AQS, 'daily_42101_*.csv')
+    COdf = get_merged_csv(glob.glob(COfmask), dtype = dtype, index_col = None, usecols = cols)
+    # for NO2
+    NO2fmask = os.path.join(pollutants_constants.PATH_AQS, 'daily_42602_*.csv')
+    NO2df = get_merged_csv(glob.glob(NO2fmask), dtype = dtype, index_col = None, usecols = cols)
+    # for O3
+    O3fmask = os.path.join(pollutants_constants.PATH_AQS, 'daily_44201_*.csv')
+    O3df = get_merged_csv(glob.glob(O3fmask), dtype = dtype, index_col = None, usecols = cols)
+    return COdf, NO2df, O3df
+# # # # # # # # # # # # #
+def trace_gas_atgmi(region_states, gmi_lat_at_all, gmi_lon_at_all, bound): 
+    """function fetches AQS CO, NO2, and O3 measurements within the radius,
+    in degrees, defined by arg bound and produces a regional-aveage of these 
+    measurements for JJA 2005-2010.
+
+    Parameters
+    ---------- 
+    region_states : list
+        States in region of interest
+    gmi_lat_at_all : list
+        Latitude of GMI sites with corresponding CASTNet observations with 
+        complete observations
+    gmi_lon_at_all : list
+        Longitude of GMI sites with corresponding CASTNet observations with 
+        complete observations
+    bound : 
+        Radius, in degrees, of bounding box surrounding individual GMI sites
+        in which AQS sites and their observations will be fetched
+        
+    Returns
+    ----------    
+    aco : pandas.core.series.Series
+        1st Max Value carbon monoxide (CO) averaged over AQS stations co-
+        located with GMI sites for JJA 2005-2010, [number of summer days]
+    aco_lat : numpy.ndarray
+        Latitude of AQS sites measuring CO co-located with GMI sites
+    aco_lon : numpy.ndarray
+        Longitude of AQS sites measuring CO co-located with GMI sites
+    ano2 : pandas.core.series.Series
+        1st Max Value nitric oxide (NO2) averaged over AQS stations co-
+        located with GMI sites for JJA 2005-2010, [number of summer days]    
+    ano2_lat : numpy.ndarray
+        Latitude of AQS sites measuring NO2 co-located with GMI sites
+    ano2_lon : numpy.ndarray
+        Longitude of AQS sites measuring NO2 co-located with GMI sites
+    ao3 : pandas.core.series.Series
+        1st Max Value ozone (O3) averaged over AQS stations co-
+        located with GMI sites for JJA 2005-2010, [number of summer days]    
+    ao3_lat : numpy.ndarray
+        Latitude of AQS sites measuring O3 co-located with GMI sites    
+    ao3_lon' : numpy.ndarray
+        Longitude of AQS sites measuring O3 co-located with GMI sites
+    """
+    import numpy as np
+    import pandas as pd
+    # load AQS observations
+    COdf, NO2df, O3df = read_aqs()
+    NO2_region = NO2df.loc[NO2df['State Name'].isin(region_states)]
+    CO_region = COdf.loc[COdf['State Name'].isin(region_states)]
+    O3_region = O3df.loc[O3df['State Name'].isin(region_states)]
+    print('%d states in input list, %d states in AQS observations!' 
+          %(len(region_states), np.unique(CO_region['State Name'].values).shape[0]))
+    # stack all GMI latitudes and longitudes separately
+    gmi_lat_at_all = np.hstack(np.hstack(gmi_lat_at_all))
+    gmi_lon_at_all = np.hstack(np.hstack(gmi_lon_at_all))
+    # pair GMI lat/lons
+    gmi_latlon = np.column_stack([gmi_lat_at_all, gmi_lon_at_all])
+    # find unique lat/lon pairs in region
+    gmi_latlon = np.vstack({tuple(row) for row in gmi_latlon})
+    # lists for the indices corresponding to AQS sites co-located (or nearly 
+    # co-located) with GMI sites and their latitudes/longitudes
+    co_idx, co_aqs_lat_at_all, co_aqs_lon_at_all = [], [], []
+    no2_idx, no2_aqs_lat_at_all, no2_aqs_lon_at_all = [], [], []
+    o3_idx, o3_aqs_lat_at_all, o3_aqs_lon_at_all = [], [], []
+    # loop through the latitude and longitude of GMI sites
+    for llpair in gmi_latlon: 
+        # upper/lower latitude/longitude bounds
+        lat_lb = llpair[0] - bound
+        lat_ub = llpair[0] + bound
+        lon_lb = llpair[1] - bound
+        lon_rb = llpair[1] + bound
+        # find all trace gas measurements within bounding box 
+        # for carbon monoxide
+        co_bb = CO_region.loc[((CO_region['Latitude'] > lat_lb) & 
+                               (CO_region['Latitude'] < lat_ub)) & 
+                              ((CO_region['Longitude'] > lon_lb) & 
+                               (CO_region['Longitude'] < lon_rb))]
+        # for nitric oxide
+        no2_bb = NO2_region.loc[((NO2_region['Latitude'] > lat_lb) & 
+                                 (NO2_region['Latitude'] < lat_ub)) & 
+                                ((NO2_region['Longitude'] > lon_lb) & 
+                                 (NO2_region['Longitude'] < lon_rb))]
+        # for ozone                          
+        o3_bb = O3_region.loc[((O3_region['Latitude'] > lat_lb) & 
+                               (O3_region['Latitude'] < lat_ub)) & 
+                              ((O3_region['Longitude'] > lon_lb) & 
+                               (O3_region['Longitude'] < lon_rb))]                                                    
+        # save indices of entries which correspond to observations at AQS 
+        # sites near GMI sites
+        co_idx.append(co_bb.index)
+        no2_idx.append(no2_bb.index)
+        o3_idx.append(o3_bb.index)
+        # save off locations of AQS stations in bounding box         
+        co_aqs_lat_at_all.append(co_bb['Latitude'].values)
+        co_aqs_lon_at_all.append(co_bb['Longitude'].values)    
+        no2_aqs_lat_at_all.append(no2_bb['Latitude'].values)
+        no2_aqs_lon_at_all.append(no2_bb['Longitude'].values)
+        o3_aqs_lat_at_all.append(o3_bb['Latitude'].values)
+        o3_aqs_lon_at_all.append(o3_bb['Longitude'].values)
+    # unique lat/lons of AQS stations measuring CO, NO2, and O3
+    # for carbon monoxide
+    co_aqs_lat_at_all = np.hstack(co_aqs_lat_at_all)
+    co_aqs_lon_at_all = np.hstack(co_aqs_lon_at_all)
+    co_latlon = np.column_stack([co_aqs_lat_at_all, co_aqs_lon_at_all])
+    co_latlon = np.vstack({tuple(row) for row in co_latlon})
+    # for nitric oxide
+    no2_aqs_lat_at_all = np.hstack(no2_aqs_lat_at_all)
+    no2_aqs_lon_at_all = np.hstack(no2_aqs_lon_at_all)
+    no2_latlon = np.column_stack([no2_aqs_lat_at_all, no2_aqs_lon_at_all])
+    no2_latlon = np.vstack({tuple(row) for row in no2_latlon})
+    # for ozone
+    o3_aqs_lat_at_all = np.hstack(o3_aqs_lat_at_all)
+    o3_aqs_lon_at_all = np.hstack(o3_aqs_lon_at_all)
+    o3_latlon = np.column_stack([o3_aqs_lat_at_all, o3_aqs_lon_at_all])
+    o3_latlon = np.vstack({tuple(row) for row in o3_latlon})
+    # CO observations co-located with GMI sites during JJA 2005 - 2010
+    co_region_atgmi = CO_region.ix[np.hstack(co_idx)]
+    co_region_atgmi.index = pd.to_datetime(co_region_atgmi['Date Local'])
+    co_region_atgmi = co_region_atgmi[(co_region_atgmi.index.year >= 2005) & 
+                                      (co_region_atgmi.index.year <= 2010)]
+    co_region_atgmi = co_region_atgmi[(co_region_atgmi.index.month >= 6) & 
+                                      (co_region_atgmi.index.month <= 8)]
+    co_region_atgmi = co_region_atgmi.groupby('Date Local').mean()
+    co_region_atgmi = co_region_atgmi.sort_index()
+    # NO2 observations co-located with GMI sites during JJA 2005 - 2010
+    no2_region_atgmi = NO2_region.ix[np.hstack(no2_idx)]
+    no2_region_atgmi.index = pd.to_datetime(no2_region_atgmi['Date Local'])
+    no2_region_atgmi = no2_region_atgmi[(no2_region_atgmi.index.year >= 2005) & 
+                                      (no2_region_atgmi.index.year <= 2010)]
+    no2_region_atgmi = no2_region_atgmi[(no2_region_atgmi.index.month >= 6) & 
+                                      (no2_region_atgmi.index.month <= 8)]
+    no2_region_atgmi = no2_region_atgmi.groupby('Date Local').mean()
+    no2_region_atgmi = no2_region_atgmi.sort_index()
+    # O3 observations co-located with GMI sites during JJA 2005 - 2010
+    o3_region_atgmi = O3_region.ix[np.hstack(o3_idx)]
+    o3_region_atgmi.index = pd.to_datetime(o3_region_atgmi['Date Local'])
+    o3_region_atgmi = o3_region_atgmi[(o3_region_atgmi.index.year >= 2005) & 
+                                      (o3_region_atgmi.index.year <= 2010)]
+    o3_region_atgmi = o3_region_atgmi[(o3_region_atgmi.index.month >= 6) & 
+                                      (o3_region_atgmi.index.month <= 8)]
+    o3_region_atgmi = o3_region_atgmi.groupby('Date Local').mean()
+    o3_region_atgmi = o3_region_atgmi.sort_index()
+    ## # # #
+    #import matplotlib.pyplot as plt
+    #from mpl_toolkits.basemap import Basemap
+    #fig = plt.figure()
+    #ax = plt.subplot2grid((1, 1), (0, 0), rowspan = 1, colspan = 1)
+    #m = Basemap(projection = 'cass', llcrnrlon = -85., llcrnrlat = 36, urcrnrlon = -63.,
+    #            urcrnrlat = 50., resolution = 'c', lat_0 = 20, lon_0 = -88, 
+    #            area_thresh = 10000) 
+    #     
+    #x_gmi, y_gmi = m(gmi_latlon[:, 1],  gmi_latlon[:, 0])
+    #x_co_aqs, y_co_aqs = m(co_latlon[:, 1],  co_latlon[:, 0])
+    #x_no2_aqs, y_no2_aqs = m(no2_latlon[:, 1],  no2_latlon[:, 0])
+    #x_o3_aqs, y_o3_aqs = m(o3_latlon[:, 1],  o3_latlon[:, 0])
+    #mno2aqs = m.plot(x_no2_aqs, y_no2_aqs, 'bx', markersize = 12, label = 'AQS NO$_{2}$')
+    #mgmi = m.plot(x_gmi, y_gmi, 'ro', markersize = 12, label = 'GMI CTM')
+    #mcoaqs = m.plot(x_co_aqs, y_co_aqs, 'kx', markersize = 12, label = 'AQS CO')
+    #mo3aqs = m.plot(x_o3_aqs, y_o3_aqs, 'gx', markersize = 12, label = 'AQS O$_{3}$')
+    #plt.legend()
+    #m.drawstates()
+    #m.drawcountries()
+    #m.drawcoastlines()
+    ## # # #
+    return {'aco' : co_region_atgmi['1st Max Value'].values, 
+            'aco_lat' : co_aqs_lat_at_all, 
+            'aco_lon' : co_aqs_lon_at_all, 
+            'ano2' : no2_region_atgmi['1st Max Value'].values,
+            'ano2_lat' : no2_aqs_lat_at_all,
+            'ano2_lon' : no2_aqs_lon_at_all, 
+            'ao3' : o3_region_atgmi['1st Max Value'].values, 
+            'ao3_lat' : o3_aqs_lat_at_all,
+            'ao3_lon' : o3_aqs_lon_at_all}
 # # # # # # # # # # # # #
