@@ -69,7 +69,7 @@ def timeseries_castneto3gmio3geoso3(castnet, mr2_o3, geos_o3):
     fig = plt.figure()
     ax = plt.subplot2grid((1, 1), (0, 0))
     # plot observed and modeled (GMI CTM, GEOS-Chem) O3
-    ax.plot(castnet, '-k', lw = 2., label = 'CASTNet')
+    ax.plot(castnet, '-k', lw = 2., label = 'AQS')
     ax.plot(mr2_o3, linestyle = '-', color = COLOR_GMI, lw = 1.5, 
             zorder = 10, label = 'GMI CTM')
     ax.plot(geos_o3, linestyle = '-', color = COLOR_GEOS, lw = 1.5, 
@@ -154,7 +154,7 @@ def timeseries_tracegases(castnet, mr2_o3, geos_o3, mr2_no, geos_no, no2,
     ax3 = plt.subplot2grid((2, 2), (1, 0))
     ax4 = plt.subplot2grid((2, 2), (1, 1))
     # plot O3
-    ax1.plot(castnet, '-k', lw = 2., label = 'CASTNet/AQS')
+    ax1.plot(castnet, '-k', lw = 2., label = 'AQS')
     ax1.plot(mr2_o3, linestyle = '-', color = COLOR_GMI, lw = 1.5, 
             zorder = 10, label = 'GMI CTM')
     ax1.plot(geos_o3, linestyle = '-', color = COLOR_GEOS, lw = 1.5, 
@@ -194,7 +194,7 @@ def timeseries_tracegases(castnet, mr2_o3, geos_o3, mr2_no, geos_no, no2,
     plt.tight_layout()
     plt.subplots_adjust(bottom = 0.2)
     # add legend
-    leg = ax1.legend(bbox_to_anchor = (2.1, -1.35), ncol = 3)
+    leg = ax1.legend(bbox_to_anchor = (2.0, -1.35), ncol = 3)
     leg.get_frame().set_linewidth(0.0)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/GEOS-Chem/' + 
                 'timeseries_tracegases.eps', dpi = 300)    
@@ -258,9 +258,9 @@ def diurnal_tracegases(castnet_d, geos_o3_d, gmi_o3_d, geos_no_d, gmi_no_d,
     path = pollutants_constants.FONTPATH_BOLD
     prop = font_manager.FontProperties(fname = path)
     mpl.rcParams['mathtext.bf'] = prop.get_name()
-    # shift CASTNet O3 observations ahead 4 hours so that they're in the same
-    # time as CTMs (i.e. UTC)
-    castnet_d = np.roll(castnet_d, 4)
+    ## shift CASTNet O3 observations ahead 4 hours so that they're in the same
+    ## time as CTMs (i.e. UTC)
+    #castnet_d = np.roll(castnet_d, 4)
     # initialize figure, axes
     fig = plt.figure()
     ax1 = plt.subplot2grid((2, 2), (0, 0))
@@ -273,7 +273,7 @@ def diurnal_tracegases(castnet_d, geos_o3_d, gmi_o3_d, geos_no_d, gmi_no_d,
     # plot every two hours so it is same length as CASTNet
     # and GMI
     ax1.plot(gmi_o3_d, lw = 1.5, color = COLOR_GMI, label = 'GMI CTM')
-    ax1.plot(castnet_d, lw = 2.0, color = 'k', label = 'CASTNet/AQS')
+    ax1.plot(castnet_d, lw = 2.0, color = 'k', label = 'AQS')
     ax1.set_xlim([0, 23])
     ax1.set_xticks(np.arange(0, 24, 6))
     ax1.set_xticklabels([''])
@@ -306,7 +306,7 @@ def diurnal_tracegases(castnet_d, geos_o3_d, gmi_o3_d, geos_no_d, gmi_no_d,
     plt.tight_layout()
     plt.subplots_adjust(bottom = 0.2)
     # add legend
-    leg = ax1.legend(bbox_to_anchor = (2.1, -1.50), ncol = 3)
+    leg = ax1.legend(bbox_to_anchor = (2.0, -1.50), ncol = 3)
     leg.get_frame().set_linewidth(0.0)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/GEOS-Chem/' + 
                 'diurnal_tracegases.eps', dpi = 300)  
@@ -314,7 +314,7 @@ def diurnal_tracegases(castnet_d, geos_o3_d, gmi_o3_d, geos_no_d, gmi_no_d,
 # # # # # # # # # # # # #    
 def map_geosgmiaqscastnet(castnet_sites_fr, sampling_months, sampling_hours, 
                           geos_lons, geos_lats, aqs_no2_lons, aqs_no2_lats, 
-                          aqs_co_lons, aqs_co_lats):
+                          aqs_co_lons, aqs_co_lats, aqs_o3_lons, aqs_o3_lats):
     """for the CASTNet sites specified in variable 'castnet_sites_fr,' function
     opens the locations (latitude/longitude coordinates) of those CASTNet 
     sites and their co-located (or nearly co-located) MERRA grid cells, GMI 
@@ -347,7 +347,15 @@ def map_geosgmiaqscastnet(castnet_sites_fr, sampling_months, sampling_hours,
     aqs_co_lats : list
         Latitudes of AQS sites within the bounding box defined by the CASTNet 
         station's longitude and latitude +/- variable 'searchrad' which 
-        measure CO during the years and months of interest    
+        measure CO during the years and months of interest   
+    aqs_o3_lons : list
+        Longitudes of AQS sites within the bounding box defined by the CASTNet 
+        station's longitude and latitude +/- variable 'searchrad' which 
+        measure O3 during the years and months of interest          
+    aqs_o3_lats : list
+        Latitudes of AQS sites within the bounding box defined by the CASTNet 
+        station's longitude and latitude +/- variable 'searchrad' which 
+        measure O3 during the years and months of interest           
     
     Returns
     ----------
@@ -394,11 +402,11 @@ def map_geosgmiaqscastnet(castnet_sites_fr, sampling_months, sampling_hours,
     gmi_loc = m.scatter(x_gmi, y_gmi, 25, color = '#1f78b4', marker = 'x', 
                         edgecolor = 'none', linewidth = 0.85, zorder = 24, 
                         label = 'GMI CTM')
-    # plot CASTNet stations
-    x_castnet, y_castnet = m(castnet_lons, castnet_lats)
-    castnet_loc = m.scatter(x_castnet, y_castnet, 20, color = 'k', marker = '^', 
-                           edgecolor = 'k', linewidth = 0.5, zorder = 23, 
-                           label = 'CASTNet')
+#    # plot CASTNet stations
+#    x_castnet, y_castnet = m(castnet_lons, castnet_lats)
+#    castnet_loc = m.scatter(x_castnet, y_castnet, 20, color = 'k', marker = '^', 
+#                           edgecolor = 'k', linewidth = 0.5, zorder = 23, 
+#                           label = 'CASTNet')
     # plot AQS stations measuring NO2
     aqs_no2_coords = np.array([np.hstack(aqs_no2_lons), 
                                np.hstack(aqs_no2_lats)], dtype = float).T
@@ -418,12 +426,21 @@ def map_geosgmiaqscastnet(castnet_sites_fr, sampling_months, sampling_hours,
     aqs_co_loc = m.scatter(x_aqs_co, y_aqs_co, 8, color = '#b2df8a', marker = 'd', 
                            edgecolor = 'none', linewidth = 0.5, zorder = 22, 
                            label = 'AQS CO')
+    # plot AQS stations measuring CO
+    aqs_o3_coords = np.array([np.hstack(aqs_o3_lons), 
+                              np.hstack(aqs_o3_lats)], dtype = float).T
+    aqs_o3_coords = pd.DataFrame(aqs_o3_coords)
+    aqs_o3_coords = aqs_o3_coords.drop_duplicates()
+    x_aqs_o3, y_aqs_o3 = m(aqs_o3_coords[0].values, aqs_o3_coords[1].values)
+    aqs_o3_loc = m.scatter(x_aqs_o3, y_aqs_o3,  20, color = 'k', marker = '^', 
+                           edgecolor = 'k', linewidth = 0.5, zorder = 18, 
+                           label = 'AQS O$_{3}$')    
     # overlay shapefile of Northeast
     plot_focus_regionOLD(ax, m)
     plt.tight_layout()
     # add legend
-    leg = ax.legend(handles = [gmi_loc, geos_loc, castnet_loc, aqs_no2_loc, 
-                    aqs_co_loc], bbox_to_anchor = (0.8, 0.5), 
+    leg = ax.legend(handles = [gmi_loc, geos_loc, aqs_no2_loc, 
+                    aqs_co_loc, aqs_o3_loc], bbox_to_anchor = (0.8, 0.5), 
                     ncol = 1, fontsize = 12, scatterpoints = 1)
     leg.get_frame().set_linewidth(0.0)
     # remove axis frame from plot             
@@ -431,7 +448,7 @@ def map_geosgmiaqscastnet(castnet_sites_fr, sampling_months, sampling_hours,
     plt.savefig('/Users/ghkerr/phd/GMI/figs/GEOS-Chem/' + 
                 'map_geosgmiaqscastnet.eps', dpi = 300)
     return     
-# # # # # # # # # # # # #    
+## # # # # # # # # # # # #    
 #import numpy as np
 #import sys
 #sys.path.append('/Users/ghkerr/phd/GMI/')
@@ -467,13 +484,15 @@ def map_geosgmiaqscastnet(castnet_sites_fr, sampling_months, sampling_hours,
 #del temp
 ## # # # open diurnal curves of AQS NO2 and CO and average over region and
 ## measuring period
-#aqs_co_d, aqs_no2_d, aqs_no2_lons, aqs_no2_lats, aqs_co_lons, aqs_co_lats = \
-#commensurability.commensurate_aqsno2co_diurnal(castnet, castnet_sites_fr, 
-#                                               years, sampling_months)
+#aqs_co_d, aqs_no2_d, aqs_o3_d, aqs_no2_lons, aqs_no2_lats, aqs_co_lons, \
+#aqs_co_lats, aqs_o3_lons, aqs_o3_lats = \
+#commensurability.commensurate_aqstracegas_diurnal(castnet, castnet_sites_fr, 
+#                                                  years, sampling_months)
 #co_d = np.nanmean(aqs_co_d[0], axis = (0, 1))
 #no2_d = np.nanmean(aqs_no2_d[0], axis = (0, 1))
+#o3_d = np.nanmean(aqs_o3_d[0], axis = (0, 1)) * 1000.
 ## # # # average HindcastMR2 over region; n.b. didn't do this before 
-## because function 'commensurate_aqsno2co_diurnal' needs unaveraged arrays
+## because function 'commensurate_aqstracegas_diurnal' needs unaveraged arrays
 #castnet, mr2_o3, mr2_no, mr2_no2, mr2_co = \
 #calculate_regional_average(castnet[0], mr2_o3[0], mr2_no[0], mr2_no2[0], mr2_co[0], 0)
 ## # # # open GEOS-Chem and average over region 
@@ -483,17 +502,21 @@ def map_geosgmiaqscastnet(castnet_sites_fr, sampling_months, sampling_hours,
 #calculate_regional_average(temp, geos_o3, geos_no, geos_no2, geos_co, 0)
 #del temp
 ## # # # open AQS NO2 and CO and average over region
-#aqs_co, aqs_no2, aqs_co_coords, aqs_no2_coords = \
-#commensurability.commensurate_aqsno2co(castnet_sites_fr, years, 
+#aqs_co, aqs_no2, aqs_o3, aqs_co_coords, aqs_no2_coords, aqs_o3_coords = \
+#commensurability.commensurate_aqstracegas(castnet_sites_fr, years, 
 #                                       sampling_months, sampling_hours)
 #co = np.nanmean(aqs_co[0], axis = 0)
 #no2 = np.nanmean(aqs_no2[0], axis = 0)
+#o3 = np.nanmean(aqs_o3[0], axis = 0) * 1000.
 # # # # visualizations
-#timeseries_castneto3gmio3geoso3(castnet, mr2_o3, geos_o3)
-#timeseries_tracegases(castnet, mr2_o3, geos_o3, mr2_no, geos_no, no2, 
+#timeseries_castneto3gmio3geoso3(o3, mr2_o3, geos_o3)
+#timeseries_tracegases(o3, mr2_o3, geos_o3, mr2_no, geos_no, no2, 
 #                      mr2_no2, geos_no2, co, mr2_co, geos_co)
-#diurnal_tracegases(castnet_d, geos_o3_d, gmi_o3_d, geos_no_d, gmi_no_d, 
+#diurnal_tracegases(o3_d, geos_o3_d, gmi_o3_d, geos_no_d, gmi_no_d, 
 #                   no2_d, geos_no2_d, gmi_no2_d, co_d, geos_co_d, gmi_co_d)
 #map_geosgmiaqscastnet(castnet_sites_fr, sampling_months, sampling_hours, 
 #                      geos_lons, geos_lats, aqs_no2_lons, aqs_no2_lats, 
-#                      aqs_co_lons, aqs_co_lats)
+#                      aqs_co_lons, aqs_co_lats, aqs_o3_lons, aqs_o3_lats)
+    
+
+
