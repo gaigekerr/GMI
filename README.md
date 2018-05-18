@@ -1,31 +1,15 @@
 ## Synopsis
 
-xx
-
-## Code Example
-
-xx
+Originally, this repository archived code for helping to analyze GMI CTM output but has since expanded to also examine output from GEOS-Chem. 
 
 ## Motivation
 
-Project examines surface-level output from the GMI CTM in the United States and examines how well the CTM simulates observed ozone and other key atmospheric species.
-
-## Installation
-
-xx
-
-## API Reference
-
-xx
-
-## Tests
-
-xx
+Code in repository examines CTM output to address the fundamental questions about the drivers of surface-level ozone (O3) vis-a-vis emissions, ambient meteorological factors, and large-scale transport
 
 ## Contributors
 
-xx
+Gaige Hunter Kerr (gaige.kerr@jhu.edu)
 
 ## License
 
-xx
+Copyright (c) 2018 Gaige Kerr
