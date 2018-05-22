@@ -18,6 +18,7 @@ REVISION HISTORY
     27042018 -- functions 'scatter_deltanoxdeltao3' and 
                 'scatter_deltanoxdeltao3_percent' added
     02052018 -- function 'scatter_deltanoxdeltao3_byyear' added
+    21052018 -- function 'timeseries_noemiss_t2m' added 
 """
 # # # # # # # # # # # # #
 def scatter_controlnoeguno_bysite(mr2, egu, castnet_sites_fr, years, region):
@@ -592,124 +593,124 @@ def scatter_tracegases_runs(no_emiss_perturbed, no_emiss_unperturbed, egu_no,
                                                          region), dpi = 300)
     return
 # # # # # # # # # # # # #
-def scatter_deltanoxdeltao3(egu_no, mr2_no, ffigac2_no, emfix_no, egu_no2, 
-                            mr2_no2, ffigac2_no2, emfix_no2, egu_o3, mr2_o3,
-                            ffigac2_o3, emfix_o3, years, region):
-    """function plots the difference in O3 versus the difference in NOx for 
-    two pairs of models: (left subplot) Fixed emissions - standard simulations
-    from Strode et al. [2015] and (right subplot) perturbed NO emissions - 
-    control simulation. For both pairs of model, the slope of the linear 
-    regression is plotted. 
-
-    Parameters
-    ----------         
-    egu_no : numpy.ndarray
-        GMI CTM NO concentrations co-located (or nearly colocated) with 
-        corresponding CASTNet stations from perturbed NO emissions simulation, 
-        units of parts per billion volume, [years in measuring period, stations 
-        in 'castnet_sites_fr', days in months in 'sampling_months']           
-    mr2_no : numpy.ndarray
-        GMI CTM NO concentrations co-located (or nearly colocated) with 
-        corresponding CASTNet stations from 'control' model run (i.e. 
-        HindcastMR2), units of parts per billion volume, [years in measuring 
-        period, stations in 'castnet_sites_fr', days in months in 
-        'sampling_months']   
-    ffigac2_no : numpy.ndarray
-        GMI CTM NO concentrations co-located (or nearly colocated) with 
-        corresponding CASTNet stations from Strode et al. [2015] 'Std.' run 
-        (i.e. HindcastFFIgac2), units of parts per billion volume, 
-        [years in measuring period, stations in 'castnet_sites_fr', days in 
-        months in 'sampling_months']   
-    emfix_no : numpy.ndarray
-        GMI CTM NO concentrations co-located (or nearly colocated) with 
-        corresponding CASTNet stations from Strode et al. [2015] 'EmFix' run 
-        (i.e. Hindcast3Igac2), units of parts per billion volume, 
-        [years in measuring period, stations in 'castnet_sites_fr', days in 
-        months in 'sampling_months']           
-    egu_no2 : numpy.ndarray
-        Same as 'egu_no' but for NO2
-    mr2_no2 : numpy.ndarray
-        Same as 'mr2_no' but for NO2       
-    ffigac2_no2 : numpy.ndarray 
-        Same as 'ffigac2_no' but for NO2   
-    emfix_no2 : numpy.ndarray
-        Same as 'emfix_no' but for NO       
-    egu_o3 : numpy.ndarray
-        Same as 'egu_no' but for O3    
-    mr2_o3 : numpy.ndarray
-        Same as 'mr2_no' but for O3
-    ffigac2_o3 : numpy.ndarray
-        Same as 'ffigac2_no' but for O3    
-    emfix_o3 : numpy.ndarray
-        Same as 'emfix_no' but for O3    
-    years : list
-        Years of interest    
-    region : str
-        Region over which regionally-averaged concentrations are supplied to 
-        function
-
-    Returns
-    ----------          
-    None             
-    """
-    import numpy as np
-    import matplotlib.pyplot as plt
-    # calculate NOx (= NO + NO2)
-    egu_nox = egu_no + egu_no2
-    mr2_nox = mr2_no + mr2_no2
-    emfix_nox = emfix_no + emfix_no2
-    ffigac2_nox = ffigac2_no + ffigac2_no2    
-    # initialize figure, axes
-    fig = plt.figure(figsize = (8, 4))
-    ax1 = plt.subplot2grid((1, 2), (0, 0))
-    ax2 = plt.subplot2grid((1, 2), (0, 1))
-    # difference in O3 vs NOx between EmFix and Std simulations (i.e. 
-    # Hindcast3Igac2 - HindcastFFIgac2)
-    ax1.plot(np.hstack(emfix_nox - ffigac2_nox), 
-             np.hstack(emfix_o3 - ffigac2_o3), 'ko', markersize = 4)
-    ax1.set_title('EmFix - Std')
-    m, b = np.polyfit(np.hstack(emfix_nox - ffigac2_nox), 
-                      np.hstack(emfix_o3 - ffigac2_o3), 1)
-    x = np.arange((emfix_nox - ffigac2_nox).min(), (emfix_nox - ffigac2_nox).max(), 0.01)
-    ax1.plot(x, x*m + b, '-k')
-    ax1.text(0.75, 0.9, '%.2f' %m, color = 'k',
-             transform = ax1.transAxes, fontsize = 14)
-    ax1.set_ylabel('ppbv $\Delta$ [O$_{3}$]')
-    ax1.set_xlabel('ppbv $\Delta$ [NO$_{x}]$')
-    # difference in O3 vs NOx between pertubed NO emissions and control simulations 
-    #(i.e. EGU_T - HindcastMR2)
-    ax2.plot(np.hstack(egu_nox - mr2_nox), 
-             np.hstack(egu_o3 - mr2_o3), 'ko', markersize = 4)
-    ax2.set_title('CEMS NO - control')
-    m, b = np.polyfit(np.hstack(egu_nox - mr2_nox), 
-                      np.hstack(egu_o3 - mr2_o3), 1)
-    x = np.arange((egu_nox - mr2_nox).min(), (egu_nox - mr2_nox).max(), 0.01)
-    ax2.plot(x, x*m + b, '-k')
-    ax2.text(0.05, 0.9, '%.2f' %m, color = 'k',
-             transform = ax2.transAxes, fontsize = 14)
-    ax2.set_xlabel('ppbv $\Delta$ [NO$_{x}]$')
-    # fit linear regression for delta NOx values greater than 0.0
-    g0 = np.where((egu_nox - mr2_nox) > 0.)
-    m_g0, b_g0 = np.polyfit(np.hstack((egu_nox - mr2_nox)[g0]), 
-                            np.hstack((egu_o3 - mr2_o3)[g0]), 1)
-    x_g0 = np.arange((egu_nox - mr2_nox)[g0].min(), 
-                  (egu_nox - mr2_nox)[g0].max(), 0.01)
-    ax2.plot(x_g0, x_g0*m_g0 + b_g0, '#1f78b4')
-    ax2.text(0.05, 0.84, '%.2f' %m_g0, color = '#1f78b4',
-            transform = ax2.transAxes, fontsize = 14)
-    # for values less than or equal to 0.0
-    l0 = np.where((egu_nox - mr2_nox) <= 0.)
-    m_l0, b_l0 = np.polyfit(np.hstack((egu_nox - mr2_nox)[l0]), 
-                            np.hstack((egu_o3 - mr2_o3)[l0]), 1)
-    x_l0 = np.arange((egu_nox - mr2_nox)[l0].min(), 
-                  (egu_nox - mr2_nox)[l0].max(), 0.01)
-    ax2.plot(x_l0, x_l0*m_l0 + b_l0, '#b2df8a')
-    ax2.text(0.05, 0.78, '%.2f' %m_l0, 
-             color = '#b2df8a', transform = ax2.transAxes, fontsize = 14)         
-    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'scatter_deltanoxdeltao3_%d-%d_%s.eps' %(years[0], years[-1], 
-                                                         region), dpi = 300)         
-    return 
+#def scatter_deltanoxdeltao3(egu_no, mr2_no, ffigac2_no, emfix_no, egu_no2, 
+#                            mr2_no2, ffigac2_no2, emfix_no2, egu_o3, mr2_o3,
+#                            ffigac2_o3, emfix_o3, years, region):
+#    """function plots the difference in O3 versus the difference in NOx for 
+#    two pairs of models: (left subplot) Fixed emissions - standard simulations
+#    from Strode et al. [2015] and (right subplot) perturbed NO emissions - 
+#    control simulation. For both pairs of model, the slope of the linear 
+#    regression is plotted. 
+#
+#    Parameters
+#    ----------         
+#    egu_no : numpy.ndarray
+#        GMI CTM NO concentrations co-located (or nearly colocated) with 
+#        corresponding CASTNet stations from perturbed NO emissions simulation, 
+#        units of parts per billion volume, [years in measuring period, stations 
+#        in 'castnet_sites_fr', days in months in 'sampling_months']           
+#    mr2_no : numpy.ndarray
+#        GMI CTM NO concentrations co-located (or nearly colocated) with 
+#        corresponding CASTNet stations from 'control' model run (i.e. 
+#        HindcastMR2), units of parts per billion volume, [years in measuring 
+#        period, stations in 'castnet_sites_fr', days in months in 
+#        'sampling_months']   
+#    ffigac2_no : numpy.ndarray
+#        GMI CTM NO concentrations co-located (or nearly colocated) with 
+#        corresponding CASTNet stations from Strode et al. [2015] 'Std.' run 
+#        (i.e. HindcastFFIgac2), units of parts per billion volume, 
+#        [years in measuring period, stations in 'castnet_sites_fr', days in 
+#        months in 'sampling_months']   
+#    emfix_no : numpy.ndarray
+#        GMI CTM NO concentrations co-located (or nearly colocated) with 
+#        corresponding CASTNet stations from Strode et al. [2015] 'EmFix' run 
+#        (i.e. Hindcast3Igac2), units of parts per billion volume, 
+#        [years in measuring period, stations in 'castnet_sites_fr', days in 
+#        months in 'sampling_months']           
+#    egu_no2 : numpy.ndarray
+#        Same as 'egu_no' but for NO2
+#    mr2_no2 : numpy.ndarray
+#        Same as 'mr2_no' but for NO2       
+#    ffigac2_no2 : numpy.ndarray 
+#        Same as 'ffigac2_no' but for NO2   
+#    emfix_no2 : numpy.ndarray
+#        Same as 'emfix_no' but for NO       
+#    egu_o3 : numpy.ndarray
+#        Same as 'egu_no' but for O3    
+#    mr2_o3 : numpy.ndarray
+#        Same as 'mr2_no' but for O3
+#    ffigac2_o3 : numpy.ndarray
+#        Same as 'ffigac2_no' but for O3    
+#    emfix_o3 : numpy.ndarray
+#        Same as 'emfix_no' but for O3    
+#    years : list
+#        Years of interest    
+#    region : str
+#        Region over which regionally-averaged concentrations are supplied to 
+#        function
+#
+#    Returns
+#    ----------          
+#    None             
+#    """
+#    import numpy as np
+#    import matplotlib.pyplot as plt
+#    # calculate NOx (= NO + NO2)
+#    egu_nox = egu_no + egu_no2
+#    mr2_nox = mr2_no + mr2_no2
+#    emfix_nox = emfix_no + emfix_no2
+#    ffigac2_nox = ffigac2_no + ffigac2_no2    
+#    # initialize figure, axes
+#    fig = plt.figure(figsize = (8, 4))
+#    ax1 = plt.subplot2grid((1, 2), (0, 0))
+#    ax2 = plt.subplot2grid((1, 2), (0, 1))
+#    # difference in O3 vs NOx between EmFix and Std simulations (i.e. 
+#    # Hindcast3Igac2 - HindcastFFIgac2)
+#    ax1.plot(np.hstack(emfix_nox - ffigac2_nox), 
+#             np.hstack(emfix_o3 - ffigac2_o3), 'ko', markersize = 4)
+#    ax1.set_title('EmFix - Std')
+#    m, b = np.polyfit(np.hstack(emfix_nox - ffigac2_nox), 
+#                      np.hstack(emfix_o3 - ffigac2_o3), 1)
+#    x = np.arange((emfix_nox - ffigac2_nox).min(), (emfix_nox - ffigac2_nox).max(), 0.01)
+#    ax1.plot(x, x*m + b, '-k')
+#    ax1.text(0.75, 0.9, '%.2f' %m, color = 'k',
+#             transform = ax1.transAxes, fontsize = 14)
+#    ax1.set_ylabel('ppbv $\Delta$ [O$_{3}$]')
+#    ax1.set_xlabel('ppbv $\Delta$ [NO$_{x}]$')
+#    # difference in O3 vs NOx between pertubed NO emissions and control simulations 
+#    #(i.e. EGU_T - HindcastMR2)
+#    ax2.plot(np.hstack(egu_nox - mr2_nox), 
+#             np.hstack(egu_o3 - mr2_o3), 'ko', markersize = 4)
+#    ax2.set_title('CEMS NO - control')
+#    m, b = np.polyfit(np.hstack(egu_nox - mr2_nox), 
+#                      np.hstack(egu_o3 - mr2_o3), 1)
+#    x = np.arange((egu_nox - mr2_nox).min(), (egu_nox - mr2_nox).max(), 0.01)
+#    ax2.plot(x, x*m + b, '-k')
+#    ax2.text(0.05, 0.9, '%.2f' %m, color = 'k',
+#             transform = ax2.transAxes, fontsize = 14)
+#    ax2.set_xlabel('ppbv $\Delta$ [NO$_{x}]$')
+#    # fit linear regression for delta NOx values greater than 0.0
+#    g0 = np.where((egu_nox - mr2_nox) > 0.)
+#    m_g0, b_g0 = np.polyfit(np.hstack((egu_nox - mr2_nox)[g0]), 
+#                            np.hstack((egu_o3 - mr2_o3)[g0]), 1)
+#    x_g0 = np.arange((egu_nox - mr2_nox)[g0].min(), 
+#                  (egu_nox - mr2_nox)[g0].max(), 0.01)
+#    ax2.plot(x_g0, x_g0*m_g0 + b_g0, '#1f78b4')
+#    ax2.text(0.05, 0.84, '%.2f' %m_g0, color = '#1f78b4',
+#            transform = ax2.transAxes, fontsize = 14)
+#    # for values less than or equal to 0.0
+#    l0 = np.where((egu_nox - mr2_nox) <= 0.)
+#    m_l0, b_l0 = np.polyfit(np.hstack((egu_nox - mr2_nox)[l0]), 
+#                            np.hstack((egu_o3 - mr2_o3)[l0]), 1)
+#    x_l0 = np.arange((egu_nox - mr2_nox)[l0].min(), 
+#                  (egu_nox - mr2_nox)[l0].max(), 0.01)
+#    ax2.plot(x_l0, x_l0*m_l0 + b_l0, '#b2df8a')
+#    ax2.text(0.05, 0.78, '%.2f' %m_l0, 
+#             color = '#b2df8a', transform = ax2.transAxes, fontsize = 14)         
+#    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+#                'scatter_deltanoxdeltao3_%d-%d_%s.eps' %(years[0], years[-1], 
+#                                                         region), dpi = 300)         
+#    return 
 # # # # # # # # # # # # #
 def scatter_deltanoxdeltao3_percent(egu_no, mr2_no, ffigac2_no, emfix_no, 
                                     egu_no2, mr2_no2, ffigac2_no2, emfix_no2, 
@@ -967,7 +968,7 @@ def scatter_deltanoxdeltao3_byyear(ffigac2_no, emfix_no, ffigac2_no2,
     ----------   
     ffigac2_no : numpy.ndarray
         GMI CTM NO concentrations regionally-averaged over co-located (or nearly 
-        colocated) with  corresponding CASTNet stations from Strode et al. 
+        colocated) with corresponding CASTNet stations from Strode et al. 
         [2015] 'Std.' run (i.e. HindcastFFIgac2), units of parts per billion 
         volume, [years in measuring period, days in months in 
         'sampling_months']   
@@ -1164,75 +1165,330 @@ def timeseries_deltanoxdeltao3_percent(ffigac2_no, emfix_no, mr2_no, egu_no,
                 'timeseries_deltanoxdeltao3_percent_%s.eps' 
                 %(region), dpi = 300)
     return 
+# # # # # # # # # # # # # 
+def timeseries_noemiss_t2m(egu_no_emiss, mr2_no_emiss, t2m, years, 
+                           region):
+    """this function is similar to function 'NO_inventory_atpoint' in script 
+    't2mdependence.py.' For the measuring period JJA 2008-2010 function plots 
+    the regionally-averaged MR2 (control) NO_ff emission inventory and the 
+    perturbed ("EGU") NO_ff emission inventory alongside regionally-averaged
+    MERRA 2 meter temperatures (top subplot). The percentage change of the two 
+    NO_ff emission inventories is also plotted (bottom subplot).
+    
+    Parameters
+    ----------   
+    egu_no_emiss : numpy.ndarray
+        Regionally-averaged NO_ff emissions inventory from HindcastMR2 
+        simulation, units of mol/mol, (3, 92)
+    emfix_no : numpy.ndarray
+        Regionally-averaged NO_ff emissions inventory from "EGU" simulation
+        in which NO_ff emissions are daily-varying and scale with surface 
+        temperatures, units of mol/mol, (3, 92)
+    t2m : numpy.ndarray
+        Regionally-averaged MERRA 2 meter temperatures co-located (or nearly 
+        colocated) with corresponding CASTNet stations, units of K, (3, 92)
+    years : list
+        Years in measuring period         
+    region : str
+        Region over which regionally-averaged concentrations are supplied to 
+        function
+
+    Returns
+    ----------          
+    None        
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import matplotlib.font_manager as font_manager    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # set custom font
+    path = pollutants_constants.FONTPATH_LIGHT
+    prop = font_manager.FontProperties(fname=path)
+    mpl.rcParams['font.family'] = prop.get_name()
+    mpl.rcParams['axes.unicode_minus'] = False
+    path = pollutants_constants.FONTPATH_BOLD
+    prop = font_manager.FontProperties(fname = path)
+    mpl.rcParams['mathtext.bf'] = prop.get_name()
+    # calculate percentage change in emissions (i.e. the percentage difference 
+    # between the perturbed vs. monthly-mean emission inventories)
+    no_percent_change = ((np.hstack(egu_no_emiss) - np.hstack(mr2_no_emiss))/
+                         np.hstack(mr2_no_emiss)) * 100.    
+    # initialize axes
+    ax1 = plt.subplot2grid((2, 2), (0, 0), rowspan = 1, colspan = 2)
+    ax2 = plt.subplot2grid((2, 2), (1, 0), rowspan = 1, colspan = 2)
+    # plot perturbed emissions 
+    ax1.plot(np.hstack(egu_no_emiss), linewidth = 1.5, clip_on = True, 
+             label = 'Perturbed', color = '#1b9e77', linestyle = ':')
+    # plot unperturbed emissions (n.b. loop through indices of months)
+    month_idx = [0, 30, 61, 92, 122, 153, 184, 214, 245, 276]
+    for a, b in zip(month_idx[:-1], month_idx[1:]):
+        ax1.plot(np.arange(a, b, 1), np.hstack(mr2_no_emiss)[a:b], 
+                 linewidth = 2., clip_on = True,  color = '#1b9e77')    
+    # twin axis, plot temperature 
+    ax1t = ax1.twinx()
+    ax1t.plot(np.hstack(t2m), linewidth = 1.5, color = '#d95f02', clip_on = True)          
+    # plot percentage change of emissions         
+    ax2.plot(no_percent_change, linewidth = 1.5, clip_on = True,  color = 'k', 
+             linestyle = '-')    
+    # set axis limits and ticks
+    ax1.set_xlim([0, len(np.hstack(egu_no_emiss))])
+    ax2.set_xlim([0, len(np.hstack(egu_no_emiss))])
+    ax1.set_xticks(month_idx[:-1])
+    ax1.set_xticklabels([])
+    ax2.set_xticks(month_idx[:-1])
+    ax2.set_xticklabels(['1 June 2008', '', '', '1 June 2009', '', '', 
+                         '1 June 2010', '', ''])
+    ax2.set_yticks([-20, -15, -10, -5, 0, 5, 10, 15, 20])
+    ax2.set_yticklabels(['-20', '', '-10', '', '0', '', '10', '', '20'])    
+        
+    # add axis labels and color ticks labels
+    ax1.set_ylabel('NO$_{\mathregular{ff}}$ [mol mol$^{-1}$]', 
+                   color = '#1b9e77')           
+    ax1t.set_ylabel('T$_{\mathregular{2m}}$ [K]', color = '#d95f02')
+    for label in ax1.get_yticklabels():
+        label.set_color('#1b9e77')
+    for label in ax1t.get_yticklabels():
+        label.set_color('#d95f02')
+    ax2.set_ylabel('$\Delta$ NO$_{\mathregular{ff}}$ [%]', color = 'k')
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'timeseries_noemiss_t2m_%d-%d_%s.eps' 
+                %(years[0], years[-1], region), dpi = 300)
+    return 
+# # # # # # # # # # # # #
+def scatter_deltanoxdeltao3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss, 
+                            ffigac2_o3, emfix_o3, mr2_o3, egu_o3, years, 
+                            years_strode, cems, ffigac2_castnet, t2m):
+    """function finds the relative difference in NO and O3 between Std and 
+    EmFix simulations discussed in Strode et al. (2016) and the relative 
+    difference between NO and O3 from the MR2-CEMS simulations along with the
+    relative variability of NO in these simulations. These differences are 
+    plotted in scatterplot along with the relative difference in NOx from 
+    CEMS (i.e. CEMS for a particular year - CEMS from 2000) and CASTNet O3
+    (i.e. CASTNet for a particular year - 2000-2003 average CASTNet).
+    
+    Parameters
+    ----------   
+    ffigac2_no_emiss : numpy.ndarray
+        Regionally-averaged monthly-varying NO from fossil fuels from the 
+        emissions inventory from HindcastFFIgac2 simulation, units of mol/mol, 
+        (years in 'years_strode', 92)
+    mr2_no_emiss : numpy.ndarray
+        Regionally-averaged monthly-varying NO from fossil fuels from the 
+        emissions inventory from HindcastMR2 simulation, units of mol/mol, 
+        (years in 'years', 92)
+    egu_no_emiss : numpy.ndarray
+        Regionally-averaged daily-varying NO from fossil fuels which scale with
+        daily surface temperatures from the emissions inventory from 
+        HindcastMR2 simulation, units of mol/mol, (years in 'years', 92)
+    ffigac2_o3 : numpy.ndarray
+        Regionally-averaged O3 from HindcastFFIgac2, units of ppbv, 
+        (years in 'years_strode', 92)
+    emfix_o3 : numpy.ndarray
+        Regionally-averaged O3 from Hindcast3Igac2, units of ppbv, 
+        (years in 'years_strode', 92)    
+    mr2_o3 : numpy.ndarray
+        Regionally-averaged O3 from HindcastMR2, units of ppbv, (years in 
+        'years', 92)        
+    egu_o3 : numpy.ndarray
+        Regionally-averaged O3 from HindcastMR2 with daily-varying NO 
+        emissions, units of ppbv, (years in 'years', 92)            
+    years : list
+        Years in measuring period for MR2-CEMS simulations
+    years_strode : list
+        Years in measuring period for Strode et al. (2016) simulations
+    cems : pandas.core.series.Series
+        Summertime (JJA) CEMS NOx emissions from the 14 states in the 
+        Northeastern United States for the measuring period 2000-2014, units of
+        tons, (1380,)
+    ffigac2_castnet : numpy.ndarray
+        Regionally-averaged CASTNet O3, (years in 'years_strode', 92)
+    t2m : numpy.ndarray
+        Regionally-averaged MERRA 2 meter temperatures co-located (or nearly 
+        colocated) with corresponding CASTNet stations, units of K, (3, 92)
+
+    Returns
+    ----------          
+    None     
+    
+    """
+    # create lists to be filled with relative changes and variability of NO, O3
+    no_emiss = []
+    no_var = []
+    o3 = []
+    no_emiss_strode = []
+    o3_strode = []
+    cems_nox = []
+    castnet_o3 = []
+    # for "EmFix" run in Strode et al. (2015), emissions were kept fixed at 
+    # 2000 levels 
+    emfix_no_emiss = ffigac2_no_emiss[0]
+    cems_2000 = cems.loc['2000-06-01':'2000-08-31'].values
+    castnet_2000 = ffigac2_castnet[0:3]
+    # loop through 2000-2010 measuring period of Strode et al. (2015) 
+    for year in years_strode:
+        # find position of year in year list  
+        ty = np.where(np.array(years_strode) == year)[0][0]
+        # NO emissions from year of interest 
+        ffigac2_no_emiss_ty = ffigac2_no_emiss[ty]
+        # relative change in emissions for year
+        no_emiss_strode.append(np.mean(emfix_no_emiss - ffigac2_no_emiss_ty))
+        # O3 from year of interest
+        ffigac2_o3_ty = ffigac2_o3[ty]
+        emfix_o3_ty = emfix_o3[ty]
+        # relative change in O3 for year
+        o3_strode.append(np.mean(emfix_o3_ty - ffigac2_o3_ty))
+        # CEMS NOx emissions for year
+        cems_ty = cems.loc['%s-06-01'%year:'%s-08-31'%year].values
+        # CASTNet O3
+        castnet_ty = ffigac2_castnet[ty]
+        # relative changes in emissions from CEMS
+        cems_nox.append(np.mean(cems_2000 - cems_ty))
+        # relative changes in CASTNet O3
+        castnet_o3.append(np.mean(castnet_2000 - castnet_ty))    
+    # loop through 2008-2010 measuring period of MR2-CEMS simulations
+    for year in years:
+        # find position of year in list 'years'
+        ty = np.where(np.array(years) == year)[0][0]
+        # T2m for year of interest
+        t2m_ty = t2m[ty]
+        # NO emissions from MR2-CEMS simulations for year of interest
+        egu_no_emiss_ty = egu_no_emiss[ty]
+        mr2_no_emiss_ty = mr2_no_emiss[ty]
+        # O3 from year of interest
+        mr2_o3_ty = mr2_o3[ty]
+        egu_o3_ty = egu_o3[ty]
+        # find hot and cold days, i.e. top and lowest 20th %-ile 
+        hot = np.where(t2m_ty >= np.percentile(t2m_ty, 80))[0]
+        cold = np.where(t2m_ty <= np.percentile(t2m_ty, 20))[0] 
+        # NO emissions on hot, cold days    
+        emiss_hot = np.mean(egu_no_emiss_ty[hot]) - np.mean(mr2_no_emiss_ty[hot])
+        emiss_cold = np.mean(egu_no_emiss_ty[cold]) - np.mean(mr2_no_emiss_ty[cold])    
+        # relative change in emissions for year
+        no_emiss.append(emiss_hot - emiss_cold)
+        # variability in emissions for year, expressed in terms of standard 
+        # deviation of NO emissions from MR2-CEMS simulation
+        no_var.append(np.std(egu_no_emiss_ty))
+        # O3 on hot, cold days
+        o3_hot = np.mean(egu_o3_ty[hot]) - np.mean(mr2_o3_ty[hot])
+        o3_cold = np.mean(egu_o3_ty[cold]) - np.mean(mr2_o3_ty[cold])    
+        o3.append(o3_hot - o3_cold)
+    COLOR_FFIGAC2 = '#e41a1c'
+    COLOR_MR2 = '#377eb8'
+    import matplotlib.pyplot as plt
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    # for Strode et al. (2015) simulation 
+    ax.plot(no_emiss_strode, o3_strode, 'o', color = COLOR_FFIGAC2, 
+            label = 'Strode et al. (2015)')
+    # for MR2-CEMS simulation 
+    ax.errorbar(x = no_emiss, y = o3, xerr = no_var, yerr = None, marker='o', 
+                ls = 'none', color = COLOR_MR2, label = 'Daily-varying NO')
+    # axis labels 
+    ax.set_xlabel('$\mathregular{\Delta}$ NO$_{\mathregular{ff}}$ [mol mol$^{-1}$]')
+    ax.set_ylabel('$\mathregular{\Delta}$ O$_{\mathregular{3}}$ [ppbv]')
+    plt.legend(loc = 'lower right', frameon = False)
+    # save figure WITHOUT CEMS NOx/CASTNet O3 
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
+                'scatter_deltanoxdeltao3.eps', dpi = 300)
+    # twin y-axis and add dO3/dNOx from CASTNet/CEMS
+    axt = ax.twiny()
+    axt.plot(cems_nox, castnet_o3, 'ko', label = 'CEMS-CASTNet')
+    axt.set_xlabel('$\mathregular{\Delta}$ CEMS NO$_{x}$ [tons]')
+    # remove old legend, create new
+    ax.legend_.remove()
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = axt.get_legend_handles_labels()
+    plt.legend(lines + lines2, labels + labels2, loc = 'lower right', 
+               frameon = False)
+    # save figure WITH CEMS NOx/CASTNet O3 
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
+                'scatter_deltanoxdeltao3_withCEMS.eps', dpi = 300)
+    return
 # # # # # # # # # # # # #    
-#import numpy as np
-#import sys
-#sys.path.append('/Users/ghkerr/phd/GMI/')
-#import commensurability
-#years = [2008, 2009, 2010]            
-#sampling_months = [6, 7, 8]
-#sampling_hours = [15, 16, 17, 18, 19, 20]  
-#castnet_sites_fr = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
-#                    'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
-#                    'CDR', 'VPI', 'MKG', 'KEF']
-#region = 'northeast'
-## # # # open HindcastMR2 run 
-#castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
-#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
-#                                          years, sampling_months, 
-#                                          sampling_hours)
-## # # # open GMI CTM run with temperature-dependent emissions
-#temp, egu_o3, egu_no, egu_no2, egu_co, egu_gmi_sites_fr = \
-#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'EGU_T', years, 
-#                                          sampling_months, sampling_hours)
-## # # # open HindcastFFIgac2 (emissions variable) run 
-#temp, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
-#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', 
-#                                          years, sampling_months, 
-#                                          sampling_hours)
-## # # # open Hindcast3Igac2 (emissions fixed at 2000 levels) run 
-#temp, emfix_o3, emfix_no, emfix_no2, emfix_co, emfix_gmi_sites_fr = \
-#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'Hindcast3Igac2', 
-#                                          years, sampling_months, 
-#                                          sampling_hours)
-#del temp
-## # # # open 2 meter temperature from MERRA which are commensurate with 
-## CASTNet sites
-#t2m, merra_lats_fr, merra_lons_fr = \
-#commensurability.commensurate_t2m(castnet, castnet_sites_fr, years, 
-#                                  sampling_months)
-## # # # open emissions inventory (NO from fossil fuel sector) from 
-## perturbed NO simulation
-#no_emiss_perturbed, emiss_lats_fr, emiss_lons_fr = \
-#commensurability.commensurate_emiss_perturbed(castnet, castnet_sites_fr, 
-#                                              years, sampling_months)
-## from unperturbed simulation
-#no_emiss_unperturbed = \
-#commensurability.commensurate_emiss_unperturbed(castnet, castnet_sites_fr, 
-#                                                years, sampling_months)
-## find regionally-averaged NO emissions for perturbed and unperturbed 
-## emissions inventories
-#no_emiss_perturbed = np.nanmean(no_emiss_perturbed, axis = 1)
-#no_emiss_unperturbed = np.nanmean(no_emiss_unperturbed, axis = 1)
-## find regionally-averaged trace gas concentrations from simulations
-## for NO
-#egu_no = np.nanmean(egu_no, axis = 1)
-#mr2_no = np.nanmean(mr2_no, axis = 1)
-#emfix_no = np.nanmean(emfix_no, axis = 1)
-#ffigac2_no = np.nanmean(ffigac2_no, axis = 1)
-## for NO2
-#egu_no2 = np.nanmean(egu_no2, axis = 1)
-#mr2_no2 = np.nanmean(mr2_no2, axis = 1)
-#emfix_no2 = np.nanmean(emfix_no2, axis = 1)
-#ffigac2_no2 = np.nanmean(ffigac2_no2, axis = 1)
-## for O3
-#egu_o3 = np.nanmean(egu_o3, axis = 1)
-#mr2_o3 = np.nanmean(mr2_o3, axis = 1)
-#emfix_o3 = np.nanmean(emfix_o3, axis = 1)
-#ffigac2_o3 = np.nanmean(ffigac2_o3, axis = 1)
-## regionally-averaged 2 meter temperatures 
-#t2m = np.nanmean(t2m, axis = 1)
-# # # # visualizations for 
+import numpy as np
+import sys
+sys.path.append('/Users/ghkerr/phd/GMI/')
+import commensurability
+from calculate_regional_average import calculate_regional_average
+import sys
+sys.path.append('/Users/ghkerr/phd/emissions/')
+import AQSCEMSobs
+years = [2008, 2009, 2010]            
+years_strode = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010]
+sampling_months = [6, 7, 8]
+sampling_hours = [15, 16, 17, 18, 19, 20]  
+castnet_sites_fr = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
+                    'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
+                    'CDR', 'VPI', 'MKG', 'KEF']
+region = 'northeast'
+# # # # open CTM output # # # #
+# open HindcastMR2 run
+mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
+commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
+                                          years, sampling_months, 
+                                          sampling_hours)
+# open HindcastMR2 run with temperature-dependent emissions 
+egu_castnet, egu_o3, egu_no, egu_no2, egu_co, egu_gmi_sites_fr = \
+commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'EGU_T', years, 
+                                          sampling_months, sampling_hours)    
+# open HindcastFFIgac2 (emissions variable) run 
+ffigac2_castnet, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
+commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', 
+                                          years_strode, sampling_months, 
+                                          sampling_hours)
+# open Hindcast3Igac2 (emissions fixed at 2000 levels) run 
+emfix_castnet, emfix_o3, emfix_no, emfix_no2, emfix_co, emfix_gmi_sites_fr = \
+commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'Hindcast3Igac2', 
+                                          years_strode, sampling_months, 
+                                          sampling_hours)
+# # # # open emissions inventories (NO from fossil fuel sector) # # # #
+# for HindcastMR2 run
+mr2_no_emiss = \
+commensurability.commensurate_emiss_unperturbed(mr2_castnet, castnet_sites_fr, 
+                                                years, sampling_months, 
+                                                '1x1.25_IAVanthGFED4')
+# for HindcastMR2 run with temperature-dependent emissions run
+egu_no_emiss, emiss_lats_fr, emiss_lons_fr = \
+commensurability.commensurate_emiss_perturbed(mr2_castnet, castnet_sites_fr, 
+                                              years, sampling_months)
+# for FFIgac2 run 
+ffigac2_no_emiss = \
+commensurability.commensurate_emiss_unperturbed(ffigac2_castnet, castnet_sites_fr, 
+                                                years_strode, sampling_months, 
+                                                '2x2.5_IAVanthGFED3gcEF')
+# # # # open 2 meter temperature from MERRA # # # #
+t2m, merra_lats_fr, merra_lons_fr = \
+commensurability.commensurate_t2m(mr2_castnet, castnet_sites_fr, years, 
+                                  sampling_months)
+# # # # calculate regional averages # # # #
+# for HindcastMR2 run
+mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co = \
+calculate_regional_average(mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, 1)
+# for HindcastMR2 run with temperature-dependent emissions run
+egu_castnet, egu_o3, egu_no, egu_no2, egu_co = \
+calculate_regional_average(egu_castnet, egu_o3, egu_no, egu_no2, egu_co, 1)
+# for HindcastFFIgac2 (emissions variable) run 
+ffigac2_castnet, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co = \
+calculate_regional_average(ffigac2_castnet, ffigac2_o3, ffigac2_no, 
+                           ffigac2_no2, ffigac2_co, 1)
+# for Hindcast3Igac2 (emissions fixed at 2000 levels) run 
+emfix_castnet, emfix_o3, emfix_no, emfix_no2, emfix_co = \
+calculate_regional_average(emfix_castnet, emfix_o3, emfix_no, emfix_no2, 
+                           emfix_co, 1)
+# for emission inventories
+egu_no_emiss = np.nanmean(egu_no_emiss, axis = 1)
+mr2_no_emiss = np.nanmean(mr2_no_emiss, axis = 1)
+ffigac2_no_emiss = np.nanmean(ffigac2_no_emiss, axis = 1)
+# for regionally-averaged 2 meter temperatures 
+t2m = np.nanmean(t2m, axis = 1)
+# # # # load CEMS NOx for NEUS # # # #
+states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 
+             'RI', 'VA', 'VT', 'WV']
+cems, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
+        '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
+# # # # visualizations for daily-average O3 # # # # 
 #scatter_controlnoeguno_bysite(mr2_no, egu_no, castnet_sites_fr, years, region)
 #scatter_controlno2egunno2_bysite(mr2_no2, egu_no2, castnet_sites_fr, years, region)
 #scatter_controlo3eguno3_bysite(mr2_o3, egu_o3, castnet_sites_fr, years, region)
@@ -1245,6 +1501,12 @@ def timeseries_deltanoxdeltao3_percent(ffigac2_no, emfix_no, mr2_no, egu_no,
 #                                egu_no2, mr2_no2, ffigac2_no2, emfix_no2, 
 #                                egu_o3, mr2_o3, ffigac2_o3, emfix_o3, 
 #                                years, region)
+#timeseries_noemiss_t2m(egu_no_emiss, mr2_no_emiss, t2m, years, region)    
+#scatter_deltanoxdeltao3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss, 
+#                        ffigac2_o3, emfix_o3, mr2_o3, egu_o3, years, 
+#                        years_strode, cems, ffigac2_castnet, t2m)
+
+
 ## # # # open time- and regionally-averaged diurnal cycles trace gases from 
 ## control ('HindcastMR2') and perturbed NOx emissions runs 
 #castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_gmi_sites_fr = \
@@ -1301,3 +1563,11 @@ def timeseries_deltanoxdeltao3_percent(ffigac2_no, emfix_no, mr2_no, egu_no,
 #                                   ffigac2_no2, emfix_no2, mr2_no2, egu_no2, 
 #                                   ffigac2_o3, emfix_o3, mr2_o3, egu_o3, t2m, 
 #                                   list(np.arange(2000, 2011, 1)), region)
+    
+
+
+
+
+
+
+
