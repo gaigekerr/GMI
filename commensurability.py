@@ -52,6 +52,10 @@ REVISION HISTORY
                 hourly observations for years of interest to save computing 
                 time and (2) also read in O3. Name of function changed to 
                 'load_aqshourly'
+    01062018 -- function 'commensurate_aqstracegas_diurnal' modified so that 
+                only unique latitude/longitude coordinates pairs for AQS NO2, 
+                CO, and O3 sites are returned. Previously all unique latitude
+                and longitudes (not pairs) had been returned
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -692,14 +696,14 @@ def commensurate_aqstracegas(castnet_sites_fr, years,
         [years in measuring period, stations in 'castnet_sites_fr', days in 
         months in 'sampling_months']        
     aqs_co_coords : list
-        Coordinates of AQS stations measuring CO within bounding boxes defined
-        by CASTNet stations, coordinate pairs may not be unique
+        Coordinates of unique AQS stations measuring CO within bounding boxes 
+        defined by CASTNet stations
     aqs_no2_coords : list
-        Coordinates of AQS stations measuring NO2 within bounding boxes defined
-        by CASTNet stations, coordinate pairs may not be unique    
+        Coordinates of unique AQS stations measuring NO2 within bounding boxes 
+        defined by CASTNet stations
     aqs_o3_coords : list
-        Coordinates of AQS stations measuring O3 within bounding boxes defined
-        by CASTNet stations, coordinate pairs may not be unique        
+        Coordinates of unique AQS stations measuring O3 within bounding boxes 
+        defined by CASTNet stations     
     """
     import numpy as np
     import pandas as pd
@@ -878,31 +882,16 @@ def commensurate_aqstracegas_diurnal(comm_castnet, castnet_sites_fr, years,
         in variable 'sampling_hours'. For all AQS O3 observations within 
         bounding box, measurements are averaged, units of parts per billion, 
         [years in measuring period, stations in 'castnet_sites_fr', days in 
-        months in 'sampling_months', 24]           
-    aqs_no2_lons : list
-        Longitudes of AQS sites within the bounding box defined by the CASTNet 
-        station's longitude and latitude +/- variable 'searchrad' which 
-        measure NO2 during the years and months of interest
-    aqs_no2_lats : list 
-        Latitudes of AQS sites within the bounding box defined by the CASTNet 
-        station's longitude and latitude +/- variable 'searchrad' which 
-        measure NO2 during the years and months of interest    
-    aqs_co_lons : list
-        Longitudes of AQS sites within the bounding box defined by the CASTNet 
-        station's longitude and latitude +/- variable 'searchrad' which 
-        measure CO during the years and months of interest          
-    aqs_co_lats : list
-        Latitudes of AQS sites within the bounding box defined by the CASTNet 
-        station's longitude and latitude +/- variable 'searchrad' which 
-        measure CO during the years and months of interest     
-    aqs_o3_lons : list
-        Longitudes of AQS sites within the bounding box defined by the CASTNet 
-        station's longitude and latitude +/- variable 'searchrad' which 
-        measure O3 during the years and months of interest           
-    aqs_o3_lats : list      
-        Latitudes of AQS sites within the bounding box defined by the CASTNet 
-        station's longitude and latitude +/- variable 'searchrad' which 
-        measure O3 during the years and months of interest     
+        months in 'sampling_months', 24]         
+    aqs_co_coords : list
+        Coordinates of unique AQS stations measuring CO within bounding boxes 
+        defined by CASTNet stations
+    aqs_no2_coords : list
+        Coordinates of unique AQS stations measuring NO2 within bounding boxes 
+        defined by CASTNet stations
+    aqs_o3_coords : list
+        Coordinates of unique AQS stations measuring O3 within bounding boxes 
+        defined by CASTNet stations      
     """
     import numpy as np
     import pandas as pd
@@ -935,10 +924,10 @@ def commensurate_aqstracegas_diurnal(comm_castnet, castnet_sites_fr, years,
     # site will be fetched
     searchrad = 1.0
     # list creation; will be filled with unique longitudes and latitudes of 
-    # AQS stations nearby CASTNet sites
-    aqs_no2_lons, aqs_no2_lats = [], []
-    aqs_co_lons, aqs_co_lats = [], []
-    aqs_o3_lons, aqs_o3_lats = [], []    
+    # AQS stations nearby CASTNet sites        
+    aqs_co_coords = []
+    aqs_no2_coords = []
+    aqs_o3_coords = []
     # loop through years in measuring period 
     for year, counter1 in zip(years, np.arange(0, len(years), 1)): 
         # find AQS NO2/CO observations for year and in variables 
@@ -986,13 +975,17 @@ def commensurate_aqstracegas_diurnal(comm_castnet, castnet_sites_fr, years,
                                     (O3_year['Latitude'] <= top) &
                                     (O3_year['Longitude'] > left) &
                                     (O3_year['Longitude'] <= right)]                 
-                # find latitudes of AQS stations within bounding box
-                aqs_no2_lons.append(np.unique(NO2_atsite['Longitude'].values))
-                aqs_no2_lats.append(np.unique(NO2_atsite['Latitude'].values))
-                aqs_co_lons.append(np.unique(CO_atsite['Longitude'].values))
-                aqs_co_lats.append(np.unique(CO_atsite['Latitude'].values))
-                aqs_o3_lons.append(np.unique(O3_atsite['Longitude'].values))
-                aqs_o3_lats.append(np.unique(O3_atsite['Latitude'].values))                
+                # find latitudes of AQS stations within bounding box and 
+                # thereafter find unique combinations 
+                if CO_atsite.empty != True:
+                    aqs_co_coords.append(CO_atsite[['Latitude', 
+                        'Longitude']].drop_duplicates().values)
+                if NO2_atsite.empty != True:
+                    aqs_no2_coords.append(NO2_atsite[['Latitude', 
+                        'Longitude']].drop_duplicates().values)
+                if O3_atsite.empty != True:
+                    aqs_o3_coords.append(O3_atsite[['Latitude', 
+                        'Longitude']].drop_duplicates().values)   
                 # loop through days in variable 'sampling_months' in year of 
                 # interest
                 for day, counter3 in zip(idx, np.arange(0, len(idx), 1)): 
@@ -1026,8 +1019,8 @@ def commensurate_aqstracegas_diurnal(comm_castnet, castnet_sites_fr, years,
                     comm_co[counter1, counter2, counter3] = CO_atsite_onday
                     comm_no2[counter1, counter2, counter3] = NO2_atsite_onday
                     comm_o3[counter1, counter2, counter3] = O3_atsite_onday
-    return (comm_co, comm_no2, comm_o3, aqs_no2_lons, aqs_no2_lats, 
-            aqs_co_lons, aqs_co_lats, aqs_o3_lons, aqs_o3_lats)
+    return (comm_co, comm_no2, comm_o3, aqs_co_coords, aqs_no2_coords, 
+            aqs_o3_coords)
 # # # # # # # # # # # # 
 def commensurate_castnet_gmi_diurnal(castnet_sites_fr, case, years, 
                                      sampling_months):
@@ -1488,13 +1481,15 @@ def open_perturbed_emissions():
         i = i + 1
     return NO_ff_all, lon, lat
 # # # # # # # # # # # # #    
-def open_unperturbed_emissions():
+def open_unperturbed_emissions(prefix):
     """same as function 'open_perturbed_emissions' but for unperturbed 
     emissions inventory used in HindcastMR2 (control). 
     
     Parameters
     ----------    
-    None 
+    prefix : str
+        File prefix of emissions inventory (i.e. for MR2-EGU run prefix is
+        IAVanthGFED4; for FFIgac2 run prefix is 'IAVanthGFED3gcEF')
 
     Returns
     ----------      
@@ -1515,7 +1510,7 @@ def open_unperturbed_emissions():
     import glob
     # path to data holdings
     path = pollutants_constants.PATH_GMIEMISSIONS
-    mfstring = 'emisc_*_m_1x1.25_IAVanthGFED4.nc'
+    mfstring = 'emisc_*_m_%s.nc' %(prefix)
     infiles = glob.glob(path + mfstring)
     infiles.sort()
     # list creation; lists will be filled on subsequent iterations in loop
@@ -1541,7 +1536,12 @@ def open_unperturbed_emissions():
             species.append(si[:])      
         del species_raw
         # NO from fossil fuels field
-        NO_ff = infile['emiss_2d'][5:8, np.where(np.array(species) == 'NO_ff')[0][0], :, :]
+        if prefix == '2x2.5_IAVanthGFED3gcEF':
+            NO_ff = infile['emiss'][5:8, 
+                          np.where(np.array(species) == 'NO_ff')[0][0], 0, :, :]
+        if prefix == '1x1.25_IAVanthGFED4':
+            NO_ff = infile['emiss_2d'][5:8, 
+                          np.where(np.array(species) == 'NO_ff')[0][0], :, :]
         NO_ff_all.append(NO_ff)    
         i = i + 1
     return NO_ff_all, lon, lat  
@@ -1636,7 +1636,7 @@ def commensurate_emiss_perturbed(comm_castnet, castnet_sites_fr, years,
     return comm_emiss, emiss_lats_fr, emiss_lons_fr
 # # # # # # # # # # # # #
 def commensurate_emiss_unperturbed(comm_castnet, castnet_sites_fr, years, 
-                                   sampling_months):
+                                   sampling_months, prefix):
     """using function 'open_unperturbed_emissions' this function loads GMI CTM
     unperturbed emissions inventories and finds grid cells commensurate with 
     CASTNet sites with data and retrieves them. Since emissions in unperturbed 
@@ -1657,6 +1657,9 @@ def commensurate_emiss_unperturbed(comm_castnet, castnet_sites_fr, years,
         Years of interest
     sampling_months : list 
         Months of interest
+    prefix : str
+        File prefix of emissions inventory (i.e. for MR2-EGU run prefix is
+        IAVanthGFED4; for FFIgac2 run prefix is 'IAVanthGFED3gcEF')
 
     Returns
     ----------
@@ -1672,7 +1675,7 @@ def commensurate_emiss_unperturbed(comm_castnet, castnet_sites_fr, years,
     sys.path.append('/Users/ghkerr/phd/GMI/')
     from geo_idx import geo_idx
     # open unperturbed emissions
-    NO_ff, lon, lat = open_unperturbed_emissions()
+    NO_ff, lon, lat = open_unperturbed_emissions(prefix)
     # convert longitude from (0 to 360) to (-180 - 180)    
     lon = np.mod(lon[0] - 180.0, 360.0) - 180.0
     lat = lat[0]
