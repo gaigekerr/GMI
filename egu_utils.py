@@ -1,4 +1,4 @@
-1#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 NAME
@@ -19,6 +19,8 @@ REVISION HISTORY
                 'scatter_deltanoxdeltao3_percent' added
     02052018 -- function 'scatter_deltanoxdeltao3_byyear' added
     21052018 -- function 'timeseries_noemiss_t2m' added 
+    29052018 -- function 'scatter_dEmissdNOxdO3' modified to output plots of 
+                dNOx/dEmiss and dO3/dNOx
 """
 # # # # # # # # # # # # #
 def scatter_controlnoeguno_bysite(mr2, egu, castnet_sites_fr, years, region):
@@ -463,8 +465,8 @@ def scatter_inventory_ctm(no_emiss_perturbed_ra, no_emiss_unperturbed_ra,
     ax.set_xlim([0.75, 1.2])
     ax.set_ylim([0.75, 1.2])
     plt.tick_params(axis = 'both', which = 'major', labelsize = 14)
-    ax.set_xlabel('Emissions Inventory', fontsize = 16)
-    ax.set_ylabel('GMI CTM', fontsize = 16)
+    ax.set_xlabel('NO$_{\mathregular{ff, Daily Varying}}$ : NO$_{\mathregular{ff, HindcastMR2}}$', fontsize = 16)
+    ax.set_ylabel('$\chi_{\mathregular{Daily Varying}}$ : $\chi_{\mathregular{HindcastMR2}}$', fontsize = 16)
     leg = ax.legend(loc = 'lower right', fontsize = 16)
     leg.get_frame().set_linewidth(0.0)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
@@ -1245,29 +1247,34 @@ def timeseries_noemiss_t2m(egu_no_emiss, mr2_no_emiss, t2m, years,
     ax2.set_yticklabels(['-20', '', '-10', '', '0', '', '10', '', '20'])    
         
     # add axis labels and color ticks labels
-    ax1.set_ylabel('NO$_{\mathregular{ff}}$ [mol mol$^{-1}$]', 
+    ax1.set_ylabel('Emiss$_{\mathregular{NO}}$ [mol mol$^{-1}$]', 
                    color = '#1b9e77')           
     ax1t.set_ylabel('T$_{\mathregular{2m}}$ [K]', color = '#d95f02')
     for label in ax1.get_yticklabels():
         label.set_color('#1b9e77')
     for label in ax1t.get_yticklabels():
         label.set_color('#d95f02')
-    ax2.set_ylabel('$\Delta$ NO$_{\mathregular{ff}}$ [%]', color = 'k')
+    ax2.set_ylabel('$\Delta$ Emiss$_{\mathregular{NO}}$ [%]', 
+                   color = 'k')
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'timeseries_noemiss_t2m_%d-%d_%s.eps' 
                 %(years[0], years[-1], region), dpi = 300)
     return 
 # # # # # # # # # # # # #
-def scatter_deltanoxdeltao3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss, 
-                            ffigac2_o3, emfix_o3, mr2_o3, egu_o3, years, 
-                            years_strode, cems, ffigac2_castnet, t2m):
+def scatter_dEmissdNOxdO3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss, 
+                          ffigac2_no, emfix_no, ffigac2_no2, emfix_no2, 
+                          mr2_no, egu_no, mr2_no2, egu_no2, ffigac2_o3, 
+                          emfix_o3, mr2_o3, egu_o3, years, years_strode, cems, 
+                          ffigac2_castnet, t2m):
     """function finds the relative difference in NO and O3 between Std and 
     EmFix simulations discussed in Strode et al. (2016) and the relative 
     difference between NO and O3 from the MR2-CEMS simulations along with the
-    relative variability of NO in these simulations. These differences are 
-    plotted in scatterplot along with the relative difference in NOx from 
-    CEMS (i.e. CEMS for a particular year - CEMS from 2000) and CASTNet O3
-    (i.e. CASTNet for a particular year - 2000-2003 average CASTNet).
+    relative variability of NO in these simulations. Relative differences are 
+    calculated for each summer (JJA) season along with each summer month. 
+    These differences are plotted in scatterplot along with the relative 
+    difference in NOx from CEMS (i.e. CEMS for a particular year - CEMS from 
+    2000) and CASTNet O3 (i.e. CASTNet for a particular year - 2000-2003 
+    average CASTNet).
     
     Parameters
     ----------   
@@ -1283,6 +1290,30 @@ def scatter_deltanoxdeltao3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss,
         Regionally-averaged daily-varying NO from fossil fuels which scale with
         daily surface temperatures from the emissions inventory from 
         HindcastMR2 simulation, units of mol/mol, (years in 'years', 92)
+    ffigac2_no : numpy.ndarray
+        Regionally-averaged NO from HindcastFFIgac2, units of ppbv, 
+        (years in 'years_strode', 92)    
+    emfix_no : numpy.ndarray
+        Regionally-averaged NO from Hindcast3Igac2, units of ppbv, 
+        (years in 'years_strode', 92)    
+    ffigac2_no2 : numpy.ndarrayh
+        Regionally-averaged NO2 from HindcastFFIgac2, units of ppbv, 
+        (years in 'years_strode', 92)    
+    emfix_no2 : numpy.ndarray
+        Regionally-averaged NO2 from Hindcast3Igac2, units of ppbv, 
+        (years in 'years_strode', 92)        
+    mr2_no : numpy.ndarray 
+        Regionally-averaged NO from HindcastMR2, units of ppbv, 
+        (years in 'years_strode', 92)        
+    egu_no : numpy.ndarray
+        Regionally-averaged NO from HindcastMR2 with daily-varying NO 
+        emissions, units of ppbv, (years in 'years', 92)      
+    mr2_no2 : numpy.ndarray
+        Regionally-averaged NO2 from HindcastMR2, units of ppbv, 
+        (years in 'years_strode', 92)            
+    egu_no2 : numpy.ndarray
+        Regionally-averaged NO2 from HindcastMR2 with daily-varying NO 
+        emissions, units of ppbv, (years in 'years', 92)          
     ffigac2_o3 : numpy.ndarray
         Regionally-averaged O3 from HindcastFFIgac2, units of ppbv, 
         (years in 'years_strode', 92)
@@ -1312,42 +1343,73 @@ def scatter_deltanoxdeltao3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss,
     Returns
     ----------          
     None     
-    
     """
-    # create lists to be filled with relative changes and variability of NO, O3
-    no_emiss = []
-    no_var = []
-    o3 = []
-    no_emiss_strode = []
-    o3_strode = []
-    cems_nox = []
-    castnet_o3 = []
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import matplotlib.font_manager as font_manager    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # set custom font
+    path = pollutants_constants.FONTPATH_LIGHT
+    prop = font_manager.FontProperties(fname=path)
+    mpl.rcParams['font.family'] = prop.get_name()
+    mpl.rcParams['axes.unicode_minus'] = False
+    path = pollutants_constants.FONTPATH_BOLD
+    prop = font_manager.FontProperties(fname = path)
+    mpl.rcParams['mathtext.bf'] = prop.get_name()    
+    # create lists to be filled with relative changes of NO emissions, NOx, 
+    # and O3
+    no_emiss_monthly, no_emiss = [], []
+    nox_monthly, nox = [], [] 
+    o3_monthly, o3 = [], []
+    no_emiss_strode_monthly, no_emiss_strode = [], []
+    nox_strode_monthly, nox_strode = [], []
+    o3_strode_monthly, o3_strode = [], []
+    #cems_nox, cems_nox_mean = [], []
+    #castnet_o3, castnet_o3_mean = [], []
+    # first day of month indices
+    month_idx = [0, 30, 61, 92]
     # for "EmFix" run in Strode et al. (2015), emissions were kept fixed at 
     # 2000 levels 
     emfix_no_emiss = ffigac2_no_emiss[0]
-    cems_2000 = cems.loc['2000-06-01':'2000-08-31'].values
-    castnet_2000 = ffigac2_castnet[0:3]
+    #cems_2000 = cems.loc['2000-06-01':'2000-08-31'].values
+    #castnet_2000 = ffigac2_castnet[0:3]
     # loop through 2000-2010 measuring period of Strode et al. (2015) 
     for year in years_strode:
         # find position of year in year list  
         ty = np.where(np.array(years_strode) == year)[0][0]
         # NO emissions from year of interest 
         ffigac2_no_emiss_ty = ffigac2_no_emiss[ty]
-        # relative change in emissions for year
-        no_emiss_strode.append(np.mean(emfix_no_emiss - ffigac2_no_emiss_ty))
+        # NOx from year of interest
+        ffigac2_nox_ty = ffigac2_no[ty] + ffigac2_no2[ty]
+        emfix_nox_ty = emfix_no[ty] + emfix_no2[ty]
         # O3 from year of interest
         ffigac2_o3_ty = ffigac2_o3[ty]
-        emfix_o3_ty = emfix_o3[ty]
-        # relative change in O3 for year
-        o3_strode.append(np.mean(emfix_o3_ty - ffigac2_o3_ty))
-        # CEMS NOx emissions for year
-        cems_ty = cems.loc['%s-06-01'%year:'%s-08-31'%year].values
-        # CASTNet O3
-        castnet_ty = ffigac2_castnet[ty]
-        # relative changes in emissions from CEMS
-        cems_nox.append(np.mean(cems_2000 - cems_ty))
-        # relative changes in CASTNet O3
-        castnet_o3.append(np.mean(castnet_2000 - castnet_ty))    
+        emfix_o3_ty = emfix_o3[ty]    
+        # relative changes in O3 and NO for each summer month
+        for start, stop in zip(month_idx[:-1], month_idx[1:]):
+            no_emiss_strode_monthly.append(np.mean(emfix_no_emiss[start:stop-1] - 
+                ffigac2_no_emiss_ty[start:stop-1]))
+            nox_strode_monthly.append(np.mean(emfix_nox_ty[start:stop-1] - 
+                    ffigac2_nox_ty[start:stop-1]))
+            o3_strode_monthly.append(np.mean(emfix_o3_ty[start:stop-1] - 
+                                     ffigac2_o3_ty[start:stop-1]))
+        # relative changes in O3 and NO for season
+        no_emiss_strode.append((emfix_no_emiss - ffigac2_no_emiss_ty))    
+        nox_strode.append((emfix_nox_ty - ffigac2_nox_ty))
+        o3_strode.append((emfix_o3_ty - ffigac2_o3_ty))
+        ## CEMS NOx emissions for year
+        #cems_ty = cems.loc['%s-06-01'%year:'%s-08-31'%year].values
+        ## CASTNet O3
+        #castnet_ty = ffigac2_castnet[ty]
+        ## relative changes in emissions from CEMS
+        #cems_nox.append(cems_2000 - cems_ty)
+        #cems_nox_mean.append(np.mean(cems_2000 - cems_ty))
+        ## relative changes in CASTNet O3
+        #castnet_o3.append(castnet_2000 - castnet_ty)
+        #castnet_o3_mean.append(np.mean(castnet_2000 - castnet_ty))    
     # loop through 2008-2010 measuring period of MR2-CEMS simulations
     for year in years:
         # find position of year in list 'years'
@@ -1357,55 +1419,282 @@ def scatter_deltanoxdeltao3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss,
         # NO emissions from MR2-CEMS simulations for year of interest
         egu_no_emiss_ty = egu_no_emiss[ty]
         mr2_no_emiss_ty = mr2_no_emiss[ty]
+        # NOx from year of interest
+        mr2_nox_ty = mr2_no[ty] + mr2_no2[ty]
+        egu_nox_ty = egu_no[ty] + egu_no2[ty]
         # O3 from year of interest
         mr2_o3_ty = mr2_o3[ty]
         egu_o3_ty = egu_o3[ty]
-        # find hot and cold days, i.e. top and lowest 20th %-ile 
+        # find relative difference in NO emissions, NOx, and O3 for each month
+        for start, stop in zip(month_idx[:-1], month_idx[1:]):
+            # find hot and cold days in each month, i.e. top and lowest 20th %-ile 
+            hot = np.where(t2m_ty[start:stop-1] >= 
+                           np.percentile(t2m_ty[start:stop-1], 80))[0]
+            cold = np.where(t2m_ty[start:stop-1] <= 
+                            np.percentile(t2m_ty[start:stop-1], 20))[0]
+            emiss_hot = (egu_no_emiss_ty[start:stop-1][hot] - 
+                         mr2_no_emiss_ty[start:stop-1][hot])
+            emiss_cold = (egu_no_emiss_ty[start:stop-1][cold] - 
+                          mr2_no_emiss_ty[start:stop-1][cold])
+            nox_hot = (egu_nox_ty[start:stop-1][hot] - 
+                       mr2_nox_ty[start:stop-1][hot])
+            nox_cold = (egu_nox_ty[start:stop-1][cold] - 
+                        mr2_nox_ty[start:stop-1][cold])
+            o3_hot = (egu_o3_ty[start:stop-1][hot] - 
+                      mr2_o3_ty[start:stop-1][hot])
+            o3_cold = (egu_o3_ty[start:stop-1][cold] - 
+                       mr2_o3_ty[start:stop-1][cold])
+            # append monthly relative differences to lists
+            no_emiss_monthly.append(np.mean(emiss_hot - emiss_cold))
+            nox_monthly.append(np.mean(nox_hot - nox_cold))
+            o3_monthly.append(np.mean(o3_hot - o3_cold))
+        # find hot and cold days for each season
         hot = np.where(t2m_ty >= np.percentile(t2m_ty, 80))[0]
-        cold = np.where(t2m_ty <= np.percentile(t2m_ty, 20))[0] 
-        # NO emissions on hot, cold days    
-        emiss_hot = np.mean(egu_no_emiss_ty[hot]) - np.mean(mr2_no_emiss_ty[hot])
-        emiss_cold = np.mean(egu_no_emiss_ty[cold]) - np.mean(mr2_no_emiss_ty[cold])    
-        # relative change in emissions for year
-        no_emiss.append(emiss_hot - emiss_cold)
-        # variability in emissions for year, expressed in terms of standard 
-        # deviation of NO emissions from MR2-CEMS simulation
-        no_var.append(np.std(egu_no_emiss_ty))
-        # O3 on hot, cold days
-        o3_hot = np.mean(egu_o3_ty[hot]) - np.mean(mr2_o3_ty[hot])
-        o3_cold = np.mean(egu_o3_ty[cold]) - np.mean(mr2_o3_ty[cold])    
-        o3.append(o3_hot - o3_cold)
+        cold = np.where(t2m_ty <= np.percentile(t2m_ty, 20))[0]
+        emiss_hot = egu_no_emiss_ty[hot] - mr2_no_emiss_ty[hot]
+        emiss_cold = egu_no_emiss_ty[cold] - mr2_no_emiss_ty[cold]
+        nox_hot = egu_nox_ty[hot] - mr2_nox_ty[hot]
+        nox_cold = egu_nox_ty[cold] - mr2_nox_ty[cold]
+        o3_hot = egu_o3_ty[hot] - mr2_o3_ty[hot]
+        o3_cold = egu_o3_ty[cold] - mr2_o3_ty[cold]
+        o3_hot_mean = (egu_o3_ty[hot]) - (mr2_o3_ty[hot])
+        o3_cold_mean = (egu_o3_ty[cold]) - (mr2_o3_ty[cold])            
+        # append seasonal relative differences to lists
+        no_emiss.append((emiss_hot) - (emiss_cold))
+        nox.append((nox_hot) - (nox_cold))
+        o3.append(o3_hot_mean - o3_cold_mean)
     COLOR_FFIGAC2 = '#e41a1c'
     COLOR_MR2 = '#377eb8'
-    import matplotlib.pyplot as plt
+    # # # # for dO3/dEmiss
     ax = plt.subplot2grid((1, 1), (0, 0))
-    # for Strode et al. (2015) simulation 
-    ax.plot(no_emiss_strode, o3_strode, 'o', color = COLOR_FFIGAC2, 
-            label = 'Strode et al. (2015)')
+    # for Strode et al. (2015) simulation daily values 
+    ax.plot(no_emiss_strode, o3_strode, 'o', markersize = 1, color = COLOR_MR2)        
+    # for MR2-CEMS simulation daily values 
+    ax.plot(no_emiss, o3, 'o', markersize = 1, color = COLOR_MR2)      
+    # for Strode et al. (2015) simulation monthly values 
+    ax.plot(no_emiss_strode_monthly, o3_strode_monthly, 's', markersize = 8, 
+            markerfacecolor = 'w', markeredgecolor = COLOR_FFIGAC2)
+    ax.plot(no_emiss_strode_monthly, o3_strode_monthly, 'o', markersize = 3, 
+            color = COLOR_FFIGAC2, label = 'Strode et al. (2015)')    
     # for MR2-CEMS simulation 
-    ax.errorbar(x = no_emiss, y = o3, xerr = no_var, yerr = None, marker='o', 
-                ls = 'none', color = COLOR_MR2, label = 'Daily-varying NO')
+    ax.plot(no_emiss_monthly, o3_monthly, 's', markersize = 8, markerfacecolor = 'w', 
+            markeredgecolor = COLOR_MR2)  
+    ax.plot(no_emiss_monthly, o3_monthly, 'o', markersize = 3, color = COLOR_MR2, 
+            label = 'Daily-varying NO')        
+    # fit linear regression through seasonal means
+    x = np.hstack((no_emiss_monthly, no_emiss_strode_monthly))
+    y = np.hstack((o3_monthly, o3_strode_monthly))
+    fit = np.polyfit(x, y, 1)
+    # plot linear regression
+    fit_fn = np.poly1d(fit) 
+    # fit_fn is now a function which takes in x and returns an estimate for y
+    ax.plot(x, fit_fn(x), '--k', zorder = 1)
+    ax.text(0.05, 0.9, 
+            r'$\frac{\mathregular{\Delta O_{\mathregular{3}}}}' \
+            '{\mathregular{\Delta} \mathregular{Emiss}_{\mathregular{NO}}}$ = %.2f' %fit[0], 
+            color = 'k', transform = ax.transAxes, fontsize = 14)
     # axis labels 
-    ax.set_xlabel('$\mathregular{\Delta}$ NO$_{\mathregular{ff}}$ [mol mol$^{-1}$]')
+    ax.set_xlabel('$\mathregular{\Delta}$ Emiss$_{\mathregular{NO}}$ [kg s$^{-1}$ grid cell$^{-1}$]')
     ax.set_ylabel('$\mathregular{\Delta}$ O$_{\mathregular{3}}$ [ppbv]')
     plt.legend(loc = 'lower right', frameon = False)
-    # save figure WITHOUT CEMS NOx/CASTNet O3 
+    ## twin y-axis and add dO3/dNOx from CASTNet/CEMS
+    #axt = ax.twiny()
+    #axt.plot(cems_nox, castnet_o3, 'ko', label = 'CEMS-CASTNet')
+    #axt.set_xlabel('$\mathregular{\Delta}$ CEMS NO$_{x}$ [tons]')
+    ## remove old legend, create new
+    #ax.legend_.remove()
+    #lines, labels = ax.get_legend_handles_labels()
+    #lines2, labels2 = axt.get_legend_handles_labels()
+    #plt.legend(lines + lines2, labels + labels2, loc = 'lower right', 
+    #           frameon = False)
+    ## save figure WITH CEMS NOx/CASTNet O3 
+    #plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
+    #            'scatter_deltanoxdeltao3_withCEMS.eps', dpi = 300)    
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
-                'scatter_deltanoxdeltao3.eps', dpi = 300)
-    # twin y-axis and add dO3/dNOx from CASTNet/CEMS
-    axt = ax.twiny()
-    axt.plot(cems_nox, castnet_o3, 'ko', label = 'CEMS-CASTNet')
-    axt.set_xlabel('$\mathregular{\Delta}$ CEMS NO$_{x}$ [tons]')
-    # remove old legend, create new
-    ax.legend_.remove()
-    lines, labels = ax.get_legend_handles_labels()
-    lines2, labels2 = axt.get_legend_handles_labels()
-    plt.legend(lines + lines2, labels + labels2, loc = 'lower right', 
-               frameon = False)
-    # save figure WITH CEMS NOx/CASTNet O3 
+                'scatter_dEmissdO3.eps', dpi = 300)
+    # # # # for dNOx/dEmiss
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    ax.plot(no_emiss_strode, nox_strode, 'o', markersize = 1, 
+            color = COLOR_FFIGAC2)    
+    ax.plot(no_emiss, nox, 'o', markersize = 1, color = COLOR_MR2)  
+    ax.plot(no_emiss_strode_monthly, nox_strode_monthly, 's', markersize = 8, 
+            markerfacecolor = 'w', markeredgecolor = COLOR_FFIGAC2)
+    ax.plot(no_emiss_strode_monthly, nox_strode_monthly, 'o', markersize = 3, 
+            color = COLOR_FFIGAC2, label = 'Strode et al. (2015)')
+    ax.plot(no_emiss_monthly, nox_monthly, 's', markersize = 8, markerfacecolor = 'w', 
+            markeredgecolor = COLOR_MR2)  
+    ax.plot(no_emiss_monthly, nox_monthly, 'o', markersize = 3, color = COLOR_MR2, 
+            label = 'Daily-varying NO')    
+    x = np.hstack((no_emiss_monthly, no_emiss_strode_monthly))
+    y = np.hstack((nox_monthly, nox_strode_monthly))
+    fit = np.polyfit(x, y, 1)
+    fit_fn = np.poly1d(fit) 
+    ax.plot(x, fit_fn(x), '--k', zorder = 1)
+    ax.text(0.05, 0.9, 
+            r'$\frac{\mathregular{\Delta NO_{x}}}' \
+            '{\mathregular{\Delta} \mathregular{Emiss}_{\mathregular{NO}}}$ = %.2f' %fit[0], 
+            color = 'k', transform = ax.transAxes, fontsize = 14)
+    ax.set_xlabel('$\mathregular{\Delta}$ Emiss$_{\mathregular{NO}}$ [kg s$^{-1}$ grid cell$^{-1}$]')
+    ax.set_ylabel('$\mathregular{\Delta}$ NO$_{x}$ [ppbv]')
+    plt.legend(loc = 'lower right', frameon = False)        
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
-                'scatter_deltanoxdeltao3_withCEMS.eps', dpi = 300)
+                'scatter_dEmissdNOx.eps', dpi = 300)
+    # # # # for dO3/dNOx
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    ax.plot(nox_strode, o3_strode, 'o', markersize = 1, color = COLOR_FFIGAC2)
+    ax.plot(nox, o3, 'o', markersize = 1, color = COLOR_MR2)    
+    ax.plot(nox_strode_monthly, o3_strode_monthly, 's', markersize = 8, 
+            markerfacecolor = 'w', markeredgecolor = COLOR_FFIGAC2)
+    ax.plot(nox_strode_monthly, o3_strode_monthly, 'o', markersize = 3, 
+            color = COLOR_FFIGAC2, label = 'Strode et al. (2015)')    
+    ax.plot(nox_monthly, o3_monthly, 's', markersize = 8, markerfacecolor = 'w', 
+            markeredgecolor = COLOR_MR2)  
+    ax.plot(nox_monthly, o3_monthly, 'o', markersize = 3, color = COLOR_MR2, 
+            label = 'Daily-varying NO')    
+    x = np.hstack((nox_monthly, nox_strode_monthly))
+    y = np.hstack((o3_monthly, o3_strode_monthly))
+    fit = np.polyfit(x, y, 1)
+    fit_fn = np.poly1d(fit) 
+    ax.plot(x, fit_fn(x), '--k', zorder = 1)
+    ax.text(0.05, 0.9, 
+            r'$\frac{\mathregular{\Delta O_{\mathregular{3}}}}' \
+            '{\mathregular{\Delta} \mathregular{NO}_{x}}$ = %.2f' %fit[0], 
+            color = 'k', transform = ax.transAxes, fontsize = 14)
+    ax.set_xlabel('$\mathregular{\Delta}$ NO$_{x}$ [ppbv]')
+    ax.set_ylabel('$\mathregular{\Delta}$ O$_{\mathregular{3}}$ [ppbv]')    
+    plt.legend(loc = 'lower right', frameon = False)    
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
+                'scatter_dNOxdO3.eps', dpi = 300)
     return
+# # # # # # # # # # # # #    
+def pdf_controlo3eguo3(egu_o3, mr2_o3, mr2_castnet, years, region):
+    """function plots probability density functions (PDFs) of regionally-
+    averaged O3 from HindcastMR2 and daily-varying NO simulations alongside 
+    CASTNet O3 observations. 
+    
+    Parameters
+    ----------       
+    egu_o3 : numpy.ndarray
+        Regionally-averaged O3 from HindcastMR2 with daily-varying NO 
+        emissions, units of ppbv, (years in 'years', 92) 
+    mr2_castnet : numpy.ndarray
+        Regionally-averaged O3 observations from CASTNet, units of ppbv, 
+        (years in 'years', 92)
+    mr2_o3 : numpy.ndarray
+        Regionally-averaged O3 from HindcastMR2, units of ppbv, (years in 
+        'years', 92)        
+    years : list
+        Years in measuring period         
+    region : str
+        Region over which regionally-averaged concentrations are supplied to 
+        function
+
+    Returns
+    ----------          
+    None   
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import matplotlib.mlab as mlab     
+    import matplotlib.font_manager as font_manager    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # set custom font
+    path = pollutants_constants.FONTPATH_LIGHT
+    prop = font_manager.FontProperties(fname=path)
+    mpl.rcParams['font.family'] = prop.get_name()
+    mpl.rcParams['axes.unicode_minus'] = False
+    path = pollutants_constants.FONTPATH_BOLD
+    prop = font_manager.FontProperties(fname = path)
+    mpl.rcParams['mathtext.bf'] = prop.get_name()
+    COLOR_MR2 = '#e41a1c'
+    COLOR_NO = '#337eb8'
+    # initialize figure, axis
+    ax = plt.subplot2grid((1, 1), (0, 0), rowspan = 1, colspan = 1)
+    # for Daily Varying NO simultion 
+    n, bins, patches = ax.hist(np.hstack(egu_o3), 25, fc = 'r', ec = 'r', 
+                               density = 1, alpha = 0.)
+    pdf_egu = mlab.normpdf(bins, np.mean(egu_o3), np.std(egu_o3))
+    ax.plot(bins, pdf_egu, lw = 1.5, color = COLOR_NO, ls = '-', label = 'Daily Varying NO')
+    # for HindcastMR2 simulation
+    n, bins, patches = ax.hist(np.hstack(mr2_o3), 25, fc = 'r', ec = 'r', 
+                               density = 1, alpha = 0.)
+    pdf_mr2 = mlab.normpdf(bins, np.mean(mr2_o3), np.std(mr2_o3))
+    ax.plot(bins, pdf_mr2, lw = 1.5, color = COLOR_MR2, ls = '-', label = 'HindcastMR2')
+    # for CASTNet        
+    n, bins, patches = ax.hist(np.hstack(mr2_castnet), 25, fc = 'r', ec = 'r', 
+                               density = 1, alpha = 0.)
+    pdf_castnet = mlab.normpdf(bins, np.mean(mr2_castnet), np.std(mr2_castnet))
+    ax.plot(bins, pdf_castnet, lw = 1.5, color = 'k', ls = '-', label = 'CASTNet')
+    # add legend and titles
+    leg = ax.legend(bbox_to_anchor = (1.02, 0.65))
+    leg.get_frame().set_linewidth(0.0)
+    ax.set_xlabel('Ozone [ppbv]')
+    ax.set_ylabel('Probability Density')
+    plt.subplots_adjust(right = 0.70, bottom = 0.15, left = 0.15)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
+                'pdf_controlo3eguo3_%d-%d_%s.eps' %(years[0], years[-1], 
+                                                    region), dpi = 300)
+    return 
+# # # # # # # # # # # # # #    
+def timeseries_controlo3eguo3(egu_o3, mr2_o3, year, years, region):
+    """function plots timeseries of regionally-averaged O3 from HindcastMR2 and
+    HindcastMR2 with daily-varying NO emissions simulations. 
+    
+    Parameters
+    ----------       
+    egu_o3 : numpy.ndarray
+        Regionally-averaged O3 from HindcastMR2 with daily-varying NO 
+        emissions, units of ppbv, (years in 'years', 92) 
+    mr2_o3 : numpy.ndarray
+        Regionally-averaged O3 from HindcastMR2, units of ppbv, (years in 
+        'years', 92)
+    year : int
+        Year for which time series will be plotted        
+    years : list
+        Years in measuring period         
+    region : str
+        Region over which regionally-averaged concentrations are supplied to 
+        function
+
+    Returns
+    ----------          
+    None       
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import matplotlib.font_manager as font_manager    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # set custom font
+    path = pollutants_constants.FONTPATH_LIGHT
+    prop = font_manager.FontProperties(fname=path)
+    mpl.rcParams['font.family'] = prop.get_name()
+    mpl.rcParams['axes.unicode_minus'] = False
+    path = pollutants_constants.FONTPATH_BOLD
+    prop = font_manager.FontProperties(fname = path)
+    mpl.rcParams['mathtext.bf'] = prop.get_name()
+    COLOR_MR2 = '#e41a1c'
+    COLOR_NO = '#337eb8'
+    ty = np.where(np.array(years) == year)[0][0]
+    # O3 from simulations for year of interest
+    egu_o3_ty = egu_o3[ty]
+    mr2_o3_ty = mr2_o3[ty]
+    # initialize figure, axis
+    ax = plt.subplot2grid((1, 1), (0, 0), rowspan = 1, colspan = 1)
+    ax.plot(egu_o3_ty, lw = 1.5, ls = '-', color = COLOR_NO)
+    ax.plot(mr2_o3_ty, lw = 1.5, ls = '-', color = COLOR_MR2)
+    ax.set_xlim([0, len(egu_o3_ty)])
+    ax.set_xticks([0, 30, 61])
+    ax.set_xticklabels(['1 June %s'%year, '1 July %s'%year, '1 August %s'%year])
+    ax.set_ylabel('O$_{3}$ [ppbv]')
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
+                'timeseries_controlo3eguo3_%s.eps' %(year), dpi = 300)    
+    return 
 # # # # # # # # # # # # #    
 import numpy as np
 import sys
@@ -1488,86 +1777,71 @@ states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA',
              'RI', 'VA', 'VT', 'WV']
 cems, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
         '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
-# # # # visualizations for daily-average O3 # # # # 
-#scatter_controlnoeguno_bysite(mr2_no, egu_no, castnet_sites_fr, years, region)
-#scatter_controlno2egunno2_bysite(mr2_no2, egu_no2, castnet_sites_fr, years, region)
-#scatter_controlo3eguno3_bysite(mr2_o3, egu_o3, castnet_sites_fr, years, region)
-#scatter_inventory_ctm(no_emiss_perturbed, no_emiss_unperturbed, egu_no, 
-#                      mr2_no, egu_no2, mr2_no2, egu_o3, mr2_o3, years, region)
-#scatter_deltanoxdeltao3(egu_no, mr2_no, ffigac2_no, emfix_no, egu_no2, 
-#                        mr2_no2, ffigac2_no2, emfix_no2, egu_o3, mr2_o3,
-#                        ffigac2_o3, emfix_o3, years, region)
-#scatter_deltanoxdeltao3_percent(egu_no, mr2_no, ffigac2_no, emfix_no, 
-#                                egu_no2, mr2_no2, ffigac2_no2, emfix_no2, 
-#                                egu_o3, mr2_o3, ffigac2_o3, emfix_o3, 
-#                                years, region)
-#timeseries_noemiss_t2m(egu_no_emiss, mr2_no_emiss, t2m, years, region)    
-#scatter_deltanoxdeltao3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss, 
-#                        ffigac2_o3, emfix_o3, mr2_o3, egu_o3, years, 
-#                        years_strode, cems, ffigac2_castnet, t2m)
+ # # # visualizations for daily-average O3 # # # # 
+scatter_controlnoeguno_bysite(mr2_no, egu_no, castnet_sites_fr, years, region)
+scatter_controlno2egunno2_bysite(mr2_no2, egu_no2, castnet_sites_fr, years, region)
+scatter_controlo3eguno3_bysite(mr2_o3, egu_o3, castnet_sites_fr, years, region)
+scatter_inventory_ctm(egu_no_emiss, mr2_no_emiss, egu_no, 
+                      mr2_no, egu_no2, mr2_no2, egu_o3, mr2_o3, years, region)
+scatter_deltanoxdeltao3(egu_no, mr2_no, ffigac2_no, emfix_no, egu_no2, 
+                        mr2_no2, ffigac2_no2, emfix_no2, egu_o3, mr2_o3,
+                        ffigac2_o3, emfix_o3, years, region)
+scatter_deltanoxdeltao3_percent(egu_no, mr2_no, ffigac2_no, emfix_no, 
+                                egu_no2, mr2_no2, ffigac2_no2, emfix_no2, 
+                                egu_o3, mr2_o3, ffigac2_o3, emfix_o3, 
+                                years, region)
+timeseries_noemiss_t2m(egu_no_emiss, mr2_no_emiss, t2m, years, region)    
+scatter_dEmissdNOxdO3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss, 
+                      ffigac2_no, emfix_no, ffigac2_no2, emfix_no2, mr2_no, 
+                      egu_no, mr2_no2, egu_no2, ffigac2_o3, emfix_o3, mr2_o3, 
+                      egu_o3, years, years_strode, cems, ffigac2_castnet, t2m)
+pdf_controlo3eguo3(egu_o3, mr2_o3, mr2_castnet, years, region)
+timeseries_controlo3eguo3(egu_o3, mr2_o3, 2008, years, region)
+# # # # open time- and regionally-averaged diurnal trace gases # # # # 
+castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d = \
+commensurability.commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'HindcastMR2', 
+                                                  years, sampling_months)
+temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d = \
+commensurability.commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'EGU_T', 
+                                                  years, sampling_months)
+# # # # calculate regional averages of diurnal curves # # # #
+castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d = \
+calculate_regional_average(castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d, 
+                           1)
+temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d = \
+calculate_regional_average(temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d, 
+                           1)
 
-
-## # # # open time- and regionally-averaged diurnal cycles trace gases from 
-## control ('HindcastMR2') and perturbed NOx emissions runs 
-#castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_gmi_sites_fr = \
-#commensurability.commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'HindcastMR2', 
-#                                                  years, sampling_months)
-#temp, egu_o3_d, egu_no_d, egu_no2_d, egu_gmi_sites_fr = \
-#commensurability.commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'EGU_T', 
-#                                                  years, sampling_months)
-#del temp
-## regionally-averaged diurnal curves of modeled NO, NO2, O3
-#mr2_no_d_ra = np.nanmean(mr2_no_d, axis = 1)
-#mr2_no2_d_ra = np.nanmean(mr2_no2_d, axis = 1)
-#mr2_o3_d_ra = np.nanmean(mr2_o3_d, axis = 1)
-#egu_no_d_ra = np.nanmean(egu_no_d, axis = 1)
-#egu_no2_d_ra = np.nanmean(egu_no2_d, axis = 1)
-#egu_o3_d_ra = np.nanmean(egu_o3_d, axis = 1)
-## average over CASTNet sites, days, and years to produce a single diurnal curve
-#mr2_no_d = np.nanmean(mr2_no_d, axis = tuple(range(0, 3)))
-#egu_no_d = np.nanmean(egu_no_d, axis = tuple(range(0, 3)))
-#mr2_no2_d = np.nanmean(mr2_no2_d, axis = tuple(range(0, 3)))
-#egu_no2_d = np.nanmean(egu_no2_d, axis = tuple(range(0, 3)))
-#mr2_o3_d = np.nanmean(mr2_o3_d, axis = tuple(range(0, 3)))
-#egu_o3_d = np.nanmean(egu_o3_d, axis = tuple(range(0, 3)))
-## # # # visualizations for diurnal curves
-#diurnal_controlegunono2nox(mr2_no_d, mr2_no2_d, egu_no_d, egu_no2_d, 
-#                           castnet_sites_fr, years, region)
-#diurnal_controlegunono2o3(mr2_no_d_ra, egu_no_d_ra, mr2_no2_d_ra, egu_no2_d_ra, 
-#                          mr2_o3_d_ra, egu_o3_d_ra, t2m, years, region)
-## # # # open HindcastFFIgac2 (emissions variable) run 
-#temp, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
-#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', 
-#                                          list(np.arange(2000, 2011, 1)), 
-#                                          sampling_months, sampling_hours)
-## # # # open Hindcast3Igac2 (emissions fixed at 2000 levels) run 
-#temp, emfix_o3, emfix_no, emfix_no2, emfix_co, emfix_gmi_sites_fr = \
-#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'Hindcast3Igac2', 
-#                                          list(np.arange(2000, 2011, 1)), 
-#                                          sampling_months, sampling_hours)
-#del temp
-## find regionally-averaged trace gas concentrations from simulations
-## for NO
-#emfix_no = np.nanmean(emfix_no, axis = 1)
-#ffigac2_no = np.nanmean(ffigac2_no, axis = 1)
-## for NO2
-#emfix_no2 = np.nanmean(emfix_no2, axis = 1)
-#ffigac2_no2 = np.nanmean(ffigac2_no2, axis = 1)
-## for O3
-#emfix_o3 = np.nanmean(emfix_o3, axis = 1)
-#ffigac2_o3 = np.nanmean(ffigac2_o3, axis = 1)
-## # # # visualizations 
-#scatter_deltanoxdeltao3_byyear(ffigac2_no, emfix_no, ffigac2_no2, emfix_no2, 
-#                               ffigac2_o3, emfix_o3, list(np.arange(2000, 2011, 1)), region)
-#timeseries_deltanoxdeltao3_percent(ffigac2_no, emfix_no, mr2_no, egu_no, 
-#                                   ffigac2_no2, emfix_no2, mr2_no2, egu_no2, 
-#                                   ffigac2_o3, emfix_o3, mr2_o3, egu_o3, t2m, 
-#                                   list(np.arange(2000, 2011, 1)), region)
-    
-
-
-
-
-
-
-
+# # # # visualizations for diurnal curves
+diurnal_controlegunono2nox(mr2_no_d, mr2_no2_d, egu_no_d, egu_no2_d, 
+                           castnet_sites_fr, years, region)
+diurnal_controlegunono2o3(mr2_no_d, egu_no_d, mr2_no2_d, egu_no2_d, 
+                          mr2_o3_d, egu_o3_d, t2m, years, region)
+# # # # open HindcastFFIgac2 (emissions variable) run 
+temp, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
+commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', 
+                                          list(np.arange(2000, 2011, 1)), 
+                                          sampling_months, sampling_hours)
+# # # # open Hindcast3Igac2 (emissions fixed at 2000 levels) run 
+temp, emfix_o3, emfix_no, emfix_no2, emfix_co, emfix_gmi_sites_fr = \
+commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'Hindcast3Igac2', 
+                                          list(np.arange(2000, 2011, 1)), 
+                                          sampling_months, sampling_hours)
+del temp
+# find regionally-averaged trace gas concentrations from simulations
+# for NO
+emfix_no = np.nanmean(emfix_no, axis = 1)
+ffigac2_no = np.nanmean(ffigac2_no, axis = 1)
+# for NO2
+emfix_no2 = np.nanmean(emfix_no2, axis = 1)
+ffigac2_no2 = np.nanmean(ffigac2_no2, axis = 1)
+# for O3
+emfix_o3 = np.nanmean(emfix_o3, axis = 1)
+ffigac2_o3 = np.nanmean(ffigac2_o3, axis = 1)
+# # # # visualizations 
+scatter_deltanoxdeltao3_byyear(ffigac2_no, emfix_no, ffigac2_no2, emfix_no2, 
+                               ffigac2_o3, emfix_o3, list(np.arange(2000, 2011, 1)), region)
+timeseries_deltanoxdeltao3_percent(ffigac2_no, emfix_no, mr2_no, egu_no, 
+                                   ffigac2_no2, emfix_no2, mr2_no2, egu_no2, 
+                                   ffigac2_o3, emfix_o3, mr2_o3, egu_o3, t2m, 
+                                   list(np.arange(2000, 2011, 1)), region)
