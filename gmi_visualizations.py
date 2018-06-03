@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 NAME
-    castnet_gmi_compare.py
+    gmi_visualizations.py
 PURPOSE
-    Compare hourly CASTNET ozone observations and modeled ozone from GMI CTM
-    model runs to determine differences between model runs 
+    Compare hourly trace gas observations and modeled trace gases from GMI CTM
 PROGRAMMER
     Gaige Hunter Kerr
 REVISION HISTORY
@@ -39,6 +38,9 @@ REVISION HISTORY
                 'diurnal_aqscogmico' added
     30052018 -- function 'boxplot_castneto3gmio3' renamed 'boxplot_tracegas' 
                 and modified so that it could plot other trace gases besides O3
+    03062018 -- code to open files moved to separate file 
+                'run_gmi_visualizations.py', this file renamed 
+                'gmi_visualizations'
     """
 # # # # # # # # # # # # #
 def scatter_t2m_castneto3(comm_t2m, comm_castnet, years, region): 
@@ -879,7 +881,7 @@ def diurnal_castneto3gmio3(castnet_o3_d, mr2_o3_d, ccmi_o3_d, ffigac2_o3_d,
     # initialize figure, axis
     fig = plt.figure(figsize = (9, 4))
     ax = plt.subplot2grid((1, 2), (0, 0), colspan = 2)
-    ax.plot(castnet_o3_d, lw = 2.0, color = 'k', label = 'CASTNet (t = GMT + 4 hr)')
+    ax.plot(castnet_o3_d, lw = 2.0, color = 'k', label = 'CASTNet')
     ax.plot(ffigac2_o3_d, lw = 1.5, color = pollutants_constants.COLOR_FFIGAC2, 
             label = 'FFIgac2')
     ax.plot(ffigac2hr_o3_d, lw = 1.5, 
@@ -1246,96 +1248,3 @@ def pdf_aqsno2gmino2(aqs_co, mr2_gmi, ccmi_gmi, ffigac2_gmi, ffigac2hr_gmi,
                 dpi = 300)
     return
 # # # # # # # # # # # # #
-import sys
-sys.path.append('/Users/ghkerr/phd/GMI/')
-import commensurability
-years = [2008, 2009, 2010]            
-sampling_months = [6, 7, 8]
-sampling_hours = [15, 16, 17, 18, 19, 20]  
-castnet_sites_fr = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
-                    'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
-                    'CDR', 'VPI', 'MKG', 'KEF']
-region = 'northeast'
-# # # # open daily mean (11-16 LST average) CASTNet O3 and GMI trace gases
-meandaily = commensurability.commensurate_castnet_gmi_ra(castnet_sites_fr, 
-                                                         years, sampling_months, 
-                                                         sampling_hours)
-# # # # open 2 meter temperature from MERRA which are commensurate with 
-# CASTNet sites, n.b. MR2 CASTNet data (with no regional average) needs 
-# to be loaded
-mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
-commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
-                                          years, sampling_months, 
-                                          sampling_hours)
-comm_t2m, merra_lats_fr, merra_lons_fr = \
-commensurability.commensurate_t2m(mr2_castnet, castnet_sites_fr, years, 
-                                  sampling_months)
-del mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr
-# # # # open AQS NO2 and CO
-aqs_co, aqs_no2, aqs_o3, aqs_co_coords, aqs_no2_coords, aqs_o3_coords = \
-commensurability.commensurate_aqstracegas(castnet_sites_fr, years, sampling_months, 
-                                       sampling_hours)
-# average AQS NO2 and CO over CASTNet sites
-aqs_co = np.nanmean(aqs_co, axis = 1)
-aqs_no2 = np.nanmean(aqs_no2, axis = 1)
-# # # # visualization functions for daily-averaged values
-map_gmiaqscastnet(meandaily['CASTNet'], castnet_sites_fr, aqs_co_coords, 
-                  aqs_no2_coords, -84., 36., -65., 49., years, sampling_months, 
-                  sampling_hours, region)
-scatter_t2m_castneto3(comm_t2m, meandaily['CASTNet'], years, region)
-# O3 boxplot
-boxplot_tracegas(meandaily['CASTNet'], meandaily['MR2 O3'], 
-                       meandaily['MR2-CCMI O3'], meandaily['FFIgac2 O3'],
-                       meandaily['FFIgac2-HighRes O3'], years, region, 
-                       'O$_{3}$ [ppbv]', 'CASTNet', 'castnetgmio3')
-# NO2 boxplot
-boxplot_tracegas(aqs_no2, meandaily['MR2 NO2'], meandaily['MR2-CCMI NO2'], 
-                       meandaily['FFIgac2 NO2'], 
-                       meandaily['FFIgac2-HighRes NO2'], years, region,
-                       'NO$_{2}$ [ppbv]', 'AQS', 'aqsgmino2')
-# CO boxplot
-boxplot_tracegas(aqs_co, meandaily['MR2 CO'], meandaily['MR2-CCMI CO'], 
-                 meandaily['FFIgac2 CO'], meandaily['FFIgac2-HighRes CO'], 
-                 years, region, 'CO [ppmv]', 'AQS', 'aqsgmico')
-cdf_castneto3gmio3(meandaily['CASTNet'], meandaily['MR2 O3'], 
-                   meandaily['MR2-CCMI O3'], meandaily['FFIgac2 O3'],
-                   meandaily['FFIgac2-HighRes O3'], years, region)
-pdf_castneto3gmio3(meandaily['CASTNet'], meandaily['MR2 O3'], 
-                   meandaily['MR2-CCMI O3'], meandaily['FFIgac2 O3'],
-                   meandaily['FFIgac2-HighRes O3'], years, region)
-scatter_castneto3_gmio3(meandaily['CASTNet'], meandaily['MR2 O3'], 
-                        meandaily['MR2-CCMI O3'], meandaily['FFIgac2 O3'],
-                        meandaily['FFIgac2-HighRes O3'], years, region)
-timeseries_castneto3gmio3(meandaily['CASTNet'], meandaily['MR2 O3'], 
-                          meandaily['MR2-CCMI O3'], meandaily['FFIgac2 O3'],
-                          meandaily['FFIgac2-HighRes O3'], years, region)
-
-pdf_aqscogmico(aqs_co, meandaily['MR2 CO'], meandaily['MR2-CCMI CO'], 
-               meandaily['FFIgac2 CO'], meandaily['FFIgac2-HighRes CO'], 
-               years, region)
-pdf_aqsno2gmino2(aqs_no2, meandaily['MR2 NO2'], meandaily['MR2-CCMI NO2'], 
-                 meandaily['FFIgac2 NO2'], meandaily['FFIgac2-HighRes NO2'], 
-                 years, region)
-## # # # open time- and regionally-averaged diurnal cycles of CASTNet O3 and
-## GMI trace gases from 
-#diurnal = commensurability.commensurate_castnet_gmi_diurnal_ra(castnet_sites_fr, 
-#                                                              years, 
-#                                                              sampling_months)
-#aqs_co_d, aqs_no2_d, aqs_no2_lons, aqs_no2_lats, aqs_co_lons, \
-#aqs_co_lats = commensurability.commensurate_aqsno2co_diurnal(castnet, 
-#                                                             castnet_sites_fr, 
-#                                                             years, 
-#                                                             sampling_months)
-## average AQS CO over years, days and CASTNet sites
-#aqs_co_d = np.nanmean(aqs_co_d, axis = tuple(range(0, 3)))
-#aqs_no2_d = np.nanmean(aqs_no2_d, axis = tuple(range(0, 3)))
-# # # #
-#diurnal_castneto3gmio3(diurnal['CASTNet'], diurnal['MR2 O3'], 
-#                       diurnal['MR2-CCMI O3'], diurnal['FFIgac2 O3'],
-#                       diurnal['FFIgac2-HighRes O3'], years, region)
-#diurnal_aqscogmico(aqs_co_d, diurnal['MR2 CO'], diurnal['MR2-CCMI CO'], 
-#                   diurnal['FFIgac2 CO'], diurnal['FFIgac2-HighRes CO'], 
-#                   years, region)
-#diurnal_aqsno2gmino2(aqs_no2_d, diurnal['MR2 NO2'], diurnal['MR2-CCMI NO2'], 
-#                     diurnal['FFIgac2 NO2'], diurnal['FFIgac2-HighRes NO2'], 
-#                     years, region)
