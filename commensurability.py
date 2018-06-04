@@ -56,6 +56,12 @@ REVISION HISTORY
                 only unique latitude/longitude coordinates pairs for AQS NO2, 
                 CO, and O3 sites are returned. Previously all unique latitude
                 and longitudes (not pairs) had been returned
+    04062018 -- previously function 'open_castnet_singyear' had converted 
+                local time to UTC/GMT by subtracting off the UTC offset from 
+                the local times; however this caused an error for hours between
+                O UTC and the UTC offset (i.e. if UTC offset was -4, then 
+                O-4 local time would become -4 to 0 UTC). This was changed 
+                so that times were converted using pytz
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -182,6 +188,7 @@ def open_castnet_singyear(year, sampling_months, sampling_hours):
         year, months, and hours, [no. obs, 5]    
     """
     import numpy as np
+    import pytz
     import pandas as pd
     import sys
     sys.path.append('/Users/ghkerr/phd/')
@@ -201,20 +208,24 @@ def open_castnet_singyear(year, sampling_months, sampling_hours):
     # convert 'DATE_TIME' column from pandas.core.series.Series to a DateTime 
     # object 
     castnet['DATE_TIME'] = pd.to_datetime(castnet['DATE_TIME'])
-    # consider only summertime ozone observations (JJA)
+    # syntax: timezone after .tz_localize is timezone that the observations
+    # are in, timezone after .tz_convert is the timezone to convert to; 
+    # options for timezones can be found by pytz.all_timezones. Code is set 
+    # up to handle any UTC offset (i.e. 'GMT+4', 'GMT+5', etc.)
+    timezone = 'GMT+4'
+    timezone = pytz.timezone('Etc/%s' %timezone)
+    castnet['DATE_TIME'] = castnet['DATE_TIME'].dt.values.tz_localize(timezone).tz_convert(pytz.utc)   
+    # strip off trailing +00:00 from index
+    # sample CASTNET observations only during hours in variable 
+    # 'sampling_hours'; n.b. values in 'sampling_hours' are in UTC
+    castnet = castnet.loc[castnet['DATE_TIME'].dt.hour.isin(sampling_hours)]
+    # consider only ozone observations taken during months contained in 
+    # 'sampling_months'
     castnet = castnet.loc[castnet['DATE_TIME'].dt.month.isin(sampling_months)]
-    # Eastern Daylight Time (EDT)		UTC - 4 hours = EDT
-    # from http://ww2010.atmos.uiuc.edu/(Gh)/guides/maps/utc/frutc.rxml
-    # sample CASTNET observations only during hours in variable 'sampling_hours'
-    # 'sampling_hours' are in UTC, so use above relationship to find measurements. 
-    # n.b. the following lines will only be accurate for the summer season on the 
-    # east coast
-    castnet = castnet.loc[castnet['DATE_TIME'].dt.hour.isin([x - 4 
-                          for x in sampling_hours])]
     # remove the last three letters of SITE_ID column for direct comparison 
     # with Cooper/GMI station names 
     castnet['SITE_ID'] = castnet['SITE_ID'].astype(str).str[:-3].astype(np.str)
-    castnet['DATE_TIME'] = pd.DatetimeIndex(castnet['DATE_TIME'])
+    castnet['DATE_TIME'] = castnet['DATE_TIME'].astype(str).str[:-6]    
     print('CASTNet data for %s loaded!' %year)
     return castnet
 # # # # # # # # # # # # #
@@ -365,7 +376,7 @@ def commensurate_castnet_gmi(castnet_sites_fr, case, years,
         # hours in variable 'sampling_hours' in ET
         dates = pd.date_range('%s-01-%s' %(sampling_months[0], year), 
             '%s-01-%s' %(sampling_months[-1] + 1, year), freq = '1H')[:-1]                
-        dates = dates[np.where(dates.hour.isin([x-4 for x in sampling_hours]))[0]]
+        dates = dates[np.where(dates.hour.isin([x for x in sampling_hours]))[0]]
         # ensure input data matches reference table
         if set(gmi_sites) == set(gmi_sites_i):
             del gmi_sites_i
@@ -1153,10 +1164,14 @@ def commensurate_castnet_gmi_diurnal(castnet_sites_fr, case, years,
                 # in variable 'sampling_months' for all hours in 'sampling_hours'), then 
                 # append
                 if castnet_atsite.shape[0] > 0:
-                    # fill missing CASTNet data with NaNs
-                    castnet_atsite.index = pd.DatetimeIndex(castnet_atsite['DATE_TIME'])
-                    castnet_atsite = castnet_atsite.reindex(dates, 
-                        fill_value = np.nan)
+                    # fill missing CASTNet data with NaNs                    
+                    if castnet_atsite.shape[0] > 2208: 
+                        castnet_atsite = castnet_atsite.groupby(['DATE_TIME']).mean()
+                        castnet_atsite = castnet_atsite.reindex(dates, fill_value = np.nan)                        
+                    else: 
+                        castnet_atsite.index = pd.DatetimeIndex(castnet_atsite['DATE_TIME'])
+                        castnet_atsite = castnet_atsite.reindex(dates, 
+                            fill_value = np.nan)
                     # add station's/model's diurnal cycle of trace gases to array
                     comm_castnet[counter1, counter2] = castnet_atsite['OZONE'].values.reshape(sos, 
                             len(sampling_hours)) 
