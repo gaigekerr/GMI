@@ -41,6 +41,9 @@ REVISION HISTORY
     03062018 -- code to open files moved to separate file 
                 'run_gmi_visualizations.py', this file renamed 
                 'gmi_visualizations'
+    04062018 -- removed np.roll from function 'diurnal_castneto3gmio3' as 
+                code modifications converted CASTNet observations to UTC 
+                prior to input in this function eliminating the need for this
     """
 # # # # # # # # # # # # #
 def scatter_t2m_castneto3(comm_t2m, comm_castnet, years, region): 
@@ -874,10 +877,6 @@ def diurnal_castneto3gmio3(castnet_o3_d, mr2_o3_d, ccmi_o3_d, ffigac2_o3_d,
     path = pollutants_constants.FONTPATH_BOLD
     prop = font_manager.FontProperties(fname = path)
     mpl.rcParams['mathtext.bf'] = prop.get_name()
-    # shift CASTNet O3 observations ahead 4 hours so that they're in the same
-    # time as GMI (i.e. UTC), from 
-    # stackoverflow.com/questions/2150108/efficient-way-to-shift-a-list-in-python
-    castnet_o3_d = np.roll(castnet_o3_d, 4)
     # initialize figure, axis
     fig = plt.figure(figsize = (9, 4))
     ax = plt.subplot2grid((1, 2), (0, 0), colspan = 2)
@@ -1145,7 +1144,7 @@ def pdf_aqscogmico(aqs_co, mr2_gmi, ccmi_gmi, ffigac2_gmi, ffigac2hr_gmi,
                 dpi = 300)
     return
 # # # # # # # # # # # # #  
-def pdf_aqsno2gmino2(aqs_co, mr2_gmi, ccmi_gmi, ffigac2_gmi, ffigac2hr_gmi, 
+def pdf_aqsno2gmino2(aqs_no2, mr2_gmi, ccmi_gmi, ffigac2_gmi, ffigac2hr_gmi, 
                      years, region):
     """function plots probability density functions of NO2 distribution for 
     AQS observations and the four GMI CTM model cases/configurations.
@@ -1154,7 +1153,7 @@ def pdf_aqsno2gmino2(aqs_co, mr2_gmi, ccmi_gmi, ffigac2_gmi, ffigac2hr_gmi,
     
     Parameters
     ----------    
-    aqs_co : numpy.ndarray
+    aqs_no2 : numpy.ndarray
         AQS NO2 observations in region, units of ppbm, [years in measuring 
         period * days in months in 'sampling_months',]        
     mr2_gmi : numpy.ndarray
@@ -1202,7 +1201,6 @@ def pdf_aqsno2gmino2(aqs_co, mr2_gmi, ccmi_gmi, ffigac2_gmi, ffigac2hr_gmi,
     path = pollutants_constants.FONTPATH_BOLD
     prop = font_manager.FontProperties(fname = path)
     mpl.rcParams['mathtext.bf'] = prop.get_name()
-    fig = plt.figure()
     ax1 = plt.subplot2grid((1, 2), (0, 0))
     ax2 = plt.subplot2grid((1, 2), (0, 1))
     ax1.set_title('MERRA-1', fontsize = 12)
