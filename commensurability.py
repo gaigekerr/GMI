@@ -745,9 +745,9 @@ def commensurate_aqstracegas(castnet_sites_fr, years,
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', years, 
                              sampling_months, sampling_hours)    
     # convert time
-    CO['Date Local'] = pd.to_datetime(CO['Date Local'])
-    NO2['Date Local'] = pd.to_datetime(NO2['Date Local'])
-    O3['Date Local'] = pd.to_datetime(O3['Date Local'])
+    CO['Date GMT'] = pd.to_datetime(CO['Date GMT'])
+    NO2['Date GMT'] = pd.to_datetime(NO2['Date GMT'])
+    O3['Date GMT'] = pd.to_datetime(O3['Date GMT'])       
     # define search radius, all AQS stations within this distance of CASTNet
     # site will be fetched
     searchrad = 1.0
@@ -757,20 +757,20 @@ def commensurate_aqstracegas(castnet_sites_fr, years,
     aqs_o3_coords = []    
     # loop through years in measuring period 
     for year, counter1 in zip(years, np.arange(0, len(years), 1)): 
-        # find AQS NO2/CO observations for year and in variables 'sampling_months' 
-        # and 'sampling_hours'
-        NO2_year = NO2.loc[NO2['Date Local'].dt.year.isin([year])]
-        NO2_year = NO2_year.loc[NO2_year['Date Local'].dt.month.isin(sampling_months)]  
-        NO2_year = NO2_year.loc[NO2_year['Time Local'].isin(
-                ['%d:00' %(x-4) for x in sampling_hours])] 
-        CO_year = CO.loc[CO['Date Local'].dt.year.isin([year])]
-        CO_year = CO_year.loc[CO_year['Date Local'].dt.month.isin(sampling_months)]  
-        CO_year = CO_year.loc[CO_year['Time Local'].isin(
-                ['%d:00' %(x-4) for x in sampling_hours])] 
-        O3_year = O3.loc[O3['Date Local'].dt.year.isin([year])]
-        O3_year = O3_year.loc[O3_year['Date Local'].dt.month.isin(sampling_months)]  
-        O3_year = O3_year.loc[O3_year['Time Local'].isin(
-                ['%d:00' %(x-4) for x in sampling_hours])]             
+        # find AQS NO2, CO, and O3 observations for year and in variables 
+        # 'sampling_months' and 'sampling_hours'
+        NO2_year = NO2.loc[NO2['Date GMT'].dt.year.isin([year])]
+        NO2_year = NO2_year.loc[NO2_year['Date GMT'].dt.month.isin(sampling_months)]  
+        NO2_year = NO2_year.loc[NO2_year['Time GMT'].isin(
+                ['%d:00' %(x) for x in sampling_hours])] 
+        CO_year = CO.loc[CO['Date GMT'].dt.year.isin([year])]
+        CO_year = CO_year.loc[CO_year['Date GMT'].dt.month.isin(sampling_months)]  
+        CO_year = CO_year.loc[CO_year['Time GMT'].isin(
+                ['%d:00' %(x) for x in sampling_hours])] 
+        O3_year = O3.loc[O3['Date GMT'].dt.year.isin([year])]
+        O3_year = O3_year.loc[O3_year['Date GMT'].dt.month.isin(sampling_months)]  
+        O3_year = O3_year.loc[O3_year['Time GMT'].isin(
+                ['%d:00' %(x) for x in sampling_hours])]             
         # in a given year, loop through CASTNet sites in focus region and
         # determine if data exists  
         for site, castnet_data, counter2 in zip(castnet_sites_fr, 
@@ -819,11 +819,11 @@ def commensurate_aqstracegas(castnet_sites_fr, years,
                 O3_atsite = O3_atsite.loc[O3_atsite['Time GMT'].isin(
                         ['%s:00' %x for x in sampling_hours])]                                         
                 # group by date and average  
-                CO_atsite = CO_atsite.groupby(['Date Local']).mean()
+                CO_atsite = CO_atsite.groupby(['Date GMT']).mean()
                 CO_atsite = CO_atsite['Sample Measurement']
-                NO2_atsite = NO2_atsite.groupby(['Date Local']).mean()
+                NO2_atsite = NO2_atsite.groupby(['Date GMT']).mean()
                 NO2_atsite = NO2_atsite['Sample Measurement']
-                O3_atsite = O3_atsite.groupby(['Date Local']).mean()
+                O3_atsite = O3_atsite.groupby(['Date GMT']).mean()
                 O3_atsite = O3_atsite['Sample Measurement']                
                 # dates in year/months of interest
                 if sampling_months == [6, 7, 8]:
