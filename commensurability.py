@@ -62,6 +62,7 @@ REVISION HISTORY
                 O UTC and the UTC offset (i.e. if UTC offset was -4, then 
                 O-4 local time would become -4 to 0 UTC). This was changed 
                 so that times were converted using pytz
+    24062018 -- function 'commensurate_aqstracegas_siting' added
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -627,32 +628,37 @@ def load_aqshourly(years):
     import sys, os
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
-    cols = ["State Code", "County Code", "Site Num", "Parameter Code", 
-            "POC", "Latitude", "Longitude", "Datum", "Parameter Name",
-            "Date Local", "Time Local", "Date GMT", "Time GMT", 
-            "Sample Measurement", "Units of Measure", "MDL", "Uncertainty",
-            "Qualifier", "Method Type", "Method Code", "Method Name",
-            "State Name", "County Name", "Date of Last Change"]
+    #cols = ["State Code", "County Code", "Site Num", "Parameter Code", 
+    #        "POC", "Latitude", "Longitude", "Datum", "Parameter Name",
+    #        "Date Local", "Time Local", "Date GMT", "Time GMT", 
+    #        "Sample Measurement", "Units of Measure", "MDL", "Uncertainty",
+    #        "Qualifier", "Method Type", "Method Code", "Method Name",
+    #        "State Name", "County Name", "Date of Last Change"]
+    cols = ["Latitude", "Longitude", "Date GMT", "Time GMT", 
+            "Sample Measurement"]
     # specificy data types for columns to avoid DtypeWarning being raised
-    dtype = {'State Code' : np.str, 'County Code' : np.str, 'Site Num' : np.str, 
-             'Parameter Code' : np.str, 'POC' : np.int64, 'Latitude' : np.float64, 
-             'Longitude' : np.float64, 'Datum' : np.str, 'Parameter Name' : np.str,
-             'Date Local' : np.str, 'Time Local' : np.str, 'Date GMT' : np.str, 
-             'Time GMT' : np.str, 'Sample Measurement' : np.float64,
-             'Units of Measure' : np.str,  'MDL' : np.float64, 
-             'Uncertainty' : np.str, 'Qualifier' : np.str, 
-             'Method Type' : np.str, 'Method Code' : np.str, 
-             'Method Name' : np.str,'State Name' : np.str, 
-             "County Name" : np.str, 'Date of Last Change' : np.str}  
+    #dtype = {'State Code' : np.str, 'County Code' : np.str, 'Site Num' : np.str, 
+    #         'Parameter Code' : np.str, 'POC' : np.int64, 'Latitude' : np.float64, 
+    #         'Longitude' : np.float64, 'Datum' : np.str, 'Parameter Name' : np.str,
+    #         'Date Local' : np.str, 'Time Local' : np.str, 'Date GMT' : np.str, 
+    #         'Time GMT' : np.str, 'Sample Measurement' : np.float64,
+    #         'Units of Measure' : np.str,  'MDL' : np.float64, 
+    #         'Uncertainty' : np.str, 'Qualifier' : np.str, 
+    #         'Method Type' : np.str, 'Method Code' : np.str, 
+    #         'Method Name' : np.str,'State Name' : np.str, 
+    #         "County Name" : np.str, 'Date of Last Change' : np.str}  
+    dtype = {'Latitude' : np.float64, 'Longitude' : np.float64, 
+             'Date GMT' : np.str, 'Time GMT' : np.str, 
+             'Sample Measurement' : np.float64}      
     # fetch file names for measuring period
     COfiles, NO2files, O3files = [], [], []
     for year in years:
         COfiles.append(os.path.join(pollutants_constants.PATH_AQS_CO, 
-                                    'hourly_42101_%s.csv' %year))
+                                    'hourly_42101_%s_reduced.csv' %year))
         NO2files.append(os.path.join(pollutants_constants.PATH_AQS_NO2, 
-                                     'hourly_42602_%s.csv' %year))
+                                     'hourly_42602_%s_reduced.csv' %year))
         O3files.append(os.path.join(pollutants_constants.PATH_AQS_O3, 
-                                     'hourly_44201_%s.csv' %year))
+                                     'hourly_44201_%s_reduced.csv' %year))
     # read multiple CSV files (yearly) into Pandas dataframe for hourly CO, 
     # NO2, and O3        
     COdf = get_merged_csv(COfiles, dtype = dtype, index_col = None, 
@@ -665,7 +671,7 @@ def load_aqshourly(years):
 # # # # # # # # # # # # # 
 def commensurate_aqstracegas(castnet_sites_fr, years, 
                              sampling_months, sampling_hours): 
-    """function loads hourly AQS CO and NO2 observations and identifies 
+    """function loads hourly AQS CO, NO2, and O3 observations and identifies 
     observations near CASTNet sites which have data for the years of interest
     in the focus region. In this case the variable 'searchrad' constitutes 
     a bounding box in which to search for AQS sites near CASTNet sites. 
@@ -1217,7 +1223,6 @@ def commensurate_castnet_gmi_locations(castnet_sites_fr, sampling_months,
         CASTNet observations during 2008, [stations in 'castnet_sites_fr',]    
     """
     import numpy as np
-    import commensurability
     import sys
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
@@ -1228,7 +1233,7 @@ def commensurate_castnet_gmi_locations(castnet_sites_fr, sampling_months,
     gmi_sites = list(gmi_castnet_matchup[:, 0])     
     castnet_sites = list(gmi_castnet_matchup[:, 1])
     # find lat/lon of CASTNet sites in focus region
-    csites = commensurability.open_castnetsiting()
+    csites = open_castnetsiting()
     # open GMI output model configuration 'HindcastMR2' for 2008 
     o3, co, no, no2, gmi_sites_i, gmi_lat, gmi_lon, times_ty = \
     commensurability.open_gmi_singyear('HindcastMR2', 2008, sampling_months,
@@ -2001,3 +2006,355 @@ def commensurate_geos_gmi_diurnal(castnet_sites_fr):
             comm_geos_co[counter] = geos_co_atsite.reshape(sos, 12)
     return comm_castnet, comm_geos_o3, comm_geos_no, comm_geos_no2, comm_geos_co                   
 # # # # # # # # # # # # #
+def commensurate_aqstracegas_siting(castnet_sites_fr, years, sampling_months,
+                                    sampling_hours):
+    """same as 'commensurate_aqstracegas' but function separates AQS CO, NO2, 
+    and O3 based on their siting environment (i.e. rural, suburban, or 
+    rural) for all AQS stations within the radius from CASTNet stations 
+    defined in 'searchrad.'
+    
+    Parameters
+    ----------    
+    castnet_sites_fr : list
+        CASTNET site names in focus region
+    years : list
+        Years of interest
+    sampling_months : list 
+        Months of interest
+    sampling_hours : list
+        Hours of interest
+        
+    Returns
+    ----------
+    comm_co_su : numpy.ndarray
+        AQS CO observations from suburban locations located within a bounding 
+        box defined by variable 'searchrad' of the location of CASTNet station 
+        averaged over the hours in variable 'sampling_hours,' units of parts 
+        per million, [years in measuring period, stations in 
+        'castnet_sites_fr', days in months in 'sampling_months']    
+    comm_co_r : numpy.ndarray
+        AQS CO observations from rural locations located within a bounding 
+        box defined by variable 'searchrad' of the location of CASTNet station 
+        averaged over the hours in variable 'sampling_hours,' units of parts 
+        per million, [years in measuring period, stations in 
+        'castnet_sites_fr', days in months in 'sampling_months']       
+    comm_co_u : numpy.ndarray
+        AQS CO observations from urban locations located within a bounding 
+        box defined by variable 'searchrad' of the location of CASTNet station 
+        averaged over the hours in variable 'sampling_hours,' units of parts 
+        per million, [years in measuring period, stations in 
+        'castnet_sites_fr', days in months in 'sampling_months']            
+    coords_co_su : list
+        Coordinates of AQS stations (may not be unique) which measure CO in 
+        suburban locations within bounding boxes defined by CASTNet stations      
+    coords_co_r : list
+        Coordinates of AQS stations (may not be unique) which measure CO in 
+        rural locations within bounding boxes defined by CASTNet stations   
+    coords_co_u : list
+        Coordinates of AQS stations (may not be unique) which measure CO in 
+        urban locations within bounding boxes defined by CASTNet stations       
+    comm_no2_su : numpy.ndarray
+        Same as 'comm_co_su' but for suburban NO2 measurements, units of 
+        parts per billion
+    comm_no2_r : numpy.ndarray
+        Same as 'comm_co_r' but for rural NO2 measurements, units of parts per 
+        billion    
+    comm_no2_u : numpy.ndarray
+        Same as 'comm_co_u' but for urban NO2 measurements, units of parts per 
+        billion           
+    coords_no2_su : list
+        Same as 'coords_co_su' but for suburban NO2 stations    
+    coords_no2_r : list
+        Same as 'coords_co_su' but for rural NO2 stations        
+    coords_no2_u : list
+        Same as 'coords_co_su' but for urban NO2 stations        
+    comm_o3_su : numpy.ndarray
+        Same as 'comm_co_su' but for suburban O3 measurements, units of parts 
+        per million       
+    comm_o3_r : numpy.ndarray
+        Same as 'comm_co_r' but for rural O3 measurements, units of parts per 
+        million         
+    comm_o3_u : numpy.ndarray
+        Same as 'comm_co_u' but for urban O3 measurements, units of parts per 
+        million                
+    coords_o3_su : list
+        Same as 'coords_co_su' but for suburban O3 stations
+    coords_o3_r : list
+        Same as 'coords_co_r' but for rural O3 stations
+    coords_o3_u : list
+        Same as 'coords_co_u' but for urban O3 stations
+    """
+    import numpy as np
+    from calendar import monthrange
+    import pandas as pd
+    import sys
+    sys.path.append('/Users/ghkerr/phd/GMI')
+    import commensurability
+    # search radius 
+    searchrad = 1.0    
+    # open AQS NO2/CO observations 
+    COdf, NO2df, O3df = commensurability.load_aqshourly(years)
+    COdf['Date GMT'] = pd.to_datetime(COdf['Date GMT'])
+    NO2df['Date GMT'] = pd.to_datetime(NO2df['Date GMT'])
+    O3df['Date GMT'] = pd.to_datetime(O3df['Date GMT'])      
+    # select summer and afternoon observations
+    CO = COdf.loc[COdf['Date GMT'].dt.month.isin(sampling_months)]
+    CO = CO.loc[CO['Time GMT'].isin(['%d:00' %(x) for x in sampling_hours])] 
+    NO2 = NO2df.loc[NO2df['Date GMT'].dt.month.isin(sampling_months)]
+    NO2 = NO2.loc[NO2['Time GMT'].isin(['%d:00' %(x) for x in sampling_hours])] 
+    O3 = O3df.loc[O3df['Date GMT'].dt.month.isin(sampling_months)]
+    O3 = O3.loc[O3['Time GMT'].isin(['%d:00' %(x) for x in sampling_hours])] 
+    # open CASTNet observations for particular model configuration (in this 
+    # case 'HindcastMR2') to see which stations have observations for the 
+    # measuring period
+    comm_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
+    commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
+                                              years, sampling_months, 
+                                              sampling_hours)  
+    # find lat/lon of CASTNet sites in focus region
+    csites = commensurability.open_castnetsiting()
+    # read AQS site file containing information about the siting of AQS
+    # sites
+    datapath = '/Users/ghkerr/phd/aqs_station_siting/data/'
+    aqs_sites = pd.read_csv((datapath + 'aqs_sites.csv'), header = 0)
+    site_cols = ['State Code', 'County Code',	 'Site Number', 'Latitude',
+                 'Longitude', 'Datum', 'Elevation', 'Land Use',	
+                 'Location Setting', 'Site Established Date', 'Site Closed Date',
+                 'Met Site State Code', 'Met Site County Code',
+                 'Met Site Site Number', 'Met Site Type', 'Met Site Distance',
+                 'Met Site Direction', 'GMT Offset', 'Owning Agency',
+                 'Local Site Name', 'Address', 'Zip Code', 'State Name',
+                 'County Name', 'City Name', 'CBSA Name', 'Tribe Name',	
+                 'Extraction Date']
+    aqs_sites = pd.DataFrame(aqs_sites, columns = site_cols) 
+    # total number of days in each year
+    sos = []
+    sos += [(monthrange(years[0], x)[1]) for x in sampling_months]    
+    sos = np.sum(sos)
+    # create empty arrays to be filled with CO, NO2 observations commensurate 
+    # to CASTNet observations in urban, rural, and suburban settings
+    # for CO
+    comm_co_u = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_co_u[:] = np.nan
+    comm_co_r = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_co_r[:] = np.nan
+    comm_co_su = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_co_su[:] = np.nan
+    # for NO2
+    comm_no2_u = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_no2_u[:] = np.nan
+    comm_no2_r = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_no2_r[:] = np.nan
+    comm_no2_su = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_no2_su[:] = np.nan
+    # for O3
+    comm_o3_u = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_o3_u[:] = np.nan
+    comm_o3_r = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_o3_r[:] = np.nan
+    comm_o3_su = np.empty([len(years), len(castnet_sites_fr), sos], 
+                             dtype = float)
+    comm_o3_su[:] = np.nan
+    # create empty lists to be filled with latitude, longitude coordinates of 
+    # AQS stations in urban, rural, and suburban environments
+    # for CO
+    coords_co_u = []
+    coords_co_su = []
+    coords_co_r = [] 
+    # for NO2
+    coords_no2_u = []
+    coords_no2_su = []
+    coords_no2_r = []
+    # for O3
+    coords_o3_u = []
+    coords_o3_su = []
+    coords_o3_r = []
+    # loop through years in measuring period and select corresponding 
+    # observations
+    for year, counter1 in zip(years, np.arange(0, len(years), 1)): 
+        # dates in year/months of interest
+        idx = pd.date_range('%s-01-%s' %(sampling_months[0], year),                                         
+                            '%s-31-%s' %(sampling_months[-1], year))
+        CO_year = CO.loc[CO['Date GMT'].dt.year.isin([year])]      
+        NO2_year = NO2.loc[NO2['Date GMT'].dt.year.isin([year])]
+        O3_year = O3.loc[O3['Date GMT'].dt.year.isin([year])]
+        # in a given year, loop through CASTNet sites in focus region and
+        # determine if data exists  
+        for site, castnet_data, counter2 in zip(castnet_sites_fr, 
+                                                comm_castnet[counter1], 
+                                                np.arange(0, len(castnet_sites_fr), 1)):
+            # if data exists, the find AQS with the distance from the CASTNet site
+            # defined by the search radius
+            if np.where(np.isnan(castnet_data) == True)[0].shape[0] != sos:
+                # find longitude/latitude of CASTNET station 
+                csites_atsite = csites.loc[csites['SITE_ID'].isin([site])]
+                lon_atsite = csites_atsite['LONGITUDE'].values[0]
+                lat_atsite = csites_atsite['LATITUDE'].values[0]
+                # define bounding box            
+                top = lat_atsite + searchrad
+                left = lon_atsite - searchrad
+                bottom = lat_atsite - searchrad
+                right = lon_atsite + searchrad
+                # CO, NO2, and O3 observations in bounding box
+                CO_atsite = CO_year[(CO_year['Latitude'] > bottom) & 
+                                    (CO_year['Latitude'] <= top) &
+                                    (CO_year['Longitude'] > left) &
+                                    (CO_year['Longitude'] <= right)]  
+                NO2_atsite = NO2_year[(NO2_year['Latitude'] > bottom) & 
+                                      (NO2_year['Latitude'] <= top) &
+                                      (NO2_year['Longitude'] > left) &
+                                      (NO2_year['Longitude'] <= right)]    
+                O3_atsite = O3_year[(O3_year['Latitude'] > bottom) & 
+                                    (O3_year['Latitude'] <= top) &
+                                    (O3_year['Longitude'] > left) &
+                                    (O3_year['Longitude'] <= right)]                
+                # loop through unique latitude and longitudes and find whether 
+                # they are urban, rural, or suburban 
+                # for CO                 
+                uniqueCO = CO_atsite.groupby(['Latitude', 'Longitude'
+                                              ]).size().reset_index(name = 'Freq')
+                for index, row in uniqueCO.iterrows():
+                    # find index in AQS site record corresponding to station's 
+                    # observations
+                    siting_lat = np.where(np.around(
+                            aqs_sites['Latitude'].values, 4) == np.around(row['Latitude'], 4))
+                    siting_lon = np.where(np.around(
+                            aqs_sites['Longitude'].values, 4) == np.around(row['Longitude'], 4))
+                    siting = np.intersect1d(siting_lat, siting_lon)
+                    siting = aqs_sites.iloc[siting[0]]['Location Setting']
+                    # CO at suburban locations                
+                    if siting == 'SUBURBAN':
+                        CO_su = CO_atsite.loc[CO_atsite['Latitude'].isin(
+                            [row['Latitude']]) & CO_atsite['Longitude'].isin(
+                            [row['Longitude']])]
+                        CO_su = CO_su.groupby(['Date GMT']).mean()
+                        CO_su.index = pd.DatetimeIndex(CO_su.index)
+                        CO_su = CO_su.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_co_su[counter1, counter2] = CO_su
+                        coords_co_su.append(tuple(row.values[:-1]))                
+                    # CO at rural locations
+                    if siting == 'RURAL':
+                        CO_r = CO_atsite.loc[CO_atsite['Latitude'].isin(
+                            [row['Latitude']]) & CO_atsite['Longitude'].isin(
+                            [row['Longitude']])]   
+                        CO_r = CO_r.groupby(['Date GMT']).mean()
+                        CO_r.index = pd.DatetimeIndex(CO_r.index)
+                        CO_r = CO_r.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_co_r[counter1, counter2] = CO_r
+                        coords_co_r.append(tuple(row.values[:-1]))                    
+                    # CO at urban locations
+                    if siting == 'URBAN AND CENTER CITY':
+                        CO_u = CO_atsite.loc[CO_atsite['Latitude'].isin(
+                            [row['Latitude']]) & CO_atsite['Longitude'].isin(
+                            [row['Longitude']])]                    
+                        CO_u = CO_u.groupby(['Date GMT']).mean()
+                        CO_u.index = pd.DatetimeIndex(CO_u.index)
+                        CO_u = CO_u.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_co_u[counter1, counter2] = CO_u
+                        coords_co_u.append(tuple(row.values[:-1]))                    
+                # for NO2 
+                uniqueNO2 = NO2_atsite.groupby(['Latitude', 'Longitude'
+                                              ]).size().reset_index(name = 'Freq')
+                for index, row in uniqueNO2.iterrows():
+                    # find index in AQS site record corresponding to station's 
+                    # observations
+                    siting_lat = np.where(np.around(
+                            aqs_sites['Latitude'].values, 4) == np.around(row['Latitude'], 4))
+                    siting_lon = np.where(np.around(
+                            aqs_sites['Longitude'].values, 4) == np.around(row['Longitude'], 4))
+                    siting = np.intersect1d(siting_lat, siting_lon)
+                    siting = aqs_sites.iloc[siting[0]]['Location Setting']
+                    # NO2 at suburban locations                
+                    if siting == 'SUBURBAN':
+                        NO2_su = NO2_atsite.loc[NO2_atsite['Latitude'].isin(
+                            [row['Latitude']]) & NO2_atsite['Longitude'].isin(
+                            [row['Longitude']])]
+                        NO2_su = NO2_su.groupby(['Date GMT']).mean()
+                        NO2_su.index = pd.DatetimeIndex(NO2_su.index)
+                        NO2_su = NO2_su.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_no2_su[counter1, counter2] = NO2_su
+                        coords_no2_su.append(tuple(row.values[:-1]))                    
+                    # NO2 at rural locations
+                    if siting == 'RURAL':
+                        NO2_r = NO2_atsite.loc[NO2_atsite['Latitude'].isin(
+                            [row['Latitude']]) & NO2_atsite['Longitude'].isin(
+                            [row['Longitude']])]   
+                        NO2_r = NO2_r.groupby(['Date GMT']).mean()
+                        NO2_r.index = pd.DatetimeIndex(NO2_r.index)
+                        NO2_r = NO2_r.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_no2_r[counter1, counter2] = NO2_r
+                        coords_no2_r.append(tuple(row.values[:-1]))                    
+                    # NO2 at urban locations
+                    if siting == 'URBAN AND CENTER CITY':
+                        NO2_u = NO2_atsite.loc[NO2_atsite['Latitude'].isin(
+                            [row['Latitude']]) & NO2_atsite['Longitude'].isin(
+                            [row['Longitude']])]                    
+                        NO2_u = NO2_u.groupby(['Date GMT']).mean()
+                        NO2_u.index = pd.DatetimeIndex(NO2_u.index)
+                        NO2_u = NO2_u.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_no2_u[counter1, counter2] = NO2_u
+                        coords_no2_u.append(tuple(row.values[:-1]))                    
+                # for O3 
+                uniqueO3 = O3_atsite.groupby(['Latitude', 'Longitude'
+                                              ]).size().reset_index(name = 'Freq')
+                for index, row in uniqueO3.iterrows():
+                    # find index in AQS site record corresponding to station's 
+                    # observations
+                    siting_lat = np.where(np.around(
+                            aqs_sites['Latitude'].values, 3) == np.around(row['Latitude'], 3))
+                    siting_lon = np.where(np.around(
+                            aqs_sites['Longitude'].values, 3) == np.around(row['Longitude'], 3))
+                    siting = np.intersect1d(siting_lat, siting_lon)
+                    siting = aqs_sites.iloc[siting[0]]['Location Setting']
+                    # O3 at suburban locations                
+                    if siting == 'SUBURBAN':
+                        O3_su = O3_atsite.loc[O3_atsite['Latitude'].isin(
+                            [row['Latitude']]) & O3_atsite['Longitude'].isin(
+                            [row['Longitude']])]
+                        O3_su = O3_su.groupby(['Date GMT']).mean()
+                        O3_su.index = pd.DatetimeIndex(O3_su.index)
+                        O3_su = O3_su.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_o3_su[counter1, counter2] = O3_su
+                        coords_o3_su.append(tuple(row.values[:-1]))                    
+                    # O3 at rural locations
+                    if siting == 'RURAL':
+                        O3_r = O3_atsite.loc[O3_atsite['Latitude'].isin(
+                            [row['Latitude']]) & O3_atsite['Longitude'].isin(
+                            [row['Longitude']])]   
+                        O3_r = O3_r.groupby(['Date GMT']).mean()
+                        O3_r.index = pd.DatetimeIndex(O3_r.index)
+                        O3_r = O3_r.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_o3_r[counter1, counter2] = O3_r
+                        coords_o3_r.append(tuple(row.values[:-1]))                    
+                    # O3 at urban locations
+                    if siting == 'URBAN AND CENTER CITY':
+                        O3_u = O3_atsite.loc[O3_atsite['Latitude'].isin(
+                            [row['Latitude']]) & O3_atsite['Longitude'].isin(
+                            [row['Longitude']])]                    
+                        O3_u = O3_u.groupby(['Date GMT']).mean()
+                        O3_u.index = pd.DatetimeIndex(O3_u.index)
+                        O3_u = O3_u.reindex(idx, 
+                            fill_value = np.nan)['Sample Measurement']
+                        comm_o3_u[counter1, counter2] = O3_u
+                        coords_o3_u.append(tuple(row.values[:-1]))                    
+    return (comm_co_su, comm_co_r, comm_co_u, coords_co_su, coords_co_r, 
+            coords_co_u, comm_no2_su, comm_no2_r, comm_no2_u, coords_no2_su, 
+            coords_no2_r, coords_no2_u, comm_o3_su, comm_o3_r, comm_o3_u, 
+            coords_o3_su, coords_o3_r, coords_o3_u)
+# # # # # # # # # # # # #    
