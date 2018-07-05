@@ -63,6 +63,9 @@ REVISION HISTORY
                 O-4 local time would become -4 to 0 UTC). This was changed 
                 so that times were converted using pytz
     24062018 -- function 'commensurate_aqstracegas_siting' added
+    05072018 -- functions 'open_gridded_idailyCTM' and 
+                'commensurate_aqstracegas_gridded' added to examine gridded
+                12Z HindcastMR2 output
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -854,6 +857,82 @@ def commensurate_aqstracegas(castnet_sites_fr, years,
     return (comm_co, comm_no2, comm_o3, aqs_co_coords, aqs_no2_coords, 
             aqs_o3_coords)
 # # # # # # # # # # # # #
+def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon):
+    """function uses CTM grid and, for each day with 12Z CTM output, finds 
+    all available AQS observations in each grid cell. If no AQS stations are 
+    located within the bounds of a CTM grid cell, a nan value is returned. If 
+    > 1 AQS station exists in a grid cell, the daily values at these stations 
+    are averaged. 
+    
+    Parameters
+    ----------        
+    df : pandas.core.frame.DataFrame
+        Raw AQS hourly summary trace gas observations for U.S. for years of 
+        interest, [no. obs, 5]
+    gmi : numpy.ndarray
+        Gridded CTM output, units of volume mixing ratio, [time, pressure, lat, 
+        lon]    
+    times : numpy.ndarray
+        datetime.datetime objects corresponding to 12Z daily CTM output, 
+        [time,] 
+    lat : numpy.ndarray
+        Latitude coordinates of focus region, units of degrees north, [lat,]
+    lon : numpy.ndarray
+        Longitude coordinates of focus region, units of degrees east, [lon,]
+        
+    Returns
+    ----------
+    station_coordinates : list
+        List of arrays containing the unique locations (latitude/longitude 
+        coordinates) of AQS stations in CTM grid cells
+    colocated_tg : numpy.ndarray
+        Daily 12Z AQS trace gas measurements for trace gas of interest (i.e., 
+        NO2, CO, or O3) within CTM grid cells. If no AQS stations are located
+        within the bounds of a CTM grid cell, a nan value is returned. If 
+        > 1 AQS station exists in a grid cell, the daily values at these 
+        stations are averaged, units of volume mixing ratio, [time, lat, lon]
+    """
+    import numpy as np
+    import pandas as pd
+    # list to be filled with latitude and longitude coordinates of AQS 
+    # stations
+    station_coordinates = []
+    # select only 12Z observations
+    df = df.loc[df['Time GMT'].isin(['12:00'])]
+    # convert input parameter 'times' into 'YYYY-MM-DD' format 
+    times_ymd = [pd.to_datetime(d).strftime('%Y-%m-%d') for d in times]
+    # select 12Z observations in JJA
+    df = df.loc[df['Date GMT'].isin(times_ymd)]
+    # create grid with same resolution as CTM to be filled with AQS trace 
+    # gas measurements, grid is 3D (not 4D)
+    colocated_tg = np.empty((gmi.shape[0], gmi.shape[2], gmi.shape[3]))
+    colocated_tg[:] = np.nan
+    # CTM resolution 
+    latres = np.diff(lat).mean()
+    lonres = np.diff(lon).mean()
+    # loop through GMI latitude and longitude coordinatesion
+    for i, ilat in enumerate(lat):
+        for j, jlon in enumerate(lon):
+            # convert longitude from (0-360) to (-180 to 180)
+            jlon = np.mod(jlon - 180.0, 360.0) - 180.0
+            # find AQS trace gas measurements in grid cell 
+            df_ingrid = df.loc[(df['Latitude'] > ilat - latres/2.) & 
+                               (df['Latitude'] <= ilat + latres/2.) &
+                               (df['Longitude'] > jlon - lonres/2.) &
+                               (df['Longitude'] <= jlon + lonres/2.)]
+            # save off unique latitudes and longitudes
+            if df_ingrid.shape[0] > 0: 
+                station_coordinates.append(df_ingrid[
+                        ['Latitude', 'Longitude']].drop_duplicates().values)
+                # in the case that >1 AQS site exists in grid cell, average over
+                # all sites in cell 
+                df_ingrid = df_ingrid.groupby(['Date GMT']).mean()
+                # add missing values                 
+                df_ingrid = df_ingrid.reindex(times_ymd, fill_value = np.nan)
+                # add daily grid cell averages to grid
+                colocated_tg[:, i, j] = df_ingrid['Sample Measurement'].values
+    return station_coordinates, colocated_tg
+# # # # # # # # # # # # #    
 def commensurate_aqstracegas_diurnal(comm_castnet, castnet_sites_fr, years, 
                                      sampling_months):
     """function loads hourly AQS CO and NO2 observations and identifies 
@@ -2358,3 +2437,87 @@ def commensurate_aqstracegas_siting(castnet_sites_fr, years, sampling_months,
             coords_no2_r, coords_no2_u, comm_o3_su, comm_o3_r, comm_o3_u, 
             coords_o3_su, coords_o3_r, coords_o3_u)
 # # # # # # # # # # # # #    
+def open_gridded_idailyCTM(years):
+    """GMI CTM output from idaily (gridded daily 12Z output) over the focus 
+    region is opened and aggregated over the summers whose years are defined 
+    in variable 'years.' Output reduced for focus region was created with 
+    'yearly_idaily_combine.py' from HindcastMR2 output. 
+    
+    Parameters
+    ----------   
+    years : list 
+        Years of interest (n.b., as of 5 July 2018 files for 2008-2010 are 
+        saved locally)
+    
+    Returns
+    ----------
+    lat : numpy.ndarray
+        Latitude coordinates of focus region, units of degrees north, [lat,]
+    lon : numpy.ndarray
+        Longitude coordinates of focus region, units of degrees east, [lon,]
+    pressure : numpy.ndarray
+        Pressure coordinates of CTM, units of hPa, [pressure,]
+    times : numpy.ndarray
+        datetime.datetime objects corresponding to 12Z daily CTM output, 
+        [time,]
+    co : numpy.ndarray
+        Gridded CTM CO output, units of volume mixing ratio, [time, pressure, 
+        lat, lon]
+    no : numpy.ndarray
+        Gridded CTM NO output, units of volume mixing ratio, [time, pressure, 
+        lat, lon]
+    no2 : numpy.ndarray
+        Gridded CTM NO2 output, units of volume mixing ratio, [time, pressure, 
+        lat, lon]
+    o3 : numpy.ndarray
+        Gridded CTM O3 output, units of volume mixing ratio, [time, pressure, 
+        lat, lon]
+    """
+    import numpy as np
+    from datetime import datetime, timedelta
+    from netCDF4 import Dataset
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # lists will be filled with CTM output from every summer
+    co, no, no2, o3, times = [], [], [], [], []
+    # open JJA file for each year in measuring period 
+    for year in years: 
+        # the latitudinal/longitudinal bounds of file are hard-coded; would have
+        # to change if examining other regions
+        infile = Dataset(pollutants_constants.PATH_GMI + 'HindcastMR2/' + 
+                         'gmic_HindcastMR2_%s_35N_275E_50N_285E_15.idaily.nc' 
+                         %year, 'r')
+        # extract dimensional information only on the first iteration of year
+        # loop 
+        if year == years[0]:
+            lat = infile.variables['lat'][:]
+            lon = infile.variables['lon'][:]
+            pressure = infile.variables['pressure'][:]
+        # append 
+        co.append(infile.variables['CO'][:])
+        no.append(infile.variables['NO'][:])
+        no2.append(infile.variables['NO2'][:])
+        o3.append(infile.variables['O3'][:])
+        # generate time dimension for netCDF file 
+        def perdelta(start, end, delta):
+            curr = start
+            while curr < end:
+                yield curr
+                curr += delta
+        time = []
+        for result in perdelta(datetime(year, 6, 1, 12), 
+                               datetime(year, 9, 1, 12), 
+                               timedelta(hours = 24)):
+            time.append(result)     
+        # append time to multi-year list
+        times.append(time)
+        print('12Z gridded CTM output for %s loaded!' %year)   
+    # convert lists to arrays
+    times = np.hstack(np.vstack(times))
+    co = np.vstack(co)
+    no = np.vstack(no)
+    no2 = np.vstack(no2)
+    o3 = np.vstack(o3)
+    return (lat, lon, pressure, times, co, no, no2, o3)  
+# # # # # # # # # # # # #       
