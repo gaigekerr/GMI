@@ -66,6 +66,8 @@ REVISION HISTORY
     05072018 -- functions 'open_gridded_idailyCTM' and 
                 'commensurate_aqstracegas_gridded' added to examine gridded
                 12Z HindcastMR2 output
+    06072018 -- function 'commensurate_aqstracegas_gridded' changed to take 
+                siting environment (i.e. urban, rural, suburban) into account
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -857,12 +859,14 @@ def commensurate_aqstracegas(castnet_sites_fr, years,
     return (comm_co, comm_no2, comm_o3, aqs_co_coords, aqs_no2_coords, 
             aqs_o3_coords)
 # # # # # # # # # # # # #
-def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon):
+def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon, environment):
     """function uses CTM grid and, for each day with 12Z CTM output, finds 
-    all available AQS observations in each grid cell. If no AQS stations are 
-    located within the bounds of a CTM grid cell, a nan value is returned. If 
-    > 1 AQS station exists in a grid cell, the daily values at these stations 
-    are averaged. 
+    all available AQS observations in each grid cell if all siting environments
+    are needed. If only rural, suburban, and/or urban observations are needed, 
+    then function retrieves just observations in these environments. If no AQS 
+    stations are located within the bounds of a CTM grid cell, a nan value is 
+    returned. If > 1 AQS station exists in a grid cell, the daily values at 
+    these stations are averaged. 
     
     Parameters
     ----------        
@@ -879,6 +883,12 @@ def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon):
         Latitude coordinates of focus region, units of degrees north, [lat,]
     lon : numpy.ndarray
         Longitude coordinates of focus region, units of degrees east, [lon,]
+    environment : list
+        Which environment (i.e., rural, urban, and/or suburban) AQS 
+        observations are retrieved from; n.b. if all observations are wanted, 
+        pass [] (faster) or ['URBAN AND CENTER CITY', 'RURAL', 'SUBURBAN']
+        (slower). Otherwise, pass a list of individual environments (i.e., 
+        ['URBAN'])
         
     Returns
     ----------
@@ -887,16 +897,32 @@ def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon):
         coordinates) of AQS stations in CTM grid cells
     colocated_tg : numpy.ndarray
         Daily 12Z AQS trace gas measurements for trace gas of interest (i.e., 
-        NO2, CO, or O3) within CTM grid cells. If no AQS stations are located
-        within the bounds of a CTM grid cell, a nan value is returned. If 
-        > 1 AQS station exists in a grid cell, the daily values at these 
-        stations are averaged, units of volume mixing ratio, [time, lat, lon]
+        NO2, CO, or O3) within CTM grid cells and environment of interest. If 
+        no AQS stations are located within the bounds of a CTM grid cell, a nan 
+        value is returned. If > 1 AQS station exists in a grid cell, the daily 
+        values at these stations are averaged, units of volume mixing ratio, 
+        [time, lat, lon]
     """
     import numpy as np
     import pandas as pd
+    # read AQS site file containing information about the siting of AQS
+    # sites
+    datapath = '/Users/ghkerr/phd/aqs_station_siting/data/'
+    aqs_sites = pd.read_csv((datapath + 'aqs_sites.csv'), header = 0)
+    site_cols = ['State Code', 'County Code',	 'Site Number', 'Latitude',
+                 'Longitude', 'Datum', 'Elevation', 'Land Use',	
+                 'Location Setting', 'Site Established Date', 
+                 'Site Closed Date', 'Met Site State Code', 
+                 'Met Site County Code', 'Met Site Site Number', 
+                 'Met Site Type', 'Met Site Distance', 'Met Site Direction', 
+                 'GMT Offset', 'Owning Agency', 'Local Site Name', 'Address', 
+                 'Zip Code', 'State Name', 'County Name', 'City Name', 
+                 'CBSA Name', 'Tribe Name', 'Extraction Date']
+    aqs_sites = pd.DataFrame(aqs_sites, columns = site_cols)     
     # list to be filled with latitude and longitude coordinates of AQS 
     # stations
     station_coordinates = []
+    new = []
     # select only 12Z observations
     df = df.loc[df['Time GMT'].isin(['12:00'])]
     # convert input parameter 'times' into 'YYYY-MM-DD' format 
@@ -920,17 +946,53 @@ def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon):
                                (df['Latitude'] <= ilat + latres/2.) &
                                (df['Longitude'] > jlon - lonres/2.) &
                                (df['Longitude'] <= jlon + lonres/2.)]
-            # save off unique latitudes and longitudes
             if df_ingrid.shape[0] > 0: 
-                station_coordinates.append(df_ingrid[
-                        ['Latitude', 'Longitude']].drop_duplicates().values)
-                # in the case that >1 AQS site exists in grid cell, average over
-                # all sites in cell 
-                df_ingrid = df_ingrid.groupby(['Date GMT']).mean()
-                # add missing values                 
-                df_ingrid = df_ingrid.reindex(times_ymd, fill_value = np.nan)
-                # add daily grid cell averages to grid
-                colocated_tg[:, i, j] = df_ingrid['Sample Measurement'].values
+                # if AQS observations from all stations (rural, urban, and sub-
+                # urban) are needed, following lines are executed
+                if environment == []:
+                    # save off unique latitudes and longitudes
+                    station_coordinates.append(df_ingrid[
+                            ['Latitude', 'Longitude']].drop_duplicates().values)                    
+                    # in the case that >1 AQS site exists in grid cell, average 
+                    # over all sites in cell 
+                    df_ingrid = df_ingrid.groupby(['Date GMT']).mean()
+                    # add missing values                 
+                    df_ingrid = df_ingrid.reindex(times_ymd, fill_value = np.nan)
+                    # add daily grid cell averages to grid
+                    colocated_tg[:, i, j] = df_ingrid['Sample Measurement'].values
+                # if AQS observations from a particular environment (i.e., 
+                # rural, urban, or suburban) are needed
+                else: 
+                    # list of latitude, longitudes in environment of interest
+                    lats_in_env, lons_in_env = [], []
+                    for (slat, slon) in df_ingrid[['Latitude', 
+                        'Longitude']].drop_duplicates().values:
+                        # find index in AQS site record corresponding to 
+                        # station's observations
+                        siting_lat = np.where(np.around(
+                                aqs_sites['Latitude'].values, 4) == np.around(
+                                        slat, 4))
+                        siting_lon = np.where(np.around(
+                                aqs_sites['Longitude'].values, 4) == np.around(
+                                        slon, 4))
+                        siting = np.intersect1d(siting_lat, siting_lon)
+                        siting = aqs_sites.iloc[siting[0]]['Location Setting']                    
+                        # only save off observations from environment of 
+                        # interest
+                        if siting in environment: 
+                            lats_in_env.append(slat)
+                            lons_in_env.append(slon)
+                    # find observations taken at latitudes/longitudes in 
+                    # environment
+                    df_ingrid = df_ingrid.loc[df_ingrid['Latitude'].isin(
+                            lats_in_env) & df_ingrid['Longitude'].isin(
+                            lons_in_env)]
+                    # same as above 
+                    station_coordinates.append(df_ingrid[
+                            ['Latitude', 'Longitude']].drop_duplicates().values)                        
+                    df_ingrid = df_ingrid.groupby(['Date GMT']).mean()
+                    df_ingrid = df_ingrid.reindex(times_ymd, fill_value = np.nan)
+                    colocated_tg[:, i, j] = df_ingrid['Sample Measurement'].values
     return station_coordinates, colocated_tg
 # # # # # # # # # # # # #    
 def commensurate_aqstracegas_diurnal(comm_castnet, castnet_sites_fr, years, 
@@ -2486,7 +2548,7 @@ def open_gridded_idailyCTM(years):
         # the latitudinal/longitudinal bounds of file are hard-coded; would have
         # to change if examining other regions
         infile = Dataset(pollutants_constants.PATH_GMI + 'HindcastMR2/' + 
-                         'gmic_HindcastMR2_%s_35N_275E_50N_285E_15.idaily.nc' 
+                         'gmic_HindcastMR2_%s_35N_275E_50N_295E_15.idaily.nc' 
                          %year, 'r')
         # extract dimensional information only on the first iteration of year
         # loop 
