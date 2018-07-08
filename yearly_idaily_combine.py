@@ -10,9 +10,11 @@ PROGRAMMER
     Gaige Hunter Kerr
 REVISION HISTORY
     05072018 -- initial version created
+    08072018 -- function 'yearly_idaily_combine' modified to include CTM 
+                simulation name as an argument.
 """
 # # # # # # # # # # # # #
-def yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, year):
+def yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, case, year):
     """using Gmimod freq1 species concentration files for summer (JJA) months, 
     function uses latitude/longitude inputs to find the closest values in 
     the CTM's grid. Output is reduced to this smaller grid and daily gridded 
@@ -33,6 +35,8 @@ def yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, year):
     presslevel : int
         The number of pressure levels (started from the lowest model level, 
         992.52 hPa) that will be saved to output file.
+    case : str
+        CTM simulation name
     year : int 
         Year of interest
 
@@ -50,7 +54,7 @@ def yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, year):
     co, no, no2, o3 = [], [], [], []
     # open input file for each summer month in year 
     for month in months:
-        infile = Dataset('gmic_HindcastMR2_%d_%s.idaily.nc' %(year, month), 'r')
+        infile = Dataset(path + 'gmic_HindcastMR2_%d_%s.idaily.nc' %(year, month), 'r')
         if month == months[0]:
             # find indices corresponding to region of interest
             llat = np.abs(infile.variables['latitude_dim'][:] - llat).argmin()
@@ -161,5 +165,6 @@ llat = 35.
 llon = 275.
 rlon = 285.
 presslevel = 15
+case = 'HindcastMR2-DiurnalAvgT'
 year = 2008
-yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, year)
+yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, case, year)
