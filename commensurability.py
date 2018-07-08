@@ -884,8 +884,8 @@ def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon, environment):
     lon : numpy.ndarray
         Longitude coordinates of focus region, units of degrees east, [lon,]
     environment : list
-        Which environment (i.e., rural, urban, and/or suburban) AQS 
-        observations are retrieved from; n.b. if all observations are wanted, 
+        Environment (i.e., rural, urban, and/or suburban) in which AQS 
+        observations are retrieved; n.b. if all observations are wanted, 
         pass [] (faster) or ['URBAN AND CENTER CITY', 'RURAL', 'SUBURBAN']
         (slower). Otherwise, pass a list of individual environments (i.e., 
         ['URBAN'])
@@ -900,8 +900,7 @@ def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon, environment):
         NO2, CO, or O3) within CTM grid cells and environment of interest. If 
         no AQS stations are located within the bounds of a CTM grid cell, a nan 
         value is returned. If > 1 AQS station exists in a grid cell, the daily 
-        values at these stations are averaged, units of volume mixing ratio, 
-        [time, lat, lon]
+        values at these stations are averaged, [time, lat, lon]
     """
     import numpy as np
     import pandas as pd
