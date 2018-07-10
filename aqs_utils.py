@@ -223,6 +223,137 @@ def boxplot_tracegas_byenv(co_all, co_u, co_su, co_r, mr2_co, no2_all,
                                                   region), dpi = 300)
     return 
 # # # # # # # # # # # # # 
+def boxplot_tracegas_byenv_gridded(all_obs, rural_obs, urban_obs, suburban_obs,
+    ctm, axislabel, filename):
+    """given AQS trace gas observations from different environments cast onto 
+    a gridded surface, function takes CTM output and finds output at particular
+    grid cells within each environment (n.b., some grid cells might be counted)
+    as both urban or rural, for example) and then produces daily, regionally-
+    averaged values and plots these values in boxplots 
+
+    Parameters
+    ----------
+    all_obs : numpy.ndarray
+        Daily 12Z AQS trace gas measurements for trace gas of interest (i.e., 
+        NO2, CO, or O3) within CTM grid cells and environment of interest. If 
+        no AQS stations are located within the bounds of a CTM grid cell, a nan 
+        value is returned. If > 1 AQS station exists in a grid cell, the daily 
+        values at these stations are averaged, [time, lat, lon] 
+    rural_obs : numpy.ndarray
+        Same as variable 'all_obs' but only for rural observations
+    urban_obs : numpy.ndarray
+        Same as variable 'all_obs' but only for urban observations
+    suburban_obs : numpy.ndarray
+        Same as variable 'all_obs' but only for suburban observations
+    ctm : numpy.ndarray
+        Daily 12Z gridded CTM output for the species of interest at the lowest 
+        model pressure level, same units as variable 'obs', [time, lat, lon]     
+    axislabel : str
+        Label for boxplot's y-axis with appropriate units included
+    filename : str
+        Trace gas name for output figure file name
+
+    Returns
+    ----------
+    None          
+    """
+    import numpy as np
+    import matplotlib.patches as mpatches
+    import matplotlib.pyplot as plt
+    # for all 
+    all_ctm = np.copy(ctm)
+    nanwhere = np.argwhere(np.isnan(all_obs))
+    all_ctm[nanwhere[:, 0], nanwhere[:, 1], nanwhere[:, 2]] = np.nan
+    del nanwhere
+    # for rural 
+    rural_ctm = np.copy(ctm)
+    nanwhere = np.argwhere(np.isnan(rural_obs))
+    rural_ctm[nanwhere[:, 0], nanwhere[:, 1], nanwhere[:, 2]] = np.nan
+    del nanwhere
+    # for urban 
+    urban_ctm = np.copy(ctm)
+    nanwhere = np.argwhere(np.isnan(urban_obs))
+    urban_ctm[nanwhere[:, 0], nanwhere[:, 1], nanwhere[:, 2]] = np.nan
+    del nanwhere
+    # for suburban
+    suburban_ctm = np.copy(ctm)
+    nanwhere = np.argwhere(np.isnan(suburban_obs))
+    suburban_ctm[nanwhere[:, 0], nanwhere[:, 1], nanwhere[:, 2]] = np.nan
+    del nanwhere
+    # find region average of trace gas observations/CTM output in different 
+    # environments; result should be one value for each day 
+    all_obs = np.nanmean(all_obs, axis = tuple((1, 2)))
+    rural_obs = np.nanmean(rural_obs, axis = tuple((1, 2)))
+    urban_obs = np.nanmean(urban_obs, axis = tuple((1, 2)))
+    suburban_obs = np.nanmean(suburban_obs, axis = tuple((1, 2)))
+    all_ctm = np.nanmean(all_ctm, axis = tuple((1, 2)))    
+    rural_ctm = np.nanmean(rural_ctm, axis = tuple((1, 2)))
+    urban_ctm = np.nanmean(urban_ctm, axis = tuple((1, 2)))
+    suburban_ctm = np.nanmean(suburban_ctm, axis = tuple((1, 2)))
+    data = {}
+    data['a'] = np.hstack(all_obs)
+    if filename == 'co':
+        data['b'] = np.hstack(all_ctm) * 1e6
+        data['d'] = np.hstack(urban_ctm) * 1e6
+        data['f'] = np.hstack(suburban_ctm) * 1e6
+        data['h'] = np.hstack(rural_ctm) * 1e6
+    else:
+        data['b'] = np.hstack(all_ctm) * 1e9
+        data['d'] = np.hstack(urban_ctm) * 1e9
+        data['f'] = np.hstack(suburban_ctm) * 1e9
+        data['h'] = np.hstack(rural_ctm) * 1e9
+    data['c'] = np.hstack(urban_obs)
+    data['e'] = np.hstack(suburban_obs)
+    data['g'] = np.hstack(rural_obs)
+    color_dict = {'all' : '#66c2a5',
+                  'urban' : '#fc8d62',
+                  'suburban' : '#8da0cb', 
+                  'rural' : '#e78ac3'}
+    controls = ['all', 'all', 'urban', 'urban', 'suburban', 'suburban',
+                'rural', 'rural']
+    # initialize figure, axis
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    boxplot_dict = ax.boxplot(
+            [data[x] for x in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']],
+            positions = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5],
+            patch_artist = True,
+            widths = 0.25, showfliers = True)
+    for b in boxplot_dict['medians']:
+        b.set_color('k')
+        b.set_linewidth(2.)
+    i = 0
+    ax.set_xticks(np.arange(1, 5, 0.5))
+    ax.set_xticklabels(controls)
+    for b in boxplot_dict['boxes']:
+        lab = ax.get_xticklabels()[i].get_text()
+        b.set_facecolor(color_dict[lab]) 
+        b.set_linewidth(2.)
+        # for CTM output, add hatch to boxplot
+        if i % 2 != 0:
+            b.set(hatch = '////')        
+        i += 1
+    for b in boxplot_dict['fliers']:
+        b.set_marker('.')
+        b.set_markersize(1)
+        b.set_markerfacecolor('k')
+    for b in boxplot_dict['whiskers']:
+        b.set_linewidth(2.)
+    for b in boxplot_dict['caps']:
+        b.set_linewidth(2.)
+    ax.set_xlim([0.75, 4.75])
+    ax.set_xticks([1.25, 2.25, 3.25, 4.25])
+    ax.set_xticklabels(['All', 'Urban', 'Suburban', 'Rural'])
+    ax.set_ylabel('%s' %axislabel)
+    # make fake legend 
+    plain_patch = mpatches.Patch(facecolor = 'w', edgecolor = 'k', 
+                                 label = 'AQS')
+    hatch_patch = mpatches.Patch(facecolor = 'w', edgecolor = 'k',
+                                 alpha = 1., hatch = r'////', 
+                                 label = 'GMI CTM')
+    plt.legend(handles=[plain_patch, hatch_patch])
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'boxplot_tracegas_byenv_gridded_%s.eps' %(filename), dpi = 300)
+# # # # # # # # # # # # #    
 def map_gmiaqsbias(obs, gmi, lat, lon, species, filename):
     """function replaces CTM trace gas concentrations with NaNs if no 
     observation for a particular day/grid cell exist and then finds the time-
@@ -403,12 +534,10 @@ castnet_sites_fr = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
 years = [2008, 2009, 2010]
 sampling_months = [6, 7, 8]
 sampling_hours = [15, 16, 17, 18, 19, 20]
-# load data
-# CTM/CASTNet
+# CTM hourly/CASTNet
 comm_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
 commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
-                                          years, sampling_months, 
-                                          sampling_hours)  
+    years, sampling_months, sampling_hours)  
 # AQS at all sites
 aqs_co, aqs_no2, aqs_o3, aqs_co_coords, aqs_no2_coords, aqs_o3_coords = \
 commensurability.commensurate_aqstracegas(castnet_sites_fr, years, sampling_months, 
@@ -439,66 +568,74 @@ o3_u = np.nanmean(comm_o3_u, axis = 1)
 o3_su = np.nanmean(comm_o3_su, axis = 1)
 o3_r = np.nanmean(comm_o3_r, axis = 1)
 mr2_o3 = np.nanmean(mr2_o3, axis = 1)
- plot boxplots of AQS O3, CO, and NO2 by environments
-boxplot_tracegas_byenv(co_all, co_u, co_su, co_r, mr2_co, no2_all, 
-                       no2_u, no2_su, no2_r, mr2_no2, o3_all_castnet, 
-                       o3_all, o3_u, o3_su, o3_r, mr2_o3, years, region)
-# open 12Z CTM output for focus region
+# CTM 12Z gridded
 (lat, lon, pressure, times, co, no, no2, o3) = \
-commensurability.open_gridded_idailyCTM(years)
+commensurability.open_gridded_idailyCTM('HindcastMR2', years)
 # load AQS observations
 COdf, NO2df, O3df = commensurability.load_aqshourly(years)
 # retrieve ALL AQS observations in CTM grid cells for NO2
 no2_station_coordinates, colocated_no2obs = \
 commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
                                                   [])
-map_gmiaqsbias(colocated_no2obs, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
-               'All')
 # retrieve RURAL AQS observations in CTM grid cells
 no2_station_coordinates_rural, colocated_no2obs_rural = \
 commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
                                                   ['RURAL'])
-map_gmiaqsbias(colocated_no2obs_rural, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
-               'Rural')
 # retrieve URBAN AQS observations in CTM grid cells
 no2_station_coordinates_urban, colocated_no2obs_urban = \
 commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
                                                   ['URBAN AND CENTER CITY'])
-map_gmiaqsbias(colocated_no2obs_urban, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
-               'Urban')
 # retrieve SUBURAN AQS observations in CTM grid cells
 no2_station_coordinates_suburban, colocated_no2obs_suburban = \
 commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
                                                   ['SUBURBAN'])
-map_gmiaqsbias(colocated_no2obs_suburban, no2[:, 0] * 1e9, lat, lon, 
-               'NO$_{2}$', 'Suburban')
-# plot locations of rural, urban, and suburban AQS stations
-map_aqsstations(no2_station_coordinates_rural, no2_station_coordinates_urban, 
-                no2_station_coordinates_suburban, 'no2')
 # retrieve ALL AQS observations in CTM grid cells for CO
 co_station_coordinates, colocated_coobs = \
 commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
                                                   [])
-map_gmiaqsbias(colocated_coobs, co[:, 0] * 1e6, lat, lon, 'CO', 
-               'All')
 # retrieve RURAL AQS observations in CTM grid cells
 co_station_coordinates_rural, colocated_coobs_rural = \
 commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
                                                   ['RURAL'])
-map_gmiaqsbias(colocated_coobs_rural, co[:, 0] * 1e6, lat, lon, 'CO', 
-               'Rural')
 # retrieve URBAN AQS observations in CTM grid cells
 co_station_coordinates_urban, colocated_coobs_urban = \
 commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
                                                   ['URBAN AND CENTER CITY'])
-map_gmiaqsbias(colocated_coobs_urban, co[:, 0] * 1e6, lat, lon, 'CO', 
-               'Urban')
 # retrieve SUBURAN AQS observations in CTM grid cells
 co_station_coordinates_suburban, colocated_coobs_suburban = \
 commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
                                                   ['SUBURBAN'])
+# boxplot of hourly observations and CTM output by environment
+boxplot_tracegas_byenv(co_all, co_u, co_su, co_r, mr2_co, no2_all, 
+                       no2_u, no2_su, no2_r, mr2_no2, o3_all_castnet, 
+                       o3_all, o3_u, o3_su, o3_r, mr2_o3, years, region)
+# boxplot of 12Z observations and CTM output by environment
+boxplot_tracegas_byenv_gridded(colocated_no2obs, colocated_no2obs_rural, 
+    colocated_no2obs_urban, colocated_no2obs_suburban, no2[:, 0], 
+    'NO$_{2}$ [ppbv]', 'no2')
+boxplot_tracegas_byenv_gridded(colocated_coobs, colocated_coobs_rural, 
+    colocated_coobs_urban, colocated_coobs_suburban, co[:, 0], 
+    'CO [ppmv]', 'co')
+# plot maps of bias by environment
+map_gmiaqsbias(colocated_no2obs, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
+               'All')
+map_gmiaqsbias(colocated_no2obs_rural, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
+               'Rural')
+map_gmiaqsbias(colocated_no2obs_urban, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
+               'Urban')
+map_gmiaqsbias(colocated_no2obs_suburban, no2[:, 0] * 1e9, lat, lon, 
+               'NO$_{2}$', 'Suburban')
+map_gmiaqsbias(colocated_coobs, co[:, 0] * 1e6, lat, lon, 'CO', 
+               'All')
+map_gmiaqsbias(colocated_coobs_rural, co[:, 0] * 1e6, lat, lon, 'CO', 
+               'Rural')
+map_gmiaqsbias(colocated_coobs_urban, co[:, 0] * 1e6, lat, lon, 'CO', 
+               'Urban')
 map_gmiaqsbias(colocated_coobs_suburban, co[:, 0] * 1e6, lat, lon, 
                'CO', 'Suburban')
+# plot locations of rural, urban, and suburban AQS stations
+map_aqsstations(no2_station_coordinates_rural, no2_station_coordinates_urban, 
+                no2_station_coordinates_suburban, 'no2')
 # plot locations of rural, urban, and suburban AQS stations
 map_aqsstations(co_station_coordinates_rural, co_station_coordinates_urban, 
                 co_station_coordinates_suburban, 'co')
