@@ -68,6 +68,7 @@ REVISION HISTORY
                 12Z HindcastMR2 output
     06072018 -- function 'commensurate_aqstracegas_gridded' changed to take 
                 siting environment (i.e. urban, rural, suburban) into account
+    10072018 -- added function 'selectenv_gridded_idailyCTM'
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -2498,7 +2499,7 @@ def commensurate_aqstracegas_siting(castnet_sites_fr, years, sampling_months,
             coords_no2_r, coords_no2_u, comm_o3_su, comm_o3_r, comm_o3_u, 
             coords_o3_su, coords_o3_r, coords_o3_u)
 # # # # # # # # # # # # #    
-def open_gridded_idailyCTM(years):
+def open_gridded_idailyCTM(case, years):
     """GMI CTM output from idaily (gridded daily 12Z output) over the focus 
     region is opened and aggregated over the summers whose years are defined 
     in variable 'years.' Output reduced for focus region was created with 
@@ -2506,13 +2507,15 @@ def open_gridded_idailyCTM(years):
     
     Parameters
     ----------   
+    case : str
+        Hindcast family (i.e. MR2, MR2-CCMI, FFIgac2, etc.)    
     years : list 
         Years of interest (n.b., as of 5 July 2018 files for 2008-2010 are 
         saved locally)
     
     Returns
     ----------
-    lat : numpy.ndarray
+    lat : numpy.ndarrayn
         Latitude coordinates of focus region, units of degrees north, [lat,]
     lon : numpy.ndarray
         Longitude coordinates of focus region, units of degrees east, [lon,]
@@ -2546,9 +2549,9 @@ def open_gridded_idailyCTM(years):
     for year in years: 
         # the latitudinal/longitudinal bounds of file are hard-coded; would have
         # to change if examining other regions
-        infile = Dataset(pollutants_constants.PATH_GMI + 'HindcastMR2/' + 
-                         'gmic_HindcastMR2_%s_35N_275E_50N_295E_15.idaily.nc' 
-                         %year, 'r')
+        infile = Dataset(pollutants_constants.PATH_GMI + '%s/' %(case) + 
+                         'gmic_%s_%s_35N_275E_50N_295E_15.idaily.nc' 
+                         %(case, year), 'r')
         # extract dimensional information only on the first iteration of year
         # loop 
         if year == years[0]:
@@ -2582,3 +2585,47 @@ def open_gridded_idailyCTM(years):
     o3 = np.vstack(o3)
     return (lat, lon, pressure, times, co, no, no2, o3)  
 # # # # # # # # # # # # #       
+def selectenv_gridded_idailyCTM(station_coords, ctm, lat, lon):
+    """given a list of latitude/longitude coordinates of AQS stations in a 
+    particular environment, function selects nearest CTM grid cells at a 
+    particular model pressure level and returns only daily 12Z gridden CTM 
+    output at these grid cells. 
+    
+    Parameters
+    ----------        
+    station_coords : lust
+        List of arrays containing the unique locations (latitude/longitude 
+        coordinates) of AQS stations in CTM grid cells    
+    ctm : numpy.ndarray
+        Gridded CTM output, units of volume mixing ratio, [time, lat, lon]
+    lat : numpy.ndarray
+        Latitude coordinates of focus region, units of degrees north, [lat,]
+    lon : numpy.ndarray
+        Longitude coordinates of focus region, units of degrees east, [lon,]
+
+    Returns
+    ----------
+    ctm_env : numpy.ndarray
+        Gridded CTM output at grid cells in environment, units of volume mixing
+        ration, [time, lat in env, lon in env]
+    lat_env : numpy.ndarray
+        Latitude coordinates in environment, units of degrees north, [lat in 
+        env,]
+    lon_env : numpy.ndarray
+        Longitude coordinates in environment, units of degrees north, [lon in 
+        env,]    
+    """
+    station_coords = np.vstack(station_coords)    
+    lonidx, latidx = [], []
+    for slon, slat in zip(station_coords[:,1], station_coords[:,0]):
+        # transform city's longitude from (-180 - 180) to (0 - 360)
+        slon = slon % 360
+        # find nearest grid cell
+        latidx.append(np.abs(lat - slat).argmin())
+        lonidx.append(np.abs(lon - slon).argmin())
+    # select CTM at observation sites for a single model level
+    ctm_env = ctm[:, latidx, lonidx]
+    lat_env = lat[latidx]
+    lon_env = lon[lonidx]
+    return ctm_env, lat_env, lon_env
+# # # # # # # # # # # # #    
