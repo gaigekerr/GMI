@@ -294,6 +294,134 @@ def tavg1_2d_aer_Nx_combine(ulat, llat, llon, rlon):
     outfile.close()
     return 
 # # # # # # # # # # # # #    
+def inst6_3d_ana_Np_combine(year, ulat, llat, llon, rlon):
+    """function opens all daily files of 6-Hourly, Instantaneous, 
+    Pressure-Level, Analysis, Analyzed Meteorological Fields for a particular
+    summer (JJA) and extracts grid cells bounded by the input latitude and 
+    longitudes and creates a single output file for the summer. 
+
+    Parameters
+    ----------
+    year : int
+        Year of interest
+    ulat : int/float
+        Upper latitude bound for focus region
+    llat : int/float
+        Lower latitude bound for focus region    
+    llon : int/float
+        Left longitude bound for focus region    
+    rlon : int/float
+        Right longitude bound for focus region            
+
+    Returns
+    ----------
+    None    
+    """
+    import numpy as np
+    from netCDF4 import Dataset
+    import glob
+    # path to MERRA-2 data holdings
+    path = '/mnt/scratch3/gkerr4/data/MERRA-2/inst6_3d_ana_Np/'
+    # file names with wildcard character for date
+    mfstring = 'MERRA2_300.inst6_3d_ana_Np.%s*.SUB.nc4' %year
+    infiles = []
+    for file in glob.glob(path + mfstring):
+        infiles.append(file)
+    # sort input files by date (YYYYMMDD format)
+    infiles.sort()
+    H, T, U, V = [], [], [], []
+    for file in infiles:     
+        infile = Dataset(file, 'r')
+        if file == infiles[0]:
+            # convert longitude to (0 - 360)        
+            lon = infile.variables['lon'][:] + 360.
+            lat = infile.variables['lat'][:]
+            # find indices corresponding to region of interest on first iteration
+            # through loop          
+            llat = np.abs(lat - llat).argmin()
+            ulat = np.abs(lat - ulat).argmin()
+            llon = np.abs(lon - llon).argmin()
+            rlon = np.abs(lon - rlon).argmin()
+            lon = lon[llon:rlon+1]
+            lat = lat[llat:ulat+1]    
+            pressure = infile.variables['lev'][:]
+        # extract relevant variables and append 4-hourly fields to JJA 
+        # list
+        # Geopotential height
+        H.append(infile.variables['H'][:, :, llat:ulat+1, llon:rlon+1])
+        # Air temperature
+        T.append(infile.variables['T'][:, :, llat:ulat+1, llon:rlon+1])
+        # Eastward wind component
+        U.append(infile.variables['U'][:, :, llat:ulat+1, llon:rlon+1])
+        # Northward wind component
+        V.append(infile.variables['V'][:, :, llat:ulat+1, llon:rlon+1])
+    # create output file; naming convention is the same as input file, 
+    # with trailing values corresponding to: lower latitude, left longitude, 
+    # upper latitude, right longitude
+    outfile = Dataset(path + 
+                      'MERRA2_300.inst6_3d_ana_Np_%d_%dN_%dE_%dN_%dE.nc'
+                      %(year, lat[0], lon[0], lat[-1], lon[-1]), 'w')    
+    # define set of dimensions
+    lat_dim = outfile.createDimension('lat', len(lat))
+    lon_dim = outfile.createDimension('lon', len(lon))
+    pressure_dim = outfile.createDimension('lev', len(pressure))
+    time_dim = outfile.createDimension('time', None)
+    # create coordinate variables for variables
+    H_dataset = outfile.createVariable('H', np.float32, 
+                                       ('time', 'lev', 'lat', 'lon')) 
+    T_dataset = outfile.createVariable('T', np.float32, 
+                                        ('time', 'lev', 'lat', 'lon')) 
+    U_dataset = outfile.createVariable('U', np.float32, 
+                                         ('time', 'lev', 'lat', 'lon')) 
+    V_dataset = outfile.createVariable('V', np.float32, 
+                                         ('time', 'lev', 'lat', 'lon')) 
+    lat_dim = outfile.createVariable('lat', np.float32, ('lat'))
+    lon_dim = outfile.createVariable('lon', np.float32, ('lon'))
+    pressure_dim = outfile.createVariable('lev', np.float32, ('lev'))
+    # add data and define their attributes
+    # latitude
+    lat_dim[:] = lat[:]
+    lat_dim.standard_name = 'latitude'
+    lat_dim.units = 'degrees_north'
+    # longitude
+    lon_dim[:] = lon
+    lon_dim.standard_name = 'longitude'
+    lon_dim.units = 'degree_east'
+    # pressure
+    pressure_dim[:] = pressure
+    pressure_dim.standard_name = 'air_pressure'
+    pressure_dim.long_name = 'vertical level'
+    pressure_dim.units = 'hPa'
+    # H
+    H_dataset[:] = np.vstack(H)
+    H_dataset.standard_name = 'geopotential_height'
+    H_dataset.long_name = 'Geopotential height'
+    H_dataset.units = 'm'
+    # T
+    T_dataset[:] = np.vstack(T)
+    T_dataset.standard_name = 'air_temperature'
+    T_dataset.long_name = 'Air temperature'
+    T_dataset.units = 'K'
+    # U 
+    U_dataset[:] = np.vstack(U)
+    U_dataset.standard_name = 'eastward_wind'
+    U_dataset.long_name = 'Eastward wind component'
+    U_dataset.units = 'm/s'
+    # V
+    V_dataset[:] = np.vstack(U)
+    V_dataset.standard_name = 'northward_wind'
+    V_dataset.long_name = 'Northward wind component'
+    V_dataset.units = 'm/s'
+    # attributes
+    outfile.title = 'MERRA2_300.inst6_3d_ana_Np, 3d, MERRA2 6-Hourly, ' + \
+         'Instantaneous, Pressure-Level, Analysis, Analyzed Meteorological ' + \
+         'Fields, for summer (JJA) %s.' %year
+    outfile.author = 'Gaige Hunter Kerr'
+    outfile.comment = 'Output latitudinally bound by %d-%dN ' %(lat[0], lat[-1]) + \
+        'and longitudinally bound by %d-%dE is included.' %(lon[0], lon[-1])
+    outfile.close()
+    return 
+# # # # # # # # # # # # # #    
 # define function inputs 
 ulat = 50.
 llat = 35.
@@ -305,3 +433,6 @@ yearly_idaily_combine(ulat, llat, llon, rlon, presslevel,
     'HindcastMR2-DiurnalAvgT', 2008)
 # for tavg1_2d_aer_Nx
 tavg1_2d_aer_Nx_combine(ulat, llat, llon, rlon)
+# for inst6_3d_ana_Np
+year = 2008
+inst6_3d_ana_Np_combine(year, ulat, llat, llon, rlon)
