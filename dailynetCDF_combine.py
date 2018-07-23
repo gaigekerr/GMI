@@ -408,7 +408,7 @@ def inst6_3d_ana_Np_combine(year, ulat, llat, llon, rlon):
     U_dataset.long_name = 'Eastward wind component'
     U_dataset.units = 'm/s'
     # V
-    V_dataset[:] = np.vstack(U)
+    V_dataset[:] = np.vstack(V)
     V_dataset.standard_name = 'northward_wind'
     V_dataset.long_name = 'Northward wind component'
     V_dataset.units = 'm/s'
