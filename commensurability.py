@@ -69,6 +69,9 @@ REVISION HISTORY
     06072018 -- function 'commensurate_aqstracegas_gridded' changed to take 
                 siting environment (i.e. urban, rural, suburban) into account
     10072018 -- added function 'selectenv_gridded_idailyCTM'
+    20072018 -- function 'open_inst6_3d_ana_Np' added to open MERRA-2 6-hourly
+                meteorology
+    25072018 -- functions added to open GMI profile information
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -2584,48 +2587,234 @@ def open_gridded_idailyCTM(case, years):
     no2 = np.vstack(no2)
     o3 = np.vstack(o3)
     return (lat, lon, pressure, times, co, no, no2, o3)  
-# # # # # # # # # # # # #       
-def selectenv_gridded_idailyCTM(station_coords, ctm, lat, lon):
-    """given a list of latitude/longitude coordinates of AQS stations in a 
-    particular environment, function selects nearest CTM grid cells at a 
-    particular model pressure level and returns only daily 12Z gridden CTM 
-    output at these grid cells. 
+# # # # # # # # # # # # #
+def open_inst6_3d_ana_Np(years, lev):
+    """function opens MERRA-2 inst6_3d_ana_Np output for the summers of 
+    interest. Input files created with file 'dailynetCDF_combine.py.' 
+    Geopotential height, temperature, U-/V-wind, and coordinate information are
+    retrieved. 
     
     Parameters
-    ----------        
-    station_coords : lust
-        List of arrays containing the unique locations (latitude/longitude 
-        coordinates) of AQS stations in CTM grid cells    
-    ctm : numpy.ndarray
-        Gridded CTM output, units of volume mixing ratio, [time, lat, lon]
+    ----------      
+    years : list 
+        Years of interest
+    lev : int/list
+        Index or indices corresponding to the pressure level(s) of interest. 
+        If a single level is desired, either an integer with a length of 1 
+        can be passed to function. If multiple levels are desired, pass a 
+        list with comma-separated indices. n.b., lev = 0 or lev = [0] would 
+        correspond to the 1000 hPa level, lev = 1 corresponds to 975 hPa, 
+        lev = 2 corresponds to 950, etc.              
+
+    Returns
+    ----------
+    H : numpy.ndarray
+        Geopotential height, units of m, [time, lev, lat, lon]
+    T : numpy.ndarray 
+        Air temperature, units of K, [time, lev, lat, lon]
+    U : numpy.ndarray 
+        U wind component, units of m/s, [time, lev, lat, lon]
+    V : numpy.ndarray
+        V wind component, units of m/s, [time, lev, lat, lon]    
+    time : numpy.ndarray
+        Datetime objects corresponding to each 6-hourly timestep of MERRA-2,
+        [time,]
     lat : numpy.ndarray
         Latitude coordinates of focus region, units of degrees north, [lat,]
     lon : numpy.ndarray
         Longitude coordinates of focus region, units of degrees east, [lon,]
+    pressure : 
+        Pressure coordinates for level(s) of interest, units of hPa, [lev,]
+    """
+    import numpy as np
+    from netCDF4 import Dataset
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    sys.path.append('/Users/ghkerr/Desktop/')
+    from generate_times import generate_times
+    H, T, U, V, times = [], [], [], [], []
+    # for each year in measuring period, open MERRA-2 meteorology and generate
+    # times of MERRA-2 output
+    for year in years: 
+        times.append(generate_times(year, 6, 8, 6))
+        # n.b., if focus region is changed, following line will need to be 
+        # rewritten
+        infile = Dataset(pollutants_constants.PATH_METEOROLOGY + 
+            'MERRA2_300.inst6_3d_ana_Np_%d_35N_275E_50N_295E.nc' %year, 'r')
+        # extract meteorology at level(s) of interest
+        H.append(infile.variables['H'][:, lev])
+        T.append(infile.variables['T'][:, lev])
+        U.append(infile.variables['U'][:, lev])
+        V.append(infile.variables['V'][:, lev])   
+        # on first iteration of loop, extract coordinate information
+        if year == years[0]:
+            lat = infile.variables['lat'][:]
+            lon = infile.variables['lon'][:]
+            pressure = infile.variables['lev'][lev]
+        print('6-hourly MERRA-2 meteorology for %s loaded!' %year)
+    # stack along time dimension 
+    H = np.vstack(H)
+    T = np.vstack(T)
+    U = np.vstack(U)
+    V = np.vstack(V)
+    times = np.hstack(times)        
+    return H, T, U, V, times, lat, lon, pressure
+# # # # # # # # # # # # #
+def open_profile_singmonth(case, month, year, species, stations, levels):
+    """for a given month, function retrieves a desired constituent at desired 
+    stations and model pressure levels. Output constituent array represents 
+    the volume mixing ratios of desired species at hourly temporal resolution.
+    
+    Parameters
+    ----------   
+    case : str
+        GMI Simulation name
+    month : str 
+        Three month abbreviations, all lowercase (i.e. 'jun', 'may', etc.); 
+        n.b. only June - August are available
+    year : int
+        Year of interest
+    species : str
+        Either 'CO', 'NO2', 'NO', or 'O3'
+    stations : list
+        'all' for all stations or a list of stations at which column diagnostic 
+        information is desired
+    levels : str/int
+        'all' for full column (surface - 0.015 hPa), 0 for surface (i.e. 
+        surface is 992.52405 hPa)
+    times : numpy.ndarray
+        Datetime objects for each model timestep, [step * no. days in months,]        
 
     Returns
     ----------
-    ctm_env : numpy.ndarray
-        Gridded CTM output at grid cells in environment, units of volume mixing
-        ration, [time, lat in env, lon in env]
-    lat_env : numpy.ndarray
-        Latitude coordinates in environment, units of degrees north, [lat in 
-        env,]
-    lon_env : numpy.ndarray
-        Longitude coordinates in environment, units of degrees north, [lon in 
-        env,]    
+    col_latitude : numpy.ndarray
+        Station latitudes, units awof degrees north, [no. stations,]
+    col_longitude : numpy.ndarray
+        Station longitudes, units of degrees east, [no. stations,]
+    station_labels : numpy.ndarray
+        Station name abbreviations, [no. stations,]
+    pressure : numpy.ndarray 
+        Pressure levels (centered), units of hPa, [no. pressure levels,]
+    const : numpy.ndarray
+        Constituent, units of volume mixing ratio, [no. stations, 24 * no. 
+        days in month, no. pressure levels,]
+    times : numpy.ndarray 
+        Datetime objects for each model timestep, [step * no. days in months,]        
     """
-    station_coords = np.vstack(station_coords)    
-    lonidx, latidx = [], []
-    for slon, slat in zip(station_coords[:,1], station_coords[:,0]):
-        # transform city's longitude from (-180 - 180) to (0 - 360)
-        slon = slon % 360
-        # find nearest grid cell
-        latidx.append(np.abs(lat - slat).argmin())
-        lonidx.append(np.abs(lon - slon).argmin())
-    # select CTM at observation sites for a single model level
-    ctm_env = ctm[:, latidx, lonidx]
-    lat_env = lat[latidx]
-    lon_env = lon[lonidx]
-    return ctm_env, lat_env, lon_env
-# # # # # # # # # # # # #    
+    import numpy as np
+    from netCDF4 import Dataset    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    from generate_times import generate_times    
+    # open Gmimod column diagnostic file of interest
+    infile = Dataset(pollutants_constants.PATH_GMI + '%s/' %case +
+                     'gmic_%s_%d_%s.profile.nc' %(case, year, month), 'r')
+    # extract species names; change format from dtype='|S1'
+    const_labels_raw = infile.variables['const_labels'][:]
+    const_labels_raw = np.vstack(const_labels_raw)
+    const_labels = []
+    for row in np.arange(0, np.shape(const_labels_raw)[0]):
+        temp = []
+        for element in const_labels_raw[row]:
+            temp.append(element.decode('UTF-8'))
+        si = ''.join(temp)
+        si = si.rstrip()
+        const_labels.append(si[:])      
+    # extract station names; change format from dtype='|S1'
+    station_labels_raw = infile.variables['station_labels'][:]
+    station_labels_raw = np.vstack(station_labels_raw)
+    station_labels = []
+    for row in np.arange(0, np.shape(station_labels_raw)[0]):
+        temp = []
+        for element in station_labels_raw[row]:
+            temp.append(element.decode('UTF-8'))
+        si = ''.join(temp)
+        si = si.rstrip()
+        station_labels.append(si[:])      
+    del station_labels_raw, const_labels_raw    
+    where_species = np.where(np.array(const_labels) == species)[0][0]
+    # location position(s) of station(s) of interest
+    if stations == 'all':
+        where_stations = np.arange(0, len(station_labels), 1)
+    else: 
+        where_stations = np.where(np.in1d(station_labels, stations) == True)[0]
+    # extract coordinate, pressure, and constituent information; n.b. 
+    # const_surf is the same as const[:, :, :, 0]
+    station_labels = np.array(station_labels)[where_stations]
+    col_latitude = infile.variables['col_latitude'][where_stations]
+    col_longitude = infile.variables['col_longitude'][where_stations]
+    if levels == 'all':
+        pressure = infile.variables['pressure'][:]
+        const = infile.variables['const'][where_stations, :, where_species, :]
+    else: 
+        pressure = infile.variables['pressure'][levels]    
+        const = infile.variables['const'][where_stations, :, 
+                                where_species, levels]
+    # generate times for hourly CTM output 
+    mon_dict = {'jun' : 6, 'jul' : 7, 'aug' : 8}
+    times = generate_times(year, mon_dict[month], mon_dict[month], 1)
+    return (np.hstack(col_latitude), np.hstack(col_longitude), station_labels, 
+            pressure, const, np.hstack(times))
+# # # # # # # # # # # # #
+def open_profile_multimonth(case, months, years, species, stations, 
+                                 levels):     
+    """similar to function open_profile_singmonth but for multiple months.
+    
+    Parameters
+    ----------   
+    case : str
+        GMI Simulation name
+    months : list
+        Contains three month abbreviations, all lowercase (i.e. 'jun', 'may', 
+        etc.); n.b. items must be in chronilogical order and only May -
+        September are available
+    years : int
+        Years of interest        
+    species : str
+        Either 'CO', 'NO2', 'NO', or 'O3'
+    stations : numpy.ndarray 
+        'all' for all stations or a list of stations at which column diagnostic 
+        information is desired
+    levels : str
+        'all' for full column (surface - 0.015 hPa), 0 for surface (i.e. 
+        surface is 992.52405 hPa)
+
+    Returns
+    ----------
+    col_latitude : numpy.ndarray
+        Station latitudes, units of degrees north, [no. stations,]
+    col_longitude: numpy.ndarray
+        Station longitudes, units of degrees east, [no. stations,]
+    station_labels : numpy.ndarray
+        Station name abbreviations, [no. stations,]        
+    pressure : numpy.ndarray 
+        Pressure levels (centered), units of hPa, [no. pressure levels,]
+    const_multiyear : numpy.ndarray
+        Constituent, units of volume mixing ration, [no. stations, step * 
+        no. days in months * no. years, no. pressure levels,]
+    times_multiyear : numpy.ndarray 
+        Datetime objects for each model timestep, 
+        [step * no. days in months * no. years,]          
+    """
+    import numpy as np
+    const_multiyear = []
+    times_multiyear = []
+    # loop through months
+    for year in years:
+        for month in months: 
+            (col_latitude, col_longitude, station_labels, pressure, 
+             const, times) = open_profile_singmonth(case, month, year, 
+                species, stations, levels)
+            # append constituent, times to list (all other information remains 
+            # the same through iterations of the loop)
+            const_multiyear.append(const)
+            times_multiyear.append(times)            
+    # stack along time dimension
+    const_multiyear = np.hstack(const_multiyear)
+    times_multiyear = np.hstack(times_multiyear)
+    return (col_latitude, col_longitude, station_labels, pressure, 
+            const_multiyear, times_multiyear)
+# # # # # # # # # # # # #
