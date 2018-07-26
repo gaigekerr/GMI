@@ -44,6 +44,7 @@ REVISION HISTORY
     04062018 -- removed np.roll from function 'diurnal_castneto3gmio3' as 
                 code modifications converted CASTNet observations to UTC 
                 prior to input in this function eliminating the need for this
+    26072018 -- function 'pdf_allgmio3' added
     """
 # # # # # # # # # # # # #
 def scatter_t2m_castneto3(comm_t2m, comm_castnet, years, region): 
@@ -1192,7 +1193,7 @@ def pdf_aqsno2gmino2(aqs_no2, mr2_gmi, ccmi_gmi, ffigac2_gmi, ffigac2hr_gmi,
     import matplotlib.mlab as mlab
     import matplotlib.font_manager as font_manager    
     import sys
-    sys.path.append('/Users/ghkerr/phd/')
+    sys.path.append('/Users/ghkenrr/phd/')
     import pollutants_constants
     # set custom font
     path = pollutants_constants.FONTPATH_LIGHT
@@ -1246,3 +1247,89 @@ def pdf_aqsno2gmino2(aqs_no2, mr2_gmi, ccmi_gmi, ffigac2_gmi, ffigac2hr_gmi,
                 dpi = 300)
     return
 # # # # # # # # # # # # #
+def pdf_allgmio3(castnet, mr2, ccmi, egu, dat, mechanism, region):
+    """function plots PDFs of regionally-averaged O3 for different GMI 
+    simulations.
+    
+    Parameters
+    ----------
+    castnet : numpy.ndarray
+        CASTNet O3 observations in region, units of ppbv, [years in measuring 
+        period, days in months in 'sampling_months']   
+    mr2 : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2, units of 
+        ppbv, [years in measuring period, days in months in 'sampling_months'] 
+    ccmi : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-CCMI, units 
+        of ppbv, [years in measuring period, days in months in 
+        'sampling_months']         
+    egu : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2 with daily-
+        varying NO emissions, units of ppbv, [years in measuring period, days 
+        in months in 'sampling_months']                 
+    dat : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']          
+    mechanism : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMERRA, units of 
+        ppbv, [years in measuring period, days in months in 'sampling_months']                  
+    region : str
+        Region over which regionally-averaged concentrations are supplied to 
+        function
+        
+    Returns
+    ----------      
+    None     
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import scipy.stats
+    import sys
+    castnet = np.hstack(castnet)
+    mr2 = np.hstack(mr2)
+    ccmi = np.hstack(ccmi)
+    egu = np.hstack(egu)
+    dat = np.hstack(dat)
+    mechanism = np.hstack(mechanism)
+    # initialize figure, axes
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    # obs
+    n, bins, patches = ax.hist(np.hstack(castnet), 25, density = 1, alpha = 0.)
+    pdf_castnet = scipy.stats.norm.pdf(bins, np.mean(castnet), np.std(castnet))
+    ax.plot(bins, pdf_castnet, lw = 2.5, color = 'k', label = 'Observations')
+    # HindcastMR2
+    n, bins, patches = ax.hist(np.hstack(castnet), 25, density = 1, alpha = 0.)
+    pdf_mr2 = scipy.stats.norm.pdf(bins, np.mean(mr2), np.std(mr2))
+    ax.plot(bins, pdf_mr2, lw = 1.5, color = '#e41a1c', label = 'Control')    
+    # HindcastMR2-CCMI
+    n, bins, patches = ax.hist(np.hstack(ccmi), 25, density = 1, alpha = 0.)
+    pdf_ccmi = scipy.stats.norm.pdf(bins, np.mean(ccmi), np.std(ccmi))
+    ax.plot(bins, pdf_ccmi, lw = 1.5, color = '#377eb8', label = 'Resolution') 
+    # EGU_T
+    n, bins, patches = ax.hist(np.hstack(egu), 25, density = 1, alpha = 0.)
+    pdf_egu = scipy.stats.norm.pdf(bins, np.mean(egu), np.std(egu))
+    ax.plot(bins, pdf_egu, lw = 1.5, color = '#4daf4a', label = 'Emissions')
+    # HindcastMERRA        
+    n, bins, patches = ax.hist(np.hstack(mechanism), 25, density = 1, alpha = 0.)
+    pdf_egu = scipy.stats.norm.pdf(bins, np.mean(mechanism), np.std(mechanism))
+    ax.plot(bins, pdf_egu, lw = 1.5, color = '#984ea3', label = 'Mechanism')        
+    # HindcastMR2-DiurnalAvgT
+    n, bins, patches = ax.hist(np.hstack(dat), 25, density = 1, alpha = 0.)
+    pdf_mad = scipy.stats.norm.pdf(bins, np.mean(dat), np.std(dat))
+    ax.plot(bins, pdf_mad, lw = 1.5, color = '#ff7f00', label = 'Chemistry')
+    ax.set_xlabel('Ozone [ppbv]', fontsize = 12)
+    ax.set_ylabel('Probability [ppbv$^{\mathregular{-1}}$]', fontsize = 12)
+    plt.subplots_adjust(top = 0.85)
+    ax.legend(ncol = 3, frameon = False, fontsize = 10, 
+              bbox_to_anchor = [0.93, 1.2])
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'pdf_allgmio3_%s.eps' %(region), dpi = 300)
+    return 
+# # # # # # # # # # # # #    
