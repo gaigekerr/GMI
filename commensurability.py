@@ -376,22 +376,60 @@ def commensurate_castnet_gmi(castnet_sites_fr, case, years,
     comm_gmi_no2[:] = np.nan
     comm_gmi_co = np.empty([len(years), len(castnet_sites_fr), sos], 
                              dtype = float)
-    comm_gmi_co[:] = np.nan    
+    comm_gmi_co[:] = np.nan   
     # loop through years in measuring period
-    for year, counter1 in zip(years, np.arange(0, len(years), 1)): 
-        # load GMI CTM output
-        o3, co, no, no2, gmi_sites_i, gmi_lat, gmi_lon, times_ty = \
-        open_gmi_singyear(case, year, sampling_months, sampling_hours)
+    for year, counter1 in zip(years, np.arange(0, len(years), 1)):
+        # load GMI CTM output        
+        if (case == 'HindcastMR2-DiurnalAvgT') or (case == 'HindcastMERRA'):
+            # given the integers of months, find their three letter 
+            # abbreviations
+            mon_dict = {1:'jan', 2:'feb', 3:'mar', 4:'apr', 5:'may',
+                        6:'jun', 7:'jul', 8:'aug', 9:'sep', 10:'oct', 
+                        11:'nov', 12:'dec'}
+            months = []
+            for sm in sampling_months:
+                months.append(mon_dict[sm])
+            # for O3
+            gmi_lat, gmi_lon, gmi_sites_i, pressure, o3, times_ty = \
+            open_profile_multimonth(case, months, year, 'O3', 'all', 'all')
+            # for NO
+            gmi_lat, gmi_lon, gmi_sites_i, pressure, no, times_ty = \
+            open_profile_multimonth(case, months, year, 'NO', 'all', 'all')  
+            # for NO2
+            gmi_lat, gmi_lon, gmi_sites_i, pressure, no2, times_ty = \
+            open_profile_multimonth(case, months, year, 'NO2', 'all', 'all')  
+            # for CO            
+            gmi_lat, gmi_lon, gmi_sites_i, pressure, co, times_ty = \
+            open_profile_multimonth(case, months, year, 'CO', 'all', 'all')  
+            # convert times to pandas.core.indexes.datetimes.DatetimeIndex
+            times_ty_pd = pd.to_datetime(times_ty)    
+            # select indices in times corresponding to sampling hours
+            times_ash = np.in1d(times_ty_pd.hour, sampling_hours)
+            times_ash = np.where(times_ash == True)[0]
+            # select only GMI sites with information in Table S1 in Strode 
+            # et al. [2015] 
+            sidx = []
+            for s in gmi_sites:
+                sidx.append(np.where(gmi_sites_i == s)[0][0])            
+            # constituents and times at sampling hours
+            o3 = o3[:, times_ash]
+            no = no[:, times_ash]
+            no2 = no2[:, times_ash]
+            co = co[:, times_ash]
+            times_ash = times_ty[times_ash]  
+            # constituents at GMI sites in Strode et al. [2015]
+            o3 = o3[sidx]
+            no = no[sidx]
+            no2 = no2[sidx]
+            co = co[sidx]
+        else:  
+            o3, co, no, no2, gmi_sites_i, gmi_lat, gmi_lon, times_ty = \
+            open_gmi_singyear(case, year, sampling_months, sampling_hours)
         # times in year of interest with hourly timestep, retrieve only 
         # hours in variable 'sampling_hours' in ET
         dates = pd.date_range('%s-01-%s' %(sampling_months[0], year), 
             '%s-01-%s' %(sampling_months[-1] + 1, year), freq = '1H')[:-1]                
         dates = dates[np.where(dates.hour.isin([x for x in sampling_hours]))[0]]
-        # ensure input data matches reference table
-        if set(gmi_sites) == set(gmi_sites_i):
-            del gmi_sites_i
-        else: 
-            'Input file sites do not match Strode list!'
         # load CASTNet output
         castnet = open_castnet_singyear(year, sampling_months, sampling_hours)
         # find GMI sites commensurate with CASTNet sites
@@ -1451,21 +1489,40 @@ def commensurate_castnet_gmi_ra(castnet_sites_fr, years, sampling_months,
     """
     import numpy as np
     # open different model configurations, averaged over 11-16 LST
+    # HindcastMR2
     castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', years, 
                              sampling_months, sampling_hours)
+    # HindcastMR2-CCMI
     temp, ccmi_o3, ccmi_no, ccmi_no2, ccmi_co, ccmi_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2-CCMI', years, 
                              sampling_months, sampling_hours)
     del temp
+    # HindcastFFIgac2
     temp, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', years, 
                              sampling_months, sampling_hours)
     del temp
+    # HindcastFFIgac2-HighRes
     temp, ffigac2hr_o3, ffigac2hr_no, ffigac2hr_no2, ffigac2hr_co, ffigac2hr_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2-HighRes', years, 
                              sampling_months, sampling_hours)
     del temp
+    # EGU_T
+    temp, egu_o3, egu_no, egu_no2, egu_co, egu_gmi_sites_fr = \
+    commensurate_castnet_gmi(castnet_sites_fr, 'EGU_T', years, 
+                             sampling_months, sampling_hours)    
+    del temp    
+    # HindcastMR2-DiurnalAvgT
+    temp, dat_o3, dat_no, dat_no2, dat_co, dat_gmi_sites_fr = \
+    commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2-DiurnalAvgT', years, 
+                             sampling_months, sampling_hours)
+    del temp
+    # HindcastMERRA    
+    temp, merra_o3, merra_no, merra_no2, merra_co, merra_gmi_sites_fr = \
+    commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMERRA', years, 
+                             sampling_months, sampling_hours)
+    del temp    
     # average over all sites in region 
     # for O3
     castnet = np.nanmean(castnet, axis = 1)
@@ -1473,30 +1530,46 @@ def commensurate_castnet_gmi_ra(castnet_sites_fr, years, sampling_months,
     ccmi_o3 = np.nanmean(ccmi_o3, axis = 1)
     ffigac2_o3 = np.nanmean(ffigac2_o3, axis = 1)                      
     ffigac2hr_o3 = np.nanmean(ffigac2hr_o3, axis = 1)
+    egu_o3 = np.nanmean(egu_o3, axis = 1)
+    dat_o3 = np.nanmean(dat_o3, axis = 1)
+    merra_o3 = np.nanmean(merra_o3, axis = 1)    
     # for NO
     mr2_no = np.nanmean(mr2_no, axis = 1)
     ccmi_no = np.nanmean(ccmi_no, axis = 1)
     ffigac2_no = np.nanmean(ffigac2_no, axis = 1)                      
     ffigac2hr_no = np.nanmean(ffigac2hr_no, axis = 1)    
+    egu_no = np.nanmean(egu_no, axis = 1)
+    dat_no = np.nanmean(dat_no, axis = 1)  
+    merra_no = np.nanmean(merra_no, axis = 1)      
     # for NO2
     mr2_no2 = np.nanmean(mr2_no2, axis = 1)
     ccmi_no2 = np.nanmean(ccmi_no2, axis = 1)
     ffigac2_no2 = np.nanmean(ffigac2_no2, axis = 1)                      
     ffigac2hr_no2 = np.nanmean(ffigac2hr_no2, axis = 1)        
+    egu_no2 = np.nanmean(egu_no2, axis = 1)
+    dat_no2 = np.nanmean(dat_no2, axis = 1)    
+    merra_no2 = np.nanmean(merra_no2, axis = 1)        
     # for CO 
     mr2_co = np.nanmean(mr2_co, axis = 1)
     ccmi_co = np.nanmean(ccmi_co, axis = 1)
     ffigac2_co = np.nanmean(ffigac2_co, axis = 1)                      
-    ffigac2hr_co = np.nanmean(ffigac2hr_co, axis = 1)      
+    ffigac2hr_co = np.nanmean(ffigac2hr_co, axis = 1)     
+    egu_co = np.nanmean(egu_co, axis = 1)
+    dat_co = np.nanmean(dat_co, axis = 1) 
+    merra_co = np.nanmean(merra_co, axis = 1)     
     return {'CASTNet':castnet, 'MR2 O3':mr2_o3,
             'MR2-CCMI O3':ccmi_o3, 'FFIgac2 O3':ffigac2_o3, 
-            'FFIgac2-HighRes O3':ffigac2hr_o3, 'MR2 NO':mr2_no,
+            'FFIgac2-HighRes O3':ffigac2hr_o3, 'EGU_T O3':egu_o3,
+            'DAT O3':dat_o3, 'MERRA O3':merra_o3, 'MR2 NO':mr2_no,
             'MR2-CCMI NO':ccmi_no, 'FFIgac2 NO':ffigac2_no, 
-            'FFIgac2-HighRes NO':ffigac2hr_no, 'MR2 NO2':mr2_no2,
+            'FFIgac2-HighRes NO':ffigac2hr_no, 'EGU_T NO':egu_no, 
+            'DAT NO':dat_no, 'MERRA NO':merra_no, 'MR2 NO2':mr2_no2,
             'MR2-CCMI NO2':ccmi_no2, 'FFIgac2 NO2':ffigac2_no2,
-            'FFIgac2-HighRes NO2':ffigac2hr_no2, 'MR2 CO':mr2_co,
-            'MR2-CCMI CO':ccmi_co, 'FFIgac2 CO':ffigac2_co,
-            'FFIgac2-HighRes CO':ffigac2hr_co}
+            'FFIgac2-HighRes NO2':ffigac2hr_no2, 'EGU_T NO2':egu_no2,
+            'DAT NO2':dat_no2, 'MERRA NO2':merra_no2, 'MR2 CO':mr2_co, 
+            'MR2-CCMI CO':ccmi_co, 'FFIgac2 CO':ffigac2_co, 
+            'FFIgac2-HighRes CO':ffigac2hr_co, 'EGU_T CO':egu_co, 
+            'DAT CO':dat_co, 'MERRA CO':merra_co}
 # # # # # # # # # # # # #
 def commensurate_castnet_gmi_diurnal_ra(castnet_sites_fr, years, 
                                         sampling_months):
@@ -2759,8 +2832,7 @@ def open_profile_singmonth(case, month, year, species, stations, levels):
     return (np.hstack(col_latitude), np.hstack(col_longitude), station_labels, 
             pressure, const, np.hstack(times))
 # # # # # # # # # # # # #
-def open_profile_multimonth(case, months, years, species, stations, 
-                                 levels):     
+def open_profile_multimonth(case, months, year, species, stations, levels):     
     """similar to function open_profile_singmonth but for multiple months.
     
     Parameters
@@ -2771,8 +2843,8 @@ def open_profile_multimonth(case, months, years, species, stations,
         Contains three month abbreviations, all lowercase (i.e. 'jun', 'may', 
         etc.); n.b. items must be in chronilogical order and only May -
         September are available
-    years : int
-        Years of interest        
+    year : int
+        Year of interest        
     species : str
         Either 'CO', 'NO2', 'NO', or 'O3'
     stations : numpy.ndarray 
@@ -2794,24 +2866,23 @@ def open_profile_multimonth(case, months, years, species, stations,
         Pressure levels (centered), units of hPa, [no. pressure levels,]
     const_multiyear : numpy.ndarray
         Constituent, units of volume mixing ration, [no. stations, step * 
-        no. days in months * no. years, no. pressure levels,]
+        no. days in months, no. pressure levels,]
     times_multiyear : numpy.ndarray 
         Datetime objects for each model timestep, 
-        [step * no. days in months * no. years,]          
+        [step * no. days in months]          
     """
     import numpy as np
     const_multiyear = []
     times_multiyear = []
     # loop through months
-    for year in years:
-        for month in months: 
-            (col_latitude, col_longitude, station_labels, pressure, 
-             const, times) = open_profile_singmonth(case, month, year, 
-                species, stations, levels)
-            # append constituent, times to list (all other information remains 
-            # the same through iterations of the loop)
-            const_multiyear.append(const)
-            times_multiyear.append(times)            
+    for month in months: 
+        (col_latitude, col_longitude, station_labels, pressure, 
+         const, times) = open_profile_singmonth(case, month, year, 
+            species, stations, levels)
+        # append constituent, times to list (all other information remains 
+        # the same through iterations of the loop)
+        const_multiyear.append(const)
+        times_multiyear.append(times)            
     # stack along time dimension
     const_multiyear = np.hstack(const_multiyear)
     times_multiyear = np.hstack(times_multiyear)
