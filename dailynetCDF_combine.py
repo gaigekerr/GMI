@@ -14,6 +14,7 @@ REVISION HISTORY
                 simulation name as an argument.
     18072018 -- filename changed to 'dailynetCDF_combine.py' and function 
                 'tavg1_2d_aer_Nx_combine' added. 
+    27072018 -- function 'inst1_2d_asm_Nx_combine' added
 """
 # # # # # # # # # # # # #
 def yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, case, year):
@@ -422,6 +423,165 @@ def inst6_3d_ana_Np_combine(year, ulat, llat, llon, rlon):
     outfile.close()
     return 
 # # # # # # # # # # # # # #    
+def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
+    """function opens all daily files of 3-Hourly, Instantaneous, 
+    Single-Level, Assimilation, Single-Level Diagnostics for a particular
+    summer (JJA) and extracts grid cells bounded by the input latitude and 
+    longitudes and creates a single output file for the summer. 
+
+    Parameters
+    ----------
+    year : int
+        Year of interest
+    ulat : int/float
+        Upper latitude bound for focus region
+    llat : int/float
+        Lower latitude bound for focus region    
+    llon : int/float
+        Left longitude bound for focus region    
+    rlon : int/float
+        Right longitude bound for focus region            
+
+    Returns
+    ----------
+    None    
+    """
+    import numpy as np
+    from netCDF4 import Dataset
+    import glob
+    # path to MERRA-2 data holdings
+    path = '/mnt/scratch3/gkerr4/data/MERRA-2/inst6_3d_ana_Np/'
+    # file names with wildcard character for date
+    mfstring = 'MERRA2_300.inst1_2d_asm_Nx.%s*.SUB.nc4' %year
+    infiles = []
+    for file in glob.glob(path + mfstring):
+        infiles.append(file)
+    # sort input files by date (YYYYMMDD format)
+    infiles.sort()
+    PS, T2M, T10M, TS, U2M, U10M, V2M, V10M = [], [], [], [], [], [], [], []
+    for file in infiles:     
+        infile = Dataset(file, 'r')
+        if file == infiles[0]:
+            # convert longitude to (0 - 360)        
+            lon = infile.variables['lon'][:] + 360.
+            lat = infile.variables['lat'][:]
+            # find indices corresponding to region of interest on first iteration
+            # through loop          
+            llat = np.abs(lat - llat).argmin()
+            ulat = np.abs(lat - ulat).argmin()
+            llon = np.abs(lon - llon).argmin()
+            rlon = np.abs(lon - rlon).argmin()
+            lon = lon[llon:rlon+1]
+            lat = lat[llat:ulat+1]    
+        # extract relevant variables and append 4-hourly fields to JJA 
+        # list
+        # surface_pressure
+        PS.append(infile.variables['PS'][:, llat:ulat+1, llon:rlon+1])
+        # 2-meter_air_temperature
+        T2M.append(infile.variables['T2M'][:, llat:ulat+1, llon:rlon+1])    
+        # 10-meter_air_temperature
+        T10M.append(infile.variables['T10M'][:, llat:ulat+1, llon:rlon+1])        
+        # surface_skin_temperature
+        TS.append(infile.variables['TS'][:, llat:ulat+1, llon:rlon+1])            
+        # 2-meter_eastward_wind
+        U2M.append(infile.variables['U2M'][:, llat:ulat+1, llon:rlon+1])    
+        # 10-meter_eastward_wind
+        U10M.append(infile.variables['U10M'][:, llat:ulat+1, llon:rlon+1])    
+        # 2-meter_northward_wind
+        V2M.append(infile.variables['V2M'][:, llat:ulat+1, llon:rlon+1])    
+        # 10-meter_northward_wind
+        V10M.append(infile.variables['V10M'][:, llat:ulat+1, llon:rlon+1])    
+        
+    
+    # create output file; naming convention is the same as input file, 
+    # with trailing values corresponding to: lower latitude, left longitude, 
+    # upper latitude, right longitude
+    outfile = Dataset(path + 
+                      'MERRA2_300.inst1_2d_asm_Nx_%d_%dN_%dE_%dN_%dE.nc'
+                      %(year, lat[0], lon[0], lat[-1], lon[-1]), 'w')    
+    # define set of dimensions
+    lat_dim = outfile.createDimension('lat', len(lat))
+    lon_dim = outfile.createDimension('lon', len(lon))
+    time_dim = outfile.createDimension('time', None)
+    # create coordinate variables for variables
+    PS_dataset = outfile.createVariable('PS', np.float32, 
+        ('time', 'lat', 'lon')) 
+    T2M_dataset = outfile.createVariable('T2M', np.float32, 
+        ('time', 'lat', 'lon')) 
+    T10M_dataset = outfile.createVariable('T10M', np.float32, 
+        ('time', 'lat', 'lon')) 
+    TS_dataset = outfile.createVariable('TS', np.float32, 
+        ('time', 'lat', 'lon')) 
+    U2M_dataset = outfile.createVariable('U2M', np.float32, 
+        ('time', 'lat', 'lon')) 
+    U10M_dataset = outfile.createVariable('U10M', np.float32, 
+        ('time', 'lat', 'lon')) 
+    V2M_dataset = outfile.createVariable('V2M', np.float32, 
+        ('time', 'lat', 'lon')) 
+    V10M_dataset = outfile.createVariable('V10M', np.float32, 
+        ('time', 'lat', 'lon')) 
+    lat_dim = outfile.createVariable('lat', np.float32, ('lat'))
+    lon_dim = outfile.createVariable('lon', np.float32, ('lon'))
+    pressure_dim = outfile.createVariable('lev', np.float32, ('lev'))
+    # add data and define their attributes
+    # latitude
+    lat_dim[:] = lat[:]
+    lat_dim.standard_name = 'latitude'
+    lat_dim.units = 'degrees_north'
+    # longitude
+    lon_dim[:] = lon
+    lon_dim.standard_name = 'longitude'
+    lon_dim.units = 'degree_east'
+    # surface_pressure
+    PS_dataset[:] = np.vstack(PS)
+    PS_dataset.standard_name = 'surface_pressure'
+    PS_dataset.long_name = 'surface_pressure'
+    PS_dataset.units = 'Pa'
+    # 2-meter_air_temperature
+    T2M_dataset[:] = np.vstack(T2M)
+    T2M_dataset.standard_name = '2-meter_air_temperature'
+    T2M_dataset.long_name = '2-meter_air_temperature'
+    T2M_dataset.units = 'K'
+    # 10-meter_air_temperature
+    T10M_dataset[:] = np.vstack(T10M)
+    T10M_dataset.standard_name = '10-meter_air_temperature'
+    T10M_dataset.long_name = '10-meter_air_temperature'
+    T10M_dataset.units = 'K'
+    # surface_skin_temperature
+    TS_dataset[:] = np.vstack(TS)
+    TS_dataset.standard_name = 'surface_skin_temperature'
+    TS_dataset.long_name = 'surface_skin_temperature'
+    TS_dataset.units = 'K'
+    # 2-meter_eastward_wind
+    U2M_dataset[:] = np.vstack(U2M)
+    U2M_dataset.standard_name = '2-meter_eastward_wind'
+    U2M_dataset.long_name = '2-meter_eastward_wind'
+    U2M_dataset.units = 'm s-1'
+    # 10-meter_eastward_wind
+    U10M_dataset[:] = np.vstack(U10M)
+    U10M_dataset.standard_name = '10-meter_eastward_wind'
+    U10M_dataset.long_name = '10-meter_eastward_wind'
+    U10M_dataset.units = 'm s-1'
+    # 2-meter_northward_wind
+    V2M_dataset[:] = np.vstack(V2M)
+    V2M_dataset.standard_name = '2-meter_northward_wind'
+    V2M_dataset.long_name = '2-meter_northward_wind'
+    V2M_dataset.units = 'm s-1'
+    # 10-meter_northward_wind
+    V10M_dataset[:] = np.vstack(V10M)
+    V10M_dataset.standard_name = '10-meter_northward_wind'
+    V10M_dataset.long_name = '10-meter_northward_wind'
+    V10M_dataset.units = 'm s-1'
+    # attributes
+    outfile.title = 'MERRA2_300.inst1_2d_asm_Nx, 3d, MERRA2 6-Hourly, ' + \
+         'Instantaneous, Pressure-Level, Analysis, Analyzed Meteorological ' + \
+         'Fields, for summer (JJA) %s.' %year
+    outfile.author = 'Gaige Hunter Kerr'
+    outfile.comment = 'Output latitudinally bound by %d-%dN ' %(lat[0], lat[-1]) + \
+        'and longitudinally bound by %d-%dE is included.' %(lon[0], lon[-1])
+    outfile.close()
+    return 
+# # # # # # # # # # # # #    
 # define function inputs 
 ulat = 50.
 llat = 35.
@@ -436,3 +596,5 @@ tavg1_2d_aer_Nx_combine(ulat, llat, llon, rlon)
 # for inst6_3d_ana_Np
 year = 2008
 inst6_3d_ana_Np_combine(year, ulat, llat, llon, rlon)
+# for inst1_2d_asm_Nx
+inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon)
