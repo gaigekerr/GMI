@@ -45,7 +45,19 @@ REVISION HISTORY
                 code modifications converted CASTNet observations to UTC 
                 prior to input in this function eliminating the need for this
     26072018 -- function 'pdf_allgmio3' added
+    29072018 -- function 'scatter_allgmio3' added
     """
+# # # # # # # # # # # # #
+# change font
+import matplotlib 
+prop = matplotlib.font_manager.FontProperties(fname = 
+    '/Users/ghkerr/Library/Fonts/cmunbmr.ttf')
+matplotlib.rcParams['font.family'] = prop.get_name()
+prop = matplotlib.font_manager.FontProperties(fname = 
+    '/Users/ghkerr/Library/Fonts/cmunbbx.ttf')
+matplotlib.rcParams['mathtext.bf'] = prop.get_name()
+# for unicode minus/negative sign implementation
+matplotlib.rcParams['axes.unicode_minus'] = False    
 # # # # # # # # # # # # #
 def scatter_t2m_castneto3(comm_t2m, comm_castnet, years, region): 
     """function plots regionally-averaged CASTNet O3 vs. MERRA 2 meter 
@@ -1290,7 +1302,6 @@ def pdf_allgmio3(castnet, mr2, ccmi, egu, dat, mechanism, region):
     import numpy as np
     import matplotlib.pyplot as plt
     import scipy.stats
-    import sys
     castnet = np.hstack(castnet)
     mr2 = np.hstack(mr2)
     ccmi = np.hstack(ccmi)
@@ -1331,5 +1342,127 @@ def pdf_allgmio3(castnet, mr2, ccmi, egu, dat, mechanism, region):
               bbox_to_anchor = [0.93, 1.2])
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'pdf_allgmio3_%s.eps' %(region), dpi = 300)
+    return 
+# # # # # # # # # # # # #
+def scatter_allgmio3(castnet, mr2, ccmi, egu, dat, mechanism, t2m_ra, region):
+    """function plots the relationship of O3 from regionally-averaged CASTNet
+    observations and co-located GMI output versus MERRA-2 2-meter temperatures. 
+    O3 from GMI is plotted for all simulations. The lines of best fit are found
+    and plotted along with the slope of these lines. 
+    
+    Parameters
+    ----------
+    castnet : numpy.ndarray
+        CASTNet O3 observations in region, units of ppbv, [years in measuring 
+        period, days in months in 'sampling_months']   
+    mr2 : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2, units of 
+        ppbv, [years in measuring period, days in months in 'sampling_months'] 
+    ccmi : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-CCMI, units 
+        of ppbv, [years in measuring period, days in months in 
+        'sampling_months']         
+    egu : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2 with daily-
+        varying NO emissions, units of ppbv, [years in measuring period, days 
+        in months in 'sampling_months']                 
+    dat : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']          
+    mechanism : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMERRA, units of 
+        ppbv, [years in measuring period, days in months in 'sampling_months'] 
+    t2m_ra : numpy.ndarray
+        Regionally-averaged MERRA-2 2-meter temperatures co-located (or nearly 
+        colocated) with corresponding CASTNet stations, units of K, [years in 
+        measuring period, days in months in 'sampling_months']   
+    region : str
+        Region over which regionally-averaged concentrations are supplied to 
+        function
+        
+    Returns
+    ----------      
+    None         
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    castnet = np.hstack(castnet)
+    mr2 = np.hstack(mr2)
+    ccmi = np.hstack(ccmi)
+    egu = np.hstack(egu)
+    dat = np.hstack(dat)
+    mechanism = np.hstack(mechanism)    
+    # initialize figure, axes
+    fig = plt.figure()
+    ax = plt.subplot2grid((4, 4), (0, 0), rowspan = 4, colspan = 3)
+    # obs
+    ax.plot(t2m_ra, castnet, marker = 'o', lw = 0.0, color = 'k', 
+            markersize = 3, label = 'Observations')
+    # HindcastMR2-CCMI
+    ax.plot(t2m_ra, ccmi, marker = 'o', lw = 0.0, color = '#377eb8', 
+            markersize = 2, label = 'Resolution')
+    # HindcastMERRA        
+    ax.plot(t2m_ra, mechanism , marker = 'o', lw = 0.0, color = '#984ea3', 
+            markersize = 2, label = 'Mechanism')
+    # HindcastMR2
+    ax.plot(t2m_ra, mr2, marker = 'o', lw = 0.0, color = '#e41a1c', 
+            markersize = 2, label = 'Control')
+    # EGU_T
+    ax.plot(t2m_ra, egu, marker = 'o', lw = 0.0, color = '#4daf4a', 
+            markersize = 2, label = 'Emissions')
+    # HindcastMR2-DiurnalAvgT
+    ax.plot(t2m_ra, dat, marker = 'o', lw = 0.0, color = '#ff7f00', 
+            markersize = 2, label = 'Chemistry')
+    ax.set_xlabel('T$_{\mathregular{2 m}}$ [K]', fontsize = 12, x = 0.75)
+    ax.set_ylabel('Ozone [ppbv]', fontsize = 12)
+    # axis for lines of best fit
+    axr = plt.subplot2grid((4, 4), (0, 3), rowspan = 4, colspan = 1)
+    # obs
+    castnet_m = np.poly1d(np.polyfit(t2m_ra, castnet, 1))[1]
+    axr.plot(np.unique(t2m_ra), np.poly1d(np.polyfit(t2m_ra, castnet, 
+             1))(np.unique(t2m_ra)), color = 'k', lw = 2.5)
+    # HindcastMR2
+    mr2_m = np.poly1d(np.polyfit(t2m_ra, mr2, 1))[1]
+    axr.plot(np.unique(t2m_ra), np.poly1d(np.polyfit(t2m_ra, mr2, 
+             1))(np.unique(t2m_ra)), color = '#e41a1c')
+    # HindcastMR2-CCMI
+    ccmi_m = np.poly1d(np.polyfit(t2m_ra, ccmi, 1))[1]
+    axr.plot(np.unique(t2m_ra), np.poly1d(np.polyfit(t2m_ra, ccmi, 
+             1))(np.unique(t2m_ra)), color = '#377eb8')
+    # EGU_T
+    egu_m = np.poly1d(np.polyfit(t2m_ra, ccmi, 1))[1]
+    axr.plot(np.unique(t2m_ra), np.poly1d(np.polyfit(t2m_ra, egu, 
+             1))(np.unique(t2m_ra)), color = '#4daf4a')
+    # HindcastMR2-DiurnalAvgT
+    dat_m = np.poly1d(np.polyfit(t2m_ra, dat, 1))[1]
+    axr.plot(np.unique(t2m_ra), np.poly1d(np.polyfit(t2m_ra, dat, 
+             1))(np.unique(t2m_ra)), color = '#ff7f00')
+    # HindcastMERRA     
+    mechanism_m = np.poly1d(np.polyfit(t2m_ra, mechanism, 1))[1]
+    axr.plot(np.unique(t2m_ra), np.poly1d(np.polyfit(t2m_ra, mechanism, 
+             1))(np.unique(t2m_ra)), color = '#984ea3')
+    # set axis limits to be the same as the larger axis
+    axr.set_xlim(ax.get_xlim())
+    axr.set_ylim(ax.get_ylim())
+    axr.set_yticklabels([''])
+    pos = 0.95
+    for m, col in zip([castnet_m, mr2_m, ccmi_m, egu_m, dat_m, mechanism_m], 
+        ['k', '#e41a1c', '#377eb8', '#4daf4a', '#ff7f00', '#984ea3']):
+        axr.text(0.2, pos, '%.2f' %m,
+                va = 'center', ha = 'center', transform = axr.transAxes,
+                color = col, fontsize = 10)
+        pos = pos - 0.06
+    # add legend
+    plt.subplots_adjust(top = 0.85)
+    ax.legend(ncol = 3, frameon = False, fontsize = 10, 
+              bbox_to_anchor = [1.28, 1.2])
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'scatterplot_allgmio3_%s.eps' %(region), dpi = 300)    
     return 
 # # # # # # # # # # # # #    
