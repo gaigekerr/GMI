@@ -46,6 +46,7 @@ REVISION HISTORY
     26072018 -- function 'pdf_allgmio3' added
     29072018 -- function 'scatter_allgmio3' added
     22082018 -- function 'timeseries_mr2o3dato3eguto3' added
+    25082018 -- function 'scatter_dt2m_dmr2o3dato3eguto3' added
     """
 # # # # # # # # # # # # #
 # change font
@@ -2121,4 +2122,256 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'scatterhist_mr2o3dato3eguto3_%s.eps' %(region), dpi = 300)     
     return    
+# # # # # # # # # # # # #    
+def scatter_dt2m_dmr2o3dato3eguto3(transport, chemistry, emissions, t2m, region):
+    """function calculates the change in temperature between Transport and 
+    + Chemistry simulations (that is, the difference between daily 2-meter
+    temperature and monthly mean 2-meter temperatures). The difference in O3 
+    between + Chemistry and Transport is plotted against this temperature 
+    difference with the line of best fit.
+    
+    Parameters
+    ----------       
+    transport : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']    
+    chemistry : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2, units of 
+        ppbv, [years in measuring period, days in months in 'sampling_months'] 
+    emissions : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2 with daily-
+        varying NO emissions, units of ppbv, [years in measuring period, days 
+        in months in 'sampling_months']
+    t2m : numpy.ndarray
+        MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of K, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']       
+    region : str
+        Region over which regionally-averaged concentrations are supplied to 
+        function
+        
+    Returns
+    ----------      
+    None         
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    # calculate regionally-averaged T2m
+    t2m = np.nanmean(t2m, axis = 1)
+    # stack along time axis
+    chemistry = np.hstack(chemistry)
+    emissions = np.hstack(emissions)
+    transport = np.hstack(transport)
+    t2m = np.hstack(t2m)
+    # find monthly mean temperatures 
+    t2m_m = []
+    month_idx = [0, 30, 61, 92, 122, 153, 184, 214, 245, 276]
+    for i, mds in enumerate(month_idx[:-1]):
+        # mean temperature in month
+        t2m_t = t2m[mds:month_idx[i + 1]]
+        t2m_m.append(np.repeat(np.mean(t2m_t), len(t2m_t)))
+    t2m_m = np.hstack(t2m_m)
+    dO3 = chemistry - transport 
+    # initialize figure, axis 
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    ax.scatter((t2m - t2m_m), dO3, s = 20, color = 'k')
+    ax.set_xlabel('T$_{\mathregular{2\:m}}$ - <T$_{\mathregular{2\:m}}$> [K]', 
+                  fontsize = 14)
+    ax.set_ylabel('O$_{\mathregular{3, +\:Chemistry}}$ - O$_{\mathregular{3, Transport}}$ [ppbv]', 
+                  fontsize = 14)
+    for tl in ax.get_xticklabels():
+        tl.set_fontsize(12)
+    for tl in ax.get_yticklabels():
+        tl.set_fontsize(12)
+    # calculate best fit line
+    m = np.poly1d(np.polyfit(t2m - t2m_m, dO3, 1))[1]
+    ax.plot(np.unique(t2m - t2m_m), np.poly1d(np.polyfit(t2m - 
+            t2m_m, dO3, 1))(np.unique(t2m - t2m_m)), color = 'k', lw = 2.5)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 'scatter_dt2m_do3_%s.eps' 
+                %(region), dpi = 300)     
+    return 
+# # # # # # # # # # # # #    
+def meano3_t2mpercentile(transport, chemistry, emissions, obs, t2m):
+    """function determines on which summer days the regionally-averaged 
+    temperatures fall into 0-10th, 10-20th, 45-55th, 80-90th, and 90-100th 
+    percentiles, and - on these days - calculates the average O3 from GMI 
+    transport, chemistry, and emissions simulations and observations on 
+    these days.
+    
+    Parameters
+    ----------       
+    transport : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']    
+    chemistry : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2, units of 
+        ppbv, [years in measuring period, days in months in 'sampling_months'] 
+    emissions : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2 with daily-
+        varying NO emissions, units of ppbv, [years in measuring period, days 
+        in months in 'sampling_months']
+    obs : numpy.ndarray
+        CASTNet O3 observations in region, units of ppbv, [years in measuring 
+        period, days in months in 'sampling_months']   
+    t2m : numpy.ndarray
+        MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of K, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']       
+        
+    Returns
+    ----------      
+    None         
+    """
+    import numpy as np
+    # calculate regionally-averaged T2m
+    t2m = np.nanmean(t2m, axis = 1)
+    # stack along time axis
+    obs = np.hstack(obs)
+    chemistry = np.hstack(chemistry)
+    emissions = np.hstack(emissions)
+    transport = np.hstack(transport)
+    t2m = np.hstack(t2m)
+    # low, mid-range, and high percentiles for T2m 
+    p010 = np.where((t2m > np.percentile(t2m, 0)) & 
+                    (t2m <= np.percentile(t2m, 10)))[0]
+    p1020 = np.where((t2m > np.percentile(t2m, 10)) & 
+                    (t2m <= np.percentile(t2m, 20)))[0]
+    p4555 = np.where((t2m > np.percentile(t2m, 45)) & 
+                    (t2m <= np.percentile(t2m, 55)))[0]
+    p8090 = np.where((t2m > np.percentile(t2m, 80)) & 
+                    (t2m <= np.percentile(t2m, 90)))[0]
+    p90100 = np.where((t2m > np.percentile(t2m, 90)) & 
+                    (t2m <= np.percentile(t2m, 100)))[0]
+    # O3 for 0th %-ile < T2m <= 10th %-ile
+    print('Obs., 0-10 %-ile = ', '%.3f' %(obs[p010].mean()))
+    print('Transport, 0-10 %-ile = ', '%.3f' %(transport[p010].mean()))
+    print('Chemistry, 0-10 %-ile = ', '%.3f' %(chemistry[p010].mean()))
+    print('Emissions, 0-10 %-ile = ', '%.3f' %(emissions[p010].mean()))
+    # for 10th %-ile < T2m <= 20th %-ile
+    print('Obs., 10-20 %-ile = ', '%.3f' %(obs[p1020].mean()))
+    print('Transport, 10-20 %-ile = ', '%.3f' %(transport[p1020].mean()))
+    print('Chemistry, 10-20 %-ile = ', '%.3f' %(chemistry[p1020].mean()))
+    print('Emissions, 10-20 %-ile = ', '%.3f' %(emissions[p1020].mean()))
+    # for 45th %-ile < T2m <= 55th %-ile
+    print('Obs., 45-55 %-ile = ', '%.3f' %(obs[p4555].mean()))
+    print('Transport, 45-55 %-ile = ', '%.3f' %(transport[p4555].mean()))
+    print('Chemistry, 45-55 %-ile = ', '%.3f' %(chemistry[p4555].mean()))
+    print('Emissions, 45-55 %-ile = ', '%.3f' %(emissions[p4555].mean()))
+    # for 80th %-ile < T2m <= 90th %-ile
+    print('Obs., 80-90 %-ile = ', '%.3f' %(obs[p8090].mean()))
+    print('Transport, 80-90 %-ile = ', '%.3f' %(transport[p8090].mean()))
+    print('Chemistry, 80-90 %-ile = ', '%.3f' %(chemistry[p8090].mean()))
+    print('Emissions, 80-90 %-ile = ', '%.3f' %(emissions[p8090].mean()))
+    # for 90th %-ile < T2m <= 100th %-ile
+    print('Obs., 90-100 %-ile = ', '%.3f' %(obs[p90100].mean()))
+    print('Transport, 90-100 %-ile = ', '%.3f' %(transport[p90100].mean()))
+    print('Chemistry, 90-100 %-ile = ', '%.3f' %(chemistry[p90100].mean()))
+    print('Emissions, 90-100 %-ile = ', '%.3f' %(emissions[p90100].mean()))
+    return 
+# # # # # # # # # # # # #    
+def scatter_dt2m_o3(transport, chemistry, emissions, t2m, region):
+    """function calculates the change in temperature between Transport and 
+    + Chemistry simulations (that is, the difference between daily 2-meter
+    temperature and monthly mean 2-meter temperatures). O3 from GMI 
+    Transport, + Chemistry, and + Emissions simulations are plotted against
+    this change in temperature along with the line of best fit. 
+    
+    Parameters
+    ----------       
+    transport : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']    
+    chemistry : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2, units of 
+        ppbv, [years in measuring period, days in months in 'sampling_months'] 
+    emissions : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2 with daily-
+        varying NO emissions, units of ppbv, [years in measuring period, days 
+        in months in 'sampling_months']
+    t2m : numpy.ndarray
+        MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of K, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']       
+    region : str
+        Region over which regionally-averaged concentrations are supplied to 
+        function
+        
+    Returns
+    ----------      
+    None     
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants    
+    # calculate regionally-averaged T2m
+    t2m = np.nanmean(t2m, axis = 1)
+    # stack along time axis
+    chemistry = np.hstack(chemistry)
+    emissions = np.hstack(emissions)
+    transport = np.hstack(transport)
+    t2m = np.hstack(t2m)
+    # find monthly mean temperatures 
+    t2m_m = []
+    month_idx = [0, 30, 61, 92, 122, 153, 184, 214, 245, 276]
+    for i, mds in enumerate(month_idx[:-1]):
+        # mean temperature in month
+        t2m_t = t2m[mds:month_idx[i + 1]]
+        t2m_m.append(np.repeat(np.mean(t2m_t), len(t2m_t)))
+    t2m_m = np.hstack(t2m_m)
+    # initialize figure, axis 
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    ax.scatter((t2m - t2m_m), transport, label = 'Transport', s = 20, 
+               color = pollutants_constants.COLOR_TRANSPORT, zorder = 9, 
+               alpha = 0.4)
+    ax.scatter((t2m - t2m_m),chemistry, label = '+$\:$Chemistry', s = 20, 
+               color = pollutants_constants.COLOR_CHEMISTRY, zorder = 6, 
+               alpha = 0.4)
+    ax.scatter((t2m - t2m_m), emissions, label = '+$\:$Emissions', s = 20, 
+               color = pollutants_constants.COLOR_EMISSIONS, zorder = 3, 
+               alpha = 0.4)
+    # calculate and plot best fit lines 
+    transport_m = np.poly1d(np.polyfit(t2m - t2m_m, transport, 1))[1]
+    chemistry_m = np.poly1d(np.polyfit(t2m - t2m_m, chemistry, 1))[1]
+    emissions_m = np.poly1d(np.polyfit(t2m - t2m_m, emissions, 1))[1]
+    print('m_transport = ', '%.3f' %transport_m)
+    print('m_chemistry = ', '%.3f' %chemistry_m)
+    print('m_emissions = ', '%.3f' %emissions_m)
+    ax.plot(np.unique(t2m - t2m_m), np.poly1d(np.polyfit(t2m - t2m_m, transport, 
+             1))(np.unique(t2m - t2m_m)), zorder = 30,
+             color = pollutants_constants.COLOR_TRANSPORT, lw = 2.5)
+    ax.plot(np.unique(t2m - t2m_m), np.poly1d(np.polyfit(t2m - t2m_m, chemistry, 
+             1))(np.unique(t2m - t2m_m)), zorder = 20,
+             color = pollutants_constants.COLOR_CHEMISTRY, lw = 2.5)
+    ax.plot(np.unique(t2m - t2m_m), np.poly1d(np.polyfit(t2m - t2m_m, emissions, 
+             1))(np.unique(t2m - t2m_m)), zorder = 10,
+             color = pollutants_constants.COLOR_EMISSIONS, lw = 2.5)
+    ax.set_xlabel('T$_{\mathregular{2\:m}}$ - <T$_{\mathregular{2\:m}}$> [K]', 
+                  fontsize = 14)
+    ax.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 14)
+    for tl in ax.get_xticklabels():
+        tl.set_fontsize(12)
+    for tl in ax.get_yticklabels():
+        tl.set_fontsize(12)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 'scatter_dt2m_o3_%s.eps' 
+                %(region), dpi = 300)     
+    return 
 # # # # # # # # # # # # #    
