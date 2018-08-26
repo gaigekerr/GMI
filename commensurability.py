@@ -72,6 +72,11 @@ REVISION HISTORY
     20072018 -- function 'open_inst6_3d_ana_Np' added to open MERRA-2 6-hourly
                 meteorology
     25072018 -- functions added to open GMI profile information
+    26082018 -- function 'commensurate_castnet_gmi' modified to do daily time-
+                averaging on any number of hours in variable 'sampling_hours' 
+                (n.b. before it was hardcoded for only 15-20 UTC) and 
+                function 'commensurate_castnet_gmi_diurnal_ra' edited to 
+                find diurnal cycle for all GMI simulations
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -287,9 +292,7 @@ def commensurate_castnet_gmi(castnet_sites_fr, case, years,
     """function opens CASTNet and GMI O3 concentrations during the years, hours
     and months of interest and finds colocated (or nearly colocated) 
     concentrations using the locations of CASTNet sites contained in 
-    'castnet_sites_fr'. n.b. function produces a daily average of hourly 
-    values assuming that len(sampling_hours) = 6. Change code if this isn't the
-    the case. 
+    'castnet_sites_fr'. 
 
     Parameters
     ----------    
@@ -473,17 +476,18 @@ def commensurate_castnet_gmi(castnet_sites_fr, case, years,
                 # average every 6 hours (i.e. 11 - 16 local time) for a 
                 # daily average and supress warnings
                 with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", message="Mean of empty slice")
+                    warnings.filterwarnings("ignore", 
+                                            message = "Mean of empty slice")
                     comm_castnet[counter1, counter2] = np.nanmean(np.array(
-                        castnet_atsite['OZONE'].values).reshape(-1, 6), axis = 1)
+                        castnet_atsite['OZONE'].values).reshape(-1, len(sampling_hours)), axis = 1)
                     comm_gmi_o3[counter1, counter2] = np.nanmean(np.array(
-                        gmi_o3 * 1e9).reshape(-1, 6), axis = 1)      
+                        gmi_o3 * 1e9).reshape(-1, len(sampling_hours)), axis = 1)      
                     comm_gmi_no[counter1, counter2] = np.nanmean(np.array(
-                        gmi_no * 1e9).reshape(-1, 6), axis = 1)   
+                        gmi_no * 1e9).reshape(-1, len(sampling_hours)), axis = 1)   
                     comm_gmi_no2[counter1, counter2] = np.nanmean(np.array(
-                        gmi_no2 * 1e9).reshape(-1, 6), axis = 1)   
+                        gmi_no2 * 1e9).reshape(-1, len(sampling_hours)), axis = 1)   
                     comm_gmi_co[counter1, counter2] = np.nanmean(np.array(
-                        gmi_co * 1e6).reshape(-1, 6), axis = 1)                   
+                        gmi_co * 1e6).reshape(-1, len(sampling_hours)), axis = 1)                   
     return comm_castnet, comm_gmi_o3, comm_gmi_no, comm_gmi_no2, comm_gmi_co, gmi_sites_fr
 # # # # # # # # # # # # #
 def find_summer_days():
@@ -561,6 +565,231 @@ def load_t2m():
                      rlon_reduced_idx: llon_reduced_idx]
     ncfile.close()
     return t2m_all, lat, lon
+# # # # # # # # # # # # #
+def load_MERRA2(years):
+    """function opens MERRA-2 2-meter and 10-meter temperatures and wind 
+    climatologies for JJA over the Eastern United States and generates times 
+    for each reanalysis field
+    
+    Parameters
+    ----------    
+    years : list
+        Years of interest
+
+    Returns
+    ----------        
+    t2m : numpy.ndarray
+        MERRA-2 hourly 2-meter air temperature, units of K, [time, lat, lon]
+    t10m : numpy.ndarray
+        MERRA-2 hourly 10-meter air temperature, units of K, [time, lat, lon]    
+    u2m : numpy.ndarray
+        MERRA-2 hourly 2-meter eastward wind, units of m s-1, [time, lat, lon]
+    u10m : numpy.ndarray
+        MERRA-2 hourly 10-meter eastward wind, units of m s-1, [time, lat, lon]    
+    v2m : numpy.ndarray
+        MERRA-2 hourly 2-meter northward wind, units of m s-1, [time, lat, lon]
+    v10m : numpy.ndarray
+        MERRA-2 hourly 10-meter northward wind, units of m s-1, [time, lat, 
+        lon]    
+    lat : numpy.ndarray
+        MERRA-2 latitude coordinates, units of degrees north, [lat,]
+    lon : numpy.ndarray
+        MERRA-2 longitude coordinates, units of degrees east, [lon,]    
+    times_all : numpy.ndarray
+        datetime.datetime objects corresponding to each hourly timestep of the 
+        reanalysis, [time,]
+    """
+    import numpy as np
+    import netCDF4 as nc
+    import glob
+    import sys 
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    from generate_times import generate_times
+    path = '/Users/ghkerr/phd/meteorology/data/inst1_2d_asm_Nx/'
+    t2m, t10m, u2m, u10m, v2m, v10m = [], [], [], [], [], []
+    times_all = []
+    for year in years:
+        mfstring = 'MERRA2_300.inst1_2d_asm_Nx_%s*.nc' %year
+        infile = glob.glob(path + mfstring)
+        infile = nc.Dataset(infile[0])
+        t2m.append(infile.variables['T2M'][:])
+        t10m.append(infile.variables['T10M'][:])
+        u2m.append(infile.variables['U2M'][:])
+        u10m.append(infile.variables['U10M'][:])
+        v2m.append(infile.variables['V2M'][:])
+        v10m.append(infile.variables['V10M'][:])  
+        # extract coordinate information
+        if year == years[-1]:
+            lat = infile.variables['lat'][:]
+            lon = infile.variables['lon'][:]
+            lon = np.mod(lon - 180.0, 360.0) - 180.0
+        # generate times for summer 
+        times = generate_times(year, 6, 8, 1)
+        times_all.append(times)
+    t2m = np.vstack(t2m)
+    t10m = np.vstack(t10m)
+    u2m = np.vstack(u2m)
+    u10m = np.vstack(u10m)
+    v2m = np.vstack(v2m)
+    v10m = np.vstack(v10m)
+    times_all = np.hstack(times_all)
+    return t2m, t10m, u2m, u10m, v2m, v10m, lat, lon, times_all
+# # # # # # # # # # # # #
+def commensurate_MERRA2(comm_castnet, castnet_sites_fr, years, sampling_months, 
+    sampling_hours):
+    """function loads MERRA-2 hourly meteorology co-located (or nearly 
+    co-located) with JJA CASTNet observations and selects only hourly output
+    at same times of CASTNet observations. 
+    
+    Parameters
+    ----------    
+    comm_castnet : numpy.ndarray
+        Existing CASTNet O3 observations at each station contained in variable 
+        'castnet_sites_fr' for years in measuring period, units of ppbv, 
+        [years in measuring period, stations in 'castnet_sites_fr', 
+        days in months in 'sampling_months']
+    castnet_sites_fr : list
+        CASTNET site names in focus region
+    years : list
+        Years of interest
+    sampling_months : list 
+        Months of interest
+    sampling_hours : list 
+        Hours during which trace gas concentrations are returned        
+
+    Returns
+    ----------
+    comm_t2m : numpy.ndarray
+        MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of K, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']
+    comm_t10m :numpy.ndarray
+        MERRA-2 10-meter temperatures co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of K, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']    
+    comm_u2m : numpy.ndarray
+        MERRA-2 2-meter eastward wind co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of m s-1, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']    
+    comm_u10m : numpy.ndarray
+        MERRA-2 2-meter eastward wind co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of m s-1, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']    
+    comm_v2m : numpy.ndarray
+        MERRA-2 2-meter northward wind co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of m s-1, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']    
+    comm_v10m : numpy.ndarray
+        MERRA-2 1m-meter northward wind co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of m s-1, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']    
+    merra_lats_fr : list  
+        Longitudes of MERRA grid cells which are co-located (or nearly co-
+        located with CASTNet observations during years of interest
+    merra_lons_fr : list
+        Latitudes of MERRA grid cells which are co-located (or nearly co-
+        located with CASTNet observations during years of interest   
+    """
+    import numpy as np
+    import pandas as pd
+    from calendar import monthrange
+    import sys
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    from geo_idx import geo_idx
+    # create empty arrays to be filled with MERRA-2 meteorology 
+    # commensurate to CASTNet observations    
+    sos = []
+    sos += [(monthrange(years[0], x)[1]) for x in sampling_months]    
+    sos = np.sum(sos)
+    comm_t2m = np.empty([len(years), len(castnet_sites_fr), sos], 
+                         dtype = float)
+    comm_t2m[:] = np.nan    
+    comm_t10m = np.empty([len(years), len(castnet_sites_fr), sos], 
+                          dtype = float)
+    comm_t10m[:] = np.nan    
+    comm_u2m = np.empty([len(years), len(castnet_sites_fr), sos], 
+                         dtype = float)
+    comm_u2m[:] = np.nan    
+    comm_u10m = np.empty([len(years), len(castnet_sites_fr), sos], 
+                         dtype = float)
+    comm_u10m[:] = np.nan    
+    comm_v2m = np.empty([len(years), len(castnet_sites_fr), sos], 
+                         dtype = float)
+    comm_v2m[:] = np.nan    
+    comm_v10m = np.empty([len(years), len(castnet_sites_fr), sos], 
+                         dtype = float)
+    comm_v10m[:] = np.nan    
+    # load MERRA-2 meteorology
+    t2m, t10m, u2m, u10m, v2m, v10m, lat, lon, times = load_MERRA2(years)
+    # find entries in reanalysis output in sampling hours
+    times = pd.to_datetime(times)
+    times_sh = np.where(np.in1d(times.hour, 
+                                np.array(sampling_hours)) == True)[0]
+    t2m = t2m[times_sh]
+    t10m = t10m[times_sh]
+    u2m = u2m[times_sh]
+    u10m = u10m[times_sh]
+    v2m = v2m[times_sh]
+    v10m = v10m[times_sh]
+    times = times[times_sh]
+    # average over each day (i.e., might be multiple sampling hours 
+    # entry in a single day)
+    t2m = np.mean(t2m.reshape(int(len(times)/len(sampling_hours)), 
+        len(sampling_hours), len(lat), len(lon)), axis = 1)    
+    t10m = np.mean(t10m.reshape(int(len(times)/len(sampling_hours)), 
+        len(sampling_hours), len(lat), len(lon)), axis = 1)
+    u2m = np.mean(u2m.reshape(int(len(times)/len(sampling_hours)), 
+        len(sampling_hours), len(lat), len(lon)), axis = 1)
+    u10m = np.mean(u10m.reshape(int(len(times)/len(sampling_hours)), 
+        len(sampling_hours), len(lat), len(lon)), axis = 1)
+    v2m = np.mean(v2m.reshape(int(len(times)/len(sampling_hours)), 
+        len(sampling_hours), len(lat), len(lon)), axis = 1)
+    v10m = np.mean(v10m.reshape(int(len(times)/len(sampling_hours)), 
+        len(sampling_hours), len(lat), len(lon)), axis = 1)
+    # find lat/lon of CASTNet sites in focus region
+    csites = open_castnetsiting()
+    # create lists to be filled with MERRA grid cell locations
+    # create lists to be filled with MERRA grid cell locations
+    merra_lats_fr, merra_lons_fr = [], []        
+    # loop through years in measuring period 
+    for year, counter1 in zip(years, np.arange(0, len(years), 1)): 
+        # in a given year, loop through CASTNet sites in focus region and 
+        # determine if data exists
+        for site, castnet_data, counter2 in zip(castnet_sites_fr, 
+                                                comm_castnet[counter1], 
+                                                np.arange(0, len(castnet_sites_fr), 1)):
+            # if data exists, then find MERRA T2m commensurate with CASTNet site
+            if np.where(np.isnan(castnet_data) == True)[0].shape[0] != sos:
+                # find longitude/latitude of CASTNET station 
+                csites_atsite = csites.loc[csites['SITE_ID'].isin([site])]
+                lon_atsite = csites_atsite['LONGITUDE'].values[0]
+                lat_atsite = csites_atsite['LATITUDE'].values[0]
+                # find closest MERRA grid cell 
+                lat_idx = geo_idx(lat_atsite, lat)
+                lon_idx = geo_idx(lon_atsite, lon)
+                t2m_atsite = t2m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
+                t10m_atsite = t10m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
+                u2m_atsite = u2m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
+                u10m_atsite = u10m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
+                v2m_atsite = v2m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
+                v10m_atsite = v10m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
+                comm_t2m[counter1, counter2] = t2m_atsite
+                comm_t10m[counter1, counter2] = t10m_atsite
+                comm_u2m[counter1, counter2] = u2m_atsite
+                comm_u10m[counter1, counter2] = u10m_atsite
+                comm_v2m[counter1, counter2] = v2m_atsite
+                comm_v10m[counter1, counter2] = v10m_atsite                
+                merra_lats_fr.append(lat[lat_idx]) 
+                merra_lons_fr.append(lon[lon_idx])
+        print('MERRA-2 data for %s loaded!' %year)
+    return (comm_t2m, comm_t10m, comm_u2m, comm_u10m, comm_v2m, comm_v10m, 
+            merra_lats_fr, merra_lons_fr)
 # # # # # # # # # # # # #   
 def commensurate_t2m(comm_castnet, castnet_sites_fr, years, sampling_months):
     """function loads MERRA 2 meter temperatures and identifes MERRA grid cells 
@@ -1313,9 +1542,52 @@ def commensurate_castnet_gmi_diurnal(castnet_sites_fr, case, years,
     comm_gmi_co[:] = np.nan
     # loop through years in measuring period
     for year, counter1 in zip(years, np.arange(0, len(years), 1)): 
-        # load GMI CTM output and retrieve all hours to understand diurnal cycle
-        o3, co, no, no2, gmi_sites_i, gmi_lat, gmi_lon, times_ty = \
-        open_gmi_singyear(case, year, sampling_months, sampling_hours)
+        if (case == 'HindcastMR2-DiurnalAvgT') or (case == 'HindcastMERRA'):
+            # given the integers of months, find their three letter 
+            # abbreviations
+            mon_dict = {1:'jan', 2:'feb', 3:'mar', 4:'apr', 5:'may',
+                        6:'jun', 7:'jul', 8:'aug', 9:'sep', 10:'oct', 
+                        11:'nov', 12:'dec'}
+            months = []
+            for sm in sampling_months:
+                months.append(mon_dict[sm])
+            # for O3
+            gmi_lat, gmi_lon, gmi_sites_i, pressure, o3, times_ty = \
+            open_profile_multimonth(case, months, year, 'O3', 'all', 'all')
+            # for NO
+            gmi_lat, gmi_lon, gmi_sites_i, pressure, no, times_ty = \
+            open_profile_multimonth(case, months, year, 'NO', 'all', 'all')  
+            # for NO2
+            gmi_lat, gmi_lon, gmi_sites_i, pressure, no2, times_ty = \
+            open_profile_multimonth(case, months, year, 'NO2', 'all', 'all')  
+            # for CO            
+            gmi_lat, gmi_lon, gmi_sites_i, pressure, co, times_ty = \
+            open_profile_multimonth(case, months, year, 'CO', 'all', 'all')  
+            # convert times to pandas.core.indexes.datetimes.DatetimeIndex
+            times_ty_pd = pd.to_datetime(times_ty)    
+            # select indices in times corresponding to sampling hours
+            times_ash = np.in1d(times_ty_pd.hour, sampling_hours)
+            times_ash = np.where(times_ash == True)[0]
+            # select only GMI sites with information in Table S1 in Strode 
+            # et al. [2015] 
+            sidx = []
+            for s in gmi_sites:
+                sidx.append(np.where(gmi_sites_i == s)[0][0])            
+            # constituents and times at sampling hours
+            o3 = o3[:, times_ash]
+            no = no[:, times_ash]
+            no2 = no2[:, times_ash]
+            co = co[:, times_ash]
+            times_ash = times_ty[times_ash]  
+            # constituents at GMI sites in Strode et al. [2015]
+            o3 = o3[sidx]
+            no = no[sidx]
+            no2 = no2[sidx]
+            co = co[sidx]
+        else:     
+            # load GMI CTM output and retrieve all hours to understand diurnal cycle
+            o3, co, no, no2, gmi_sites_i, gmi_lat, gmi_lon, times_ty = \
+            open_gmi_singyear(case, year, sampling_months, sampling_hours)
         # times in year of interest with hourly timestep 
         dates = pd.date_range('%s-01-%s' %(sampling_months[0], year), 
             '%s-01-%s' %(sampling_months[-1] + 1, year), freq = '1H')[:-1]
@@ -1613,6 +1885,18 @@ def commensurate_castnet_gmi_diurnal_ra(castnet_sites_fr, years,
     commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'HindcastFFIgac2-HighRes', 
                                                       years, sampling_months)
     del temp
+    temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d = \
+    commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'EGU_T', years, 
+                                                      sampling_months)
+    del temp
+    temp, dat_o3_d, dat_no_d, dat_no2_d, dat_co_d = \
+    commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'HindcastMR2-DiurnalAvgT', 
+                                                     years, sampling_months)
+    del temp    
+    temp, merra_o3_d, merra_no_d, merra_no2_d, merra_co_d = \
+    commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'HindcastMERRA', 
+                                                     years, sampling_months)    
+    del temp        
     # average over years, CASTNet sites, and days in variable 'sampling_months'
     # in region to yield a single diurnal curve
     # for O3
@@ -1621,31 +1905,47 @@ def commensurate_castnet_gmi_diurnal_ra(castnet_sites_fr, years,
     ccmi_o3_d = np.nanmean(ccmi_o3_d, axis = tuple(range(0, 3)))
     ffigac2_o3_d = np.nanmean(ffigac2_o3_d, axis = tuple(range(0, 3)))
     ffigac2hr_o3_d = np.nanmean(ffigac2hr_o3_d, axis = tuple(range(0, 3)))
+    egu_o3_d = np.nanmean(egu_o3_d, axis = tuple(range(0, 3)))
+    dat_o3_d = np.nanmean(dat_o3_d, axis = tuple(range(0, 3)))
+    merra_o3_d = np.nanmean(merra_o3_d, axis = tuple(range(0, 3)))
     # for NO
     mr2_no_d = np.nanmean(mr2_no_d, axis = tuple(range(0, 3)))
     ccmi_no_d = np.nanmean(ccmi_no_d, axis = tuple(range(0, 3)))
     ffigac2_no_d = np.nanmean(ffigac2_no_d, axis = tuple(range(0, 3)))
-    ffigac2hr_no_d = np.nanmean(ffigac2hr_no_d, axis = tuple(range(0, 3)))    
+    ffigac2hr_no_d = np.nanmean(ffigac2hr_no_d, axis = tuple(range(0, 3))) 
+    egu_no_d = np.nanmean(egu_no_d, axis = tuple(range(0, 3)))
+    dat_no_d = np.nanmean(dat_no_d, axis = tuple(range(0, 3)))
+    merra_no_d = np.nanmean(merra_no_d, axis = tuple(range(0, 3)))    
     # for NO2
     mr2_no2_d = np.nanmean(mr2_no2_d, axis = tuple(range(0, 3)))
     ccmi_no2_d = np.nanmean(ccmi_no2_d, axis = tuple(range(0, 3)))
     ffigac2_no2_d = np.nanmean(ffigac2_no2_d, axis = tuple(range(0, 3)))
     ffigac2hr_no2_d = np.nanmean(ffigac2hr_no2_d, axis = tuple(range(0, 3)))        
+    egu_no2_d = np.nanmean(egu_no2_d, axis = tuple(range(0, 3)))
+    dat_no2_d = np.nanmean(dat_no2_d, axis = tuple(range(0, 3)))
+    merra_no2_d = np.nanmean(merra_no2_d, axis = tuple(range(0, 3)))    
     # for CO
     mr2_co_d = np.nanmean(mr2_co_d, axis = tuple(range(0, 3)))
     ccmi_co_d = np.nanmean(ccmi_co_d, axis = tuple(range(0, 3)))
     ffigac2_co_d = np.nanmean(ffigac2_co_d, axis = tuple(range(0, 3)))
     ffigac2hr_co_d = np.nanmean(ffigac2hr_co_d, axis = tuple(range(0, 3)))   
+    egu_co_d = np.nanmean(egu_co_d, axis = tuple(range(0, 3)))
+    dat_co_d = np.nanmean(dat_co_d, axis = tuple(range(0, 3)))
+    merra_co_d = np.nanmean(merra_co_d, axis = tuple(range(0, 3)))      
     # return values using a dictionary
     return {'CASTNet':castnet_d, 'MR2 O3':mr2_o3_d,
             'MR2-CCMI O3':ccmi_o3_d, 'FFIgac2 O3':ffigac2_o3_d, 
-            'FFIgac2-HighRes O3':ffigac2hr_o3_d, 'MR2 NO':mr2_no_d,
+            'FFIgac2-HighRes O3':ffigac2hr_o3_d, 'EGU_T O3':egu_o3_d, 
+            'DAT O3':dat_o3_d, 'MERRA O3':merra_o3_d, 'MR2 NO':mr2_no_d,
             'MR2-CCMI NO':ccmi_no_d, 'FFIgac2 NO':ffigac2_no_d, 
-            'FFIgac2-HighRes NO':ffigac2hr_no_d, 'MR2 NO2':mr2_no2_d,
+            'FFIgac2-HighRes NO':ffigac2hr_no_d, 'EGU_T NO':egu_no_d, 
+            'DAT NO':dat_no_d, 'MERRA NO':merra_no_d, 'MR2 NO2':mr2_no2_d,
             'MR2-CCMI NO2':ccmi_no2_d, 'FFIgac2 NO2':ffigac2_no2_d,
-            'FFIgac2-HighRes NO2':ffigac2hr_no2_d, 'MR2 CO':mr2_co_d,
+            'FFIgac2-HighRes NO2':ffigac2hr_no2_d, 'EGU_T NO2':egu_no2_d, 
+            'DAT NO2':dat_no2_d, 'MERRA NO2':merra_no2_d, 'MR2 CO':mr2_co_d,
             'MR2-CCMI CO':ccmi_co_d, 'FFIgac2 CO':ffigac2_co_d,
-            'FFIgac2-HighRes CO':ffigac2hr_co_d}
+            'FFIgac2-HighRes CO':ffigac2hr_co_d, 'EGU_T CO':egu_co_d, 
+            'DAT CO':dat_co_d, 'MERRA CO':merra_co_d}
 # # # # # # # # # # # # #
 def open_perturbed_emissions():
     """function opens perturbed emissions inventories used in GMI CTM 
@@ -2704,13 +3004,13 @@ def open_inst6_3d_ana_Np(years, lev):
     import sys
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
-    sys.path.append('/Users/ghkerr/Desktop/')
-    from generate_times import generate_times
+    sys.path.append('/Users/ghkerr/phd/GMI')    
+    import generate_times    
     H, T, U, V, times = [], [], [], [], []
     # for each year in measuring period, open MERRA-2 meteorology and generate
     # times of MERRA-2 output
     for year in years: 
-        times.append(generate_times(year, 6, 8, 6))
+        times.append(generate_times.generate_times(year, 6, 8, 6))
         # n.b., if focus region is changed, following line will need to be 
         # rewritten
         infile = Dataset(pollutants_constants.PATH_METEOROLOGY + 
