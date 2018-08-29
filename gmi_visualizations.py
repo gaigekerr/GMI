@@ -47,6 +47,7 @@ REVISION HISTORY
     29072018 -- function 'scatter_allgmio3' added
     22082018 -- function 'timeseries_mr2o3dato3eguto3' added
     25082018 -- function 'scatter_dt2m_dmr2o3dato3eguto3' added
+    28082018 -- edited function 'map_gmiaqscastnet' to prepare for publication
     """
 # # # # # # # # # # # # #
 # change font
@@ -698,8 +699,7 @@ def timeseries_castneto3gmio3(castnet, mr2_gmi, ccmi_gmi, ffigac2_gmi,
     return
 # # # # # # # # # # # # #
 def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords, 
-                      llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, years, 
-                      sampling_months, sampling_hours, region):        
+                      years, sampling_months, sampling_hours, region):        
     """for the CASTNet sites specified in variable 'castnet_sites_fr,' function
     opens the locations (latitude/longitude coordinates) of those CASTNet 
     sites and their co-located (or nearly co-located) MERRA grid cells, GMI 
@@ -720,14 +720,6 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
     aqs_no2_coords : list
         Coordinates of unique AQS stations measuring NO2 within bounding boxes 
         defined by CASTNet stations
-    llcrnrlon : float
-        Lower left longitude value of map, units of degrees east
-    llcrnrlat : float
-        Lower left latitude value of map, units of degrees north    
-    urcrnrlon : float
-        Upper right longitude value of map, units of degrees east    
-    urcrnrlat : float
-        Upper right latitude value of map, units of degrees north
     years : list
         Years of interest
     sampling_months : list 
@@ -746,101 +738,171 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
     import pandas as pd
     import matplotlib.pyplot as plt
     from mpl_toolkits.basemap import Basemap
-    import matplotlib.font_manager as font_manager 
     from matplotlib.patches import Polygon 
+    from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+    from matplotlib.path import Path
+    import matplotlib.patches as patches
+    import shapely.geometry as sg
+    import shapely.ops as so
+    from descartes import PolygonPatch    
     import matplotlib as mpl    
-    import matplotlib.patches as mpatches
     import sys
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
-    sys.path.append('/Users/ghkerr/phd/stagnation/')
-    from plot_focus_region import plot_focus_regionOLD
     sys.path.append('/Users/ghkerr/phd/GMI/')
     import commensurability
-    # set custom font
-    path = pollutants_constants.FONTPATH_LIGHT
-    prop = font_manager.FontProperties(fname=path)
-    mpl.rcParams['font.family'] = prop.get_name()
-    path = pollutants_constants.FONTPATH_BOLD
-    prop = font_manager.FontProperties(fname = path)
-    mpl.rcParams['mathtext.bf'] = prop.get_name()
+    # change hatch width
+    mpl.rcParams['hatch.linewidth'] = 2.0
     # open CASTNet and GMI sites
     castnet_lats, castnet_lons, gmi_lats, gmi_lons = \
     commensurability.commensurate_castnet_gmi_locations(castnet_sites_fr, 
         sampling_months, sampling_hours)
-    # open MERRA (requires a year's worth of GMI CTM output)
-    mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
-    commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
-                                              years, sampling_months, 
-                                              sampling_hours)
-    comm_t2m, merra_lats, merra_lons = commensurability.commensurate_t2m(
-            mr2_castnet, castnet_sites_fr, years, sampling_months)
-    del mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr    
-    # initialize figure, axis, and a new instance of basemap
-    fig = plt.figure()
+    # open MERRA-2 (requires a year's worth of GMI CTM output)
+    (comm_t2m, comm_t10m, comm_u2m, comm_u10m, comm_v2m, comm_v10m, 
+     merra_lats_fr, merra_lons_fr) = commensurability.commensurate_MERRA2(
+        mr2_castnet, castnet_sites_fr, years, sampling_months, sampling_hours)        
+    # initialize figure, axes
+    fig = plt.figure(figsize = (15,7))
     ax = plt.subplot2grid((1, 1), (0, 0))
+    # focus region map 
+    llcrnrlon = -84.
+    llcrnrlat = 36.
+    urcrnrlon = -66.3
+    urcrnrlat = 48.
     m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
                 llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
-                urcrnrlat = urcrnrlat, resolution = 'c', area_thresh = 10000)
-    # plot MERRA grid cells
-    x_merra, y_merra = m(merra_lons, merra_lats)
+                urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
+    m.drawmapboundary(color = '#888888')
+    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+    m.drawcoastlines(color = '#888888')
+    # plot GMI sites 
+    x_gmi, y_gmi = m(gmi_lons, gmi_lats)
+    for xi, yi in zip(x_gmi, y_gmi):
+        # find longitude, latitude of every unique grid cell
+        xinverse, yinverse = m(xi, yi, inverse = True)
+        # change bounds of grid cell to map projection (MERRA-2 resolution is 
+        # 0.625˚ x 0.5˚)
+        x1, y1 = m(xinverse + 0.625, yinverse - 0.5)
+        x2, y2 = m(xinverse + 0.625, yinverse + 0.5)
+        x3, y3 = m(xinverse - 0.625, yinverse + 0.5)
+        x4, y4 = m(xinverse - 0.625, yinverse - 0.5)
+        # add patch to map
+        p = Polygon([(x1, y1),(x2, y2),(x3,y3),(x4, y4)], facecolor = 
+                     pollutants_constants.COLOR_CHEMISTRY, alpha = 1., 
+                     edgecolor = 'none', linewidth = 0.0, zorder = 5)
+        plt.gca().add_patch(p) 
+    # plot MERRA-2 reanalysis
+    x_merra, y_merra = m(merra_lons_fr, merra_lats_fr)
     for xi, yi in zip(x_merra, y_merra):
         # find longitude, latitude of every unique grid cell
         xinverse, yinverse = m(xi, yi, inverse = True)
-        # change bounds of grid cell to map projection (MERRA longitude as 
-        # 2/3 degree resolution, latitude has 1/2 degree resolution)
-        x1, y1 = m(xinverse + 1/3., yinverse - 1/4.)
-        x2, y2 = m(xinverse + 1/3., yinverse + 1/4.)
-        x3, y3 = m(xinverse - 1/3., yinverse + 1/4.)
-        x4, y4 = m(xinverse - 1/3., yinverse - 1/4.)
+        # change bounds of grid cell to map projection (MERRA-2 resolution is 
+        # 0.625˚ x 0.5˚)
+        x1, y1 = m(xinverse + 0.3125, yinverse - 0.25)
+        x2, y2 = m(xinverse + 0.3125, yinverse + 0.25)
+        x3, y3 = m(xinverse - 0.3125, yinverse + 0.25)
+        x4, y4 = m(xinverse - 0.3125, yinverse - 0.25)
         # add patch to map
-        p = Polygon([(x1, y1),(x2, y2),(x3,y3),(x4, y4)], facecolor = 
-                     '#fb9a99', alpha = 1., edgecolor = 'none', 
-                     linewidth = 0.0, zorder = 20)
+        p = Polygon([(x1, y1),(x2, y2),(x3,y3),(x4, y4)], fill = False, 
+                     color = '#ff7f00', hatch = '///', linewidth = 0.0, 
+                     zorder = 10)
         plt.gca().add_patch(p) 
-    # plot GMI sites 
-    x_gmi, y_gmi = m(gmi_lons, gmi_lats)
-    gmi_loc = m.scatter(x_gmi, y_gmi, 25, color = '#1f78b4', marker = 'x', 
-                        edgecolor = 'none', linewidth = 0.85, zorder = 24, 
-                        label = 'GMI CTM')
     # plot CASTNet stations
     x_castnet, y_castnet = m(castnet_lons, castnet_lats)
-    castnet_loc = m.scatter(x_castnet, y_castnet, 20, color = 'k', marker = '^', 
-                           edgecolor = 'k', linewidth = 0.5, zorder = 23, 
-                           label = 'CASTNet')
-    # plot AQS stations measuring NO2
-    aqs_no2 = np.array([np.vstack(aqs_no2_coords)[:, 1], 
-                        np.vstack(aqs_no2_coords)[:, 0]], dtype = float).T
-    aqs_no2 = pd.DataFrame(aqs_no2)
-    aqs_no2 = aqs_no2.drop_duplicates()
-    x_aqs_no2, y_aqs_no2 = m(aqs_no2[0].values, 
-                             aqs_no2[1].values)
-    aqs_no2_loc = m.scatter(x_aqs_no2, y_aqs_no2, 8, color = '#33a02c', 
-                            marker = 'o', edgecolor = 'none', linewidth = 0.5, 
-                            zorder = 21, label = 'AQS NO$_{2}$')
-    # plot AQS stations measuring CO
-    aqs_co = np.array([np.vstack(aqs_co_coords)[:, 1], 
-                       np.vstack(aqs_co_coords)[:, 0]], dtype = float).T
-    aqs_co = pd.DataFrame(aqs_co)
-    aqs_co = aqs_co.drop_duplicates()
-    x_aqs_co, y_aqs_co = m(aqs_co[0].values, aqs_co[1].values)
-    aqs_co_loc = m.scatter(x_aqs_co, y_aqs_co, 8, color = '#b2df8a', marker = 'd', 
-                           edgecolor = 'none', linewidth = 0.5, zorder = 22, 
-                           label = 'AQS CO')
-    # overlay shapefile of Northeast
-    plot_focus_regionOLD(ax, m)
-    plt.tight_layout()
-    # create patch which represents MERRA
-    merra_patch = mpatches.Patch(facecolor = '#fb9a99', alpha = 1., edgecolor = 'none', 
-                     linewidth = 0.0, label = 'MERRA')
-    leg = ax.legend(handles = [gmi_loc, castnet_loc, aqs_no2_loc, 
-                    aqs_co_loc, merra_patch], bbox_to_anchor = (0.8, 0.5), 
-                    ncol = 1, fontsize = 12, scatterpoints = 1)
+    castnet_loc = m.scatter(x_castnet, y_castnet, 50, color = 'k', 
+                            marker = 's', edgecolor = 'k', 
+                            linewidth = 0.5, zorder = 15, label = 'CASTNet')
+    ## plot AQS stations measuring NO2
+    #aqs_no2 = np.array([np.vstack(aqs_no2_coords)[:, 1], 
+    #                    np.vstack(aqs_no2_coords)[:, 0]], dtype = float).T
+    #aqs_no2 = pd.DataFrame(aqs_no2)
+    #aqs_no2 = aqs_no2.drop_duplicates()
+    #x_aqs_no2, y_aqs_no2 = m(aqs_no2[0].values, 
+    #                         aqs_no2[1].values)
+    #aqs_no2_loc = m.scatter(x_aqs_no2, y_aqs_no2, 8, color = '#33a02c', 
+    #                        marker = 'o', edgecolor = 'none', linewidth = 0.5, 
+    #                        zorder = 21, label = 'AQS NO$_{2}$')
+    ## plot AQS stations measuring CO
+    #aqs_co = np.array([np.vstack(aqs_co_coords)[:, 1], 
+    #                   np.vstack(aqs_co_coords)[:, 0]], dtype = float).T
+    #aqs_co = pd.DataFrame(aqs_co)
+    #aqs_co = aqs_co.drop_duplicates()
+    #x_aqs_co, y_aqs_co = m(aqs_co[0].values, aqs_co[1].values)
+    #aqs_co_loc = m.scatter(x_aqs_co, y_aqs_co, 8, color = '#b2df8a', marker = 'd', 
+    #                       edgecolor = 'none', linewidth = 0.5, zorder = 22, 
+    #                       label = 'AQS CO')
+    # outline focus region
+    m.readshapefile(pollutants_constants.PATH_SHAPEFILES + 
+                    'cb_2015_us_state_20m', name = 'states', 
+                    drawbounds = True, color = '#888888')
+    state_names = []
+    for shape_dict in m.states_info:
+        state_names.append(shape_dict['NAME'])
+    # dict values are the AQS state codes
+    state_fips_code_listing = {'Alaska' : 2, 'Alabama' : 1, 'Arkansas' : 5, 'Arizona' : 4, 'California' : 6, 
+                               'Colorado' : 8, 'Connecticut' : 9, 'District of Columbia' : 11, 'Delaware' : 10, 
+                               'Florida' : 12, 'Georgia' : 13, 'Hawaii' : 15, 'Iowa' : 19, 'Idaho' : 16, 'Illinois' : 17, 
+                               'Indiana' : 18, 'Kansas' : 20, 'Kentucky' : 21, 'Louisiana' : 22, 'Massachusetts' : 25, 
+                               'Maryland' : 24, 'Maine' : 23, 'Michigan' : 26, 'Minnesota' : 27, 'Missouri' : 29, 
+                               'Mississippi' : 28, 'Montana' : 30, 'North Carolina' : 37, 'North Dakota' : 38, 
+                               'Nebraska' : 31, 'New Hampshire' : 33, 'New Jersey' : 34, 'New Mexico' : 35, 
+                               'Nevada' : 32, 'New York' : 36, 'Ohio' : 39, 'Oklahoma' : 40, 'Oregon' : 41, 
+                               'Pennsylvania' : 42, 'Rhode Island' : 44, 'South Carolina' : 45, 'South Dakota' : 46, 
+                               'Tennessee' : 47, 'Texas' : 48, 'Utah' : 49, 'Virginia' : 51, 'Vermont' : 50, 
+                               'Washington' : 53, 'Wisconsin' : 55, 'West Virginia' : 54, 'Wyoming' : 56}
+    # iterate through states, if states are in the Northeastern United States, 
+    # append shapely.geometry.polygon.Polygon obejcts to list
+    patches_union = [] 
+    for key, value in state_fips_code_listing.items():
+        if key in pollutants_constants.NORTHEAST_STATES: 
+                for info, shape in zip(m.states_info, m.states):
+                    if info['NAME'] == key:
+                        patches_union.append(sg.Polygon(shape))
+    # cascaded union can work on a list of shapes, adapted from 
+    # https://stackoverflow.com/questions/34475431/plot-unions-of-polygons-in-matplotlib
+    neus = so.cascaded_union(patches_union) 
+    ax.add_patch(PolygonPatch(neus, fill = False, ec = '#888888', 
+                              zorder = 2, linewidth = 4.0)) 
+    # generate inset axes
+    ax_small = zoomed_inset_axes(ax, 0.055, loc = 'lower right')
+    m_small = Basemap(projection = 'ortho', lat_0 = 30, lon_0 = -80,
+                      resolution = 'c', area_thresh = 10000) 
+    m_small.drawcoastlines(color = '#888888')
+    m_small.drawcountries(color = '#888888')
+    m_small.fillcontinents(color = '#f9f6d8')
+    m_small.drawmapboundary(color = '#888888')
+    # draw the zoom rectangle around focus region
+    lbx, lby = m_small(*m(m.xmin, m.ymin, inverse= True))
+    ltx, lty = m_small(*m(m.xmin, m.ymax, inverse= True))
+    rtx, rty = m_small(*m(m.xmax, m.ymax, inverse= True))
+    rbx, rby = m_small(*m(m.xmax, m.ymin, inverse= True))
+    verts = [(lbx, lby), # left, bottom
+        (ltx, lty), # left, top
+        (rtx, rty), # right, top
+        (rbx, rby), # right, bottom
+        (lbx, lby), # ignored
+        ]
+    codes = [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO, Path.CLOSEPOLY]
+    path = Path(verts, codes)
+    patch = patches.PathPatch(path, facecolor = 'r', edgecolor = 'r', 
+                              fill = False, lw = 2)
+    ax_small.text(0.72, 0.53, 'Map\nArea', horizontalalignment = 'center',
+                  fontsize = 14, verticalalignment = 'center', 
+                  transform = ax_small.transAxes)
+    ax_small.add_patch(patch)
+    # create legend
+    merra_patch = patches.Patch(fill = False, color = '#ff7f00', 
+                                 hatch = '///', linewidth = 0.0, 
+                                 label = 'MERRA-2')
+    gmi_patch = patches.Patch(facecolor = pollutants_constants.COLOR_CHEMISTRY, 
+                               alpha = 1., edgecolor = 'none', linewidth = 0.0,
+                               label = 'GMI')
+    leg = ax.legend(handles = [castnet_loc, merra_patch, gmi_patch], 
+                    loc = 'upper left', ncol = 2, 
+                    fontsize = 16, scatterpoints = 1, framealpha = 0.0)
     leg.get_frame().set_linewidth(0.0)
-    # remove axis frame from plot             
-    ax.axis('off')
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'map_gmiaqscastnet_%s.eps' %(region), dpi = 300)
+                'map_gmiaqscastnet_%s_UPDATED.png' %(region), dpi = 500)
     return 
 # # # # # # # # # # # # #    
 def diurnal_castneto3gmio3(castnet_o3_d, mr2_o3_d, ccmi_o3_d, ffigac2_o3_d,
