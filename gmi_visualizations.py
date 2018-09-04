@@ -34,7 +34,7 @@ REVISION HISTORY
                 CO, NO, and NO2 and adapted function to handle perturbed
                 emissions runs; function gmi_castnet_dailyavg_singleyear added
     16042018 -- functions 'map_gmiaqscastnet', 'diurnal_castneto3gmio3' and
-                'diurnal_aqscogmico' added
+                'diurnaal_aqscogmico' added
     30052018 -- function 'boxplot_castneto3gmio3' renamed 'boxplot_tracegas' 
                 and modified so that it could plot other trace gases besides O3
     03062018 -- code to open files moved to separate file 
@@ -48,6 +48,8 @@ REVISION HISTORY
     22082018 -- function 'timeseries_mr2o3dato3eguto3' added
     25082018 -- function 'scatter_dt2m_dmr2o3dato3eguto3' added
     28082018 -- edited function 'map_gmiaqscastnet' to prepare for publication
+    29082018 -- function 'timeseries_t2m_castneto3_cemsnox' added
+    04092018 -- function 'map_simulationschematic' added
     """
 # # # # # # # # # # # # #
 # change font
@@ -758,6 +760,9 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
     commensurability.commensurate_castnet_gmi_locations(castnet_sites_fr, 
         sampling_months, sampling_hours)
     # open MERRA-2 (requires a year's worth of GMI CTM output)
+    mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
+    commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
+        years, sampling_months, sampling_hours)        
     (comm_t2m, comm_t10m, comm_u2m, comm_u10m, comm_v2m, comm_v10m, 
      merra_lats_fr, merra_lons_fr) = commensurability.commensurate_MERRA2(
         mr2_castnet, castnet_sites_fr, years, sampling_months, sampling_hours)        
@@ -772,8 +777,9 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
     m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
                 llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
                 urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
-    m.drawmapboundary(color = '#888888')
+    m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
     m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+    m.drawlsmask(ocean_color = '#dcf0fa')
     m.drawcoastlines(color = '#888888')
     # plot GMI sites 
     x_gmi, y_gmi = m(gmi_lons, gmi_lats)
@@ -839,17 +845,21 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
     for shape_dict in m.states_info:
         state_names.append(shape_dict['NAME'])
     # dict values are the AQS state codes
-    state_fips_code_listing = {'Alaska' : 2, 'Alabama' : 1, 'Arkansas' : 5, 'Arizona' : 4, 'California' : 6, 
-                               'Colorado' : 8, 'Connecticut' : 9, 'District of Columbia' : 11, 'Delaware' : 10, 
-                               'Florida' : 12, 'Georgia' : 13, 'Hawaii' : 15, 'Iowa' : 19, 'Idaho' : 16, 'Illinois' : 17, 
-                               'Indiana' : 18, 'Kansas' : 20, 'Kentucky' : 21, 'Louisiana' : 22, 'Massachusetts' : 25, 
-                               'Maryland' : 24, 'Maine' : 23, 'Michigan' : 26, 'Minnesota' : 27, 'Missouri' : 29, 
-                               'Mississippi' : 28, 'Montana' : 30, 'North Carolina' : 37, 'North Dakota' : 38, 
-                               'Nebraska' : 31, 'New Hampshire' : 33, 'New Jersey' : 34, 'New Mexico' : 35, 
-                               'Nevada' : 32, 'New York' : 36, 'Ohio' : 39, 'Oklahoma' : 40, 'Oregon' : 41, 
-                               'Pennsylvania' : 42, 'Rhode Island' : 44, 'South Carolina' : 45, 'South Dakota' : 46, 
-                               'Tennessee' : 47, 'Texas' : 48, 'Utah' : 49, 'Virginia' : 51, 'Vermont' : 50, 
-                               'Washington' : 53, 'Wisconsin' : 55, 'West Virginia' : 54, 'Wyoming' : 56}
+    state_fips_code_listing = {'Alaska' : 2, 'Alabama' : 1, 'Arkansas' : 5, 
+        'Arizona' : 4, 'California' : 6, 'Colorado' : 8, 'Connecticut' : 9, 
+        'District of Columbia' : 11, 'Delaware' : 10, 'Florida' : 12, 
+        'Georgia' : 13, 'Hawaii' : 15, 'Iowa' : 19, 'Idaho' : 16, 
+        'Illinois' : 17, 'Indiana' : 18, 'Kansas' : 20, 'Kentucky' : 21, 
+        'Louisiana' : 22, 'Massachusetts' : 25, 'Maryland' : 24, 'Maine' : 23, 
+        'Michigan' : 26, 'Minnesota' : 27, 'Missouri' : 29, 'Mississippi' : 28, 
+        'Montana' : 30, 'North Carolina' : 37, 'North Dakota' : 38, 
+        'Nebraska' : 31, 'New Hampshire' : 33, 'New Jersey' : 34, 
+        'New Mexico' : 35, 'Nevada' : 32, 'New York' : 36, 'Ohio' : 39, 
+        'Oklahoma' : 40, 'Oregon' : 41, 'Pennsylvania' : 42, 
+        'Rhode Island' : 44, 'South Carolina' : 45, 'South Dakota' : 46, 
+        'Tennessee' : 47, 'Texas' : 48, 'Utah' : 49, 'Virginia' : 51, 
+        'Vermont' : 50, 'Washington' : 53, 'Wisconsin' : 55, 
+        'West Virginia' : 54, 'Wyoming' : 56}
     # iterate through states, if states are in the Northeastern United States, 
     # append shapely.geometry.polygon.Polygon obejcts to list
     patches_union = [] 
@@ -900,7 +910,7 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
     leg = ax.legend(handles = [castnet_loc, merra_patch, gmi_patch], 
                     loc = 'upper left', ncol = 2, 
                     fontsize = 16, scatterpoints = 1, framealpha = 0.0)
-    leg.get_frame().set_linewidth(0.0)
+    leg.get_frame().set_linewidth(0.0)    
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'map_gmiaqscastnet_%s_UPDATED.png' %(region), dpi = 500)
     return 
@@ -2101,10 +2111,16 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     import numpy as np
     import scipy.stats as stats
     import matplotlib.pyplot as plt
+    import matplotlib as mpl
     from matplotlib.ticker import NullFormatter
     import sys
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
+    mpl.rcParams['axes.linewidth'] = 1.5
+    mpl.rcParams['xtick.major.width'] = 1.5
+    mpl.rcParams['xtick.minor.width'] = 1.5
+    mpl.rcParams['ytick.major.width'] = 1.5
+    mpl.rcParams['ytick.minor.width'] = 1.5    
     t2m = np.nanmean(t2m, axis = 1)
     t2m = np.hstack(t2m)
     transport = np.hstack(transport)
@@ -2127,7 +2143,8 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     # remove labels
     axHistx.xaxis.set_major_formatter(nullfmt)
     axHisty.yaxis.set_major_formatter(nullfmt)
-    # scatter plot
+    # scatter plot, change absolute O3 concentrations versus 
+    # absolute temperature 
     axScatter.scatter(t2m, obs, label = 'CASTNet', s = 20, 
                       color = 'lightgrey', zorder = 2)    
     axScatter.scatter(t2m, transport, label = 'Transport', s = 20, 
@@ -2138,6 +2155,12 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
                       color = pollutants_constants.COLOR_EMISSIONS, zorder = 3)
     axScatter.set_xlabel('T$_{\mathregular{2\:m}}$ [K]', fontsize = 14)
     axScatter.set_ylabel('Ozone [ppbv]', fontsize = 14)
+    for tl in axScatter.get_xticklabels():
+        tl.set_fontsize(12)
+    for tl in axScatter.get_yticklabels():
+        tl.set_fontsize(12)    
+    axScatter.get_xaxis().set_label_coords(0.5, -0.07)        
+    axScatter.get_yaxis().set_label_coords(-0.09, 0.5)        
     # histograms
     nbins = 18
     n, x, _  = axHistx.hist(t2m, bins = nbins, histtype = u'step', 
@@ -2145,6 +2168,7 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     density = stats.gaussian_kde(t2m)
     axHistx.plot(x, density(x), lw = 2., color = 'k')
     axHistx.set_ylabel('Density', fontsize = 14)
+    axHistx.get_yaxis().set_label_coords(-0.09, 0.5)        
     # observations
     n, x, _  = axHisty.hist(obs, bins = nbins, histtype = u'step', 
                             orientation = 'horizontal', density = True, lw = 0.)
@@ -2169,6 +2193,7 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     axHisty.plot(density(x), x, zorder = 3, lw = 2.,
                  color = pollutants_constants.COLOR_EMISSIONS)
     axHisty.set_xlabel('Density', fontsize = 14)
+    axHisty.get_xaxis().set_label_coords(0.5, -0.07)        
     axHistx.set_xlim(axScatter.get_xlim())
     axHistx.spines['top'].set_visible(False)
     axHistx.spines['right'].set_visible(False)
@@ -2284,7 +2309,7 @@ def meano3_t2mpercentile(transport, chemistry, emissions, obs, t2m):
         in months in 'sampling_months']
     obs : numpy.ndarray
         CASTNet O3 observations in region, units of ppbv, [years in measuring 
-        period, days in months in 'sampling_months']   
+        period, days in months in 'sampling_months']        
     t2m : numpy.ndarray
         MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
         corresponding CASTNet stations, units of K, [years in measuring 
@@ -2293,7 +2318,7 @@ def meano3_t2mpercentile(transport, chemistry, emissions, obs, t2m):
         
     Returns
     ----------      
-    None         
+    None     
     """
     import numpy as np
     # calculate regionally-averaged T2m
@@ -2436,4 +2461,416 @@ def scatter_dt2m_o3(transport, chemistry, emissions, t2m, region):
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 'scatter_dt2m_o3_%s.eps' 
                 %(region), dpi = 300)     
     return 
+# # # # # # # # # # # # #    
+def timeseries_t2m_castneto3_cemsnox(castnet, t2m, year, years, 
+    sampling_months, region):
+    """for a given summer (JJA) function plots regionally-averaged 2-meter
+    temperatures from MERRA-2, regionally-averaged O3 from CASTNet, and 
+    regionally-summed NOx emissions from CEMS and determines the correlation 
+    coefficients between these variables. 
+
+    Parameters
+    ----------       
+    cast et : numpy.ndarray
+        CASTNet O3 observations in region, units of ppbv, [years in measuring 
+        period, days in months in 'sampling_months']   
+    t2m : numpy.ndarray
+        MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of K, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']  
+    year : int
+        Year of interest
+    years : list
+        Years in measuring period
+    sampling_months : list 
+        Months of interest
+    region : str
+        Region over which regionally-averaged concentrations are supplied to 
+        function
+        
+    Returns
+    ----------      
+    None             
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    sys.path.append('/Users/ghkerr/phd/emissions/')
+    import AQSCEMSobs      
+    mpl.rcParams['axes.linewidth'] = 1.5
+    mpl.rcParams['xtick.major.width'] = 1.5
+    mpl.rcParams['xtick.minor.width'] = 1.5
+    mpl.rcParams['ytick.major.width'] = 1.5
+    mpl.rcParams['ytick.minor.width'] = 1.5
+    # load CEMS NOx emissions in NEUS
+#    states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 
+#                 'RI', 'VA', 'VT', 'WV']
+#    nox_state, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
+#            '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
+#    nox = nox_state['%d-0%d-01'%(year, sampling_months[0]):
+#                    '%d-0%d-31'%(year, sampling_months[-1])].values
+    # select year of interest
+    yearpos = np.where(np.array(years) == year)[0][0]
+    t2m = t2m[yearpos]
+    castnet = castnet[yearpos]
+    # calculate regionally-averaged temperature 
+    t2m = np.nanmean(t2m, axis = 0)
+    # initialize figure, axes
+    fig = plt.figure(figsize = (10, 6))
+    ax1 = plt.subplot2grid((3, 3), (0, 0), colspan = 3)
+    ax2 = plt.subplot2grid((3, 3), (1, 0), colspan = 3)
+    ax3 = plt.subplot2grid((3, 3), (2, 0), colspan = 3)
+    # MERRA-2 2-meter temperature plot
+    ax1.text(0.03, 0.84, '(a)', ha = 'center', va = 'center', 
+             transform = ax1.transAxes, fontsize = 20)
+    ax1.plot(t2m, lw = 2., color = '#ff7f00')
+    ax1.set_xlim([0, len(t2m) - 1])
+    ax1.set_xticks([0, 30, 61])
+    ax1.set_xticklabels([''])
+    for t in ax1.get_yticklabels():
+        t.set_fontsize(12)        
+    ax1.get_yaxis().set_label_coords(-0.07, 0.5)
+    ax1.set_ylabel('T$_{\mathregular{2\:m}}$ [K]', fontsize = 16)
+    ax1.xaxis.set_ticks_position('both')
+    ax1.yaxis.set_ticks_position('both')
+    # CASTNet O3
+    ax2.text(0.03, 0.84, '(b)', ha = 'center', va = 'center', 
+             transform = ax2.transAxes, fontsize = 20)    
+    ax2.plot(castnet, lw = 2., color = 'k')
+    ax2.set_xlim([0, len(castnet) - 1])
+    ax2.set_xticks([0, 30, 61])
+    for t in ax2.get_yticklabels():
+        t.set_fontsize(12)
+    ax2.set_xticklabels([''])
+    ax2.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    ax2.get_yaxis().set_label_coords(-0.07, 0.5)
+    ax2.xaxis.set_ticks_position('both')
+    ax2.yaxis.set_ticks_position('both')
+    # CEMS NOx plot
+    ax3.text(0.03, 0.84, '(c)', ha = 'center', va = 'center', 
+             transform = ax3.transAxes, fontsize = 20)    
+    ax3.plot(nox, lw = 2., color = '#984ea3')
+    ax3.set_xlim([0, len(nox) - 1])
+    ax3.set_xticks([0, 30, 61])
+    ax3.set_xticklabels(['1 Jun', '1 Jul', '1 Aug'], fontsize = 12)
+    for t in ax3.get_yticklabels():
+        t.set_fontsize(12)
+    ax3.set_ylabel('NO$_{x}$ [tons]', fontsize = 16)
+    ax3.get_yaxis().set_label_coords(-0.07, 0.5)
+    ax3.xaxis.set_ticks_position('both')
+    ax3.yaxis.set_ticks_position('both')
+    plt.subplots_adjust(hspace = 0.3)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'timeseries_t2m_castneto3_cemsnox_%d_%s.eps' %(year, region), 
+                dpi = 300)    
+    print('T2m-O3 correlation = %.3f' %(np.corrcoef(t2m, castnet)[0, 1]))
+    print('T2m-NOx correlation = %.3f' %(np.corrcoef(t2m, nox)[0, 1]))
+    print('O3-NOx correlation = %.3f' %(np.corrcoef(castnet, nox)[0, 1])) 
+    return 
+# # # # # # # # # # # # #
+def map_simulationschematic(lat_merra, lon_merra, T0, times, castnet_sites_fr,
+                            years, sampling_months, sampling_hours):     
+    """function plots a map of the region over which anthropogenic NO 
+    emissions were varied. In this region the locations of industrial 
+    facilities which report to CEMS were plotted, and their colors/scatterpoint
+    sizes were determined by the JJA 2008-2010 cumulative NOx emissions. 
+    The Northeastern U.S. is outlined, and two inset (zoomed) plots 
+    illustrate "Transport" and "+ Emissions" simulations. n.b. The grid cells 
+    referenced in the inset plots do NOT correspond to the data shown in the 
+    insets. 
+    
+    Parameters
+    ----------  
+    lat_merra : numpy.ndarray
+        MERRA-2 latitude coordinates of focus region, units of degrees north, 
+        [lat,]
+    lon_merra : numpy.ndarray
+        MERRA-2 longitude coordinates of focus region, units of degrees east, 
+        [lon,]
+    T0 : numpy.ndarray 
+        Surface air temperature, units of K, [time, lat, lon]
+    times : numpy.ndarray
+        Datetime objects corresponding to each 6-hourly timestep of MERRA-2,
+        [time,]
+    castnet_sites_fr : list
+        CASTNET site names in focus region
+    years : list
+        Years of interest
+    sampling_months : list 
+        Months of interest
+    sampling_hours : list 
+        Hours during which trace gas concentrations are returned           
+
+    Returns
+    ----------
+    None        
+    """     
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap
+    from mpl_toolkits.axes_grid.inset_locator import zoomed_inset_axes
+    from mpl_toolkits.axes_grid.inset_locator import mark_inset
+    import matplotlib as mpl
+    from matplotlib.lines import Line2D
+    import shapely.geometry as sg
+    import shapely.ops as so
+    from descartes import PolygonPatch    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    from geo_idx import geo_idx
+    import pollutants_constants
+    sys.path.append('/Users/ghkerr/phd/emissions/')
+    import cems_nei
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    import commensurability
+    mpl.rcParams['axes.linewidth'] = 1.5
+    mpl.rcParams['xtick.major.width'] = 1.5
+    mpl.rcParams['xtick.minor.width'] = 1.5
+    mpl.rcParams['ytick.major.width'] = 1.5
+    mpl.rcParams['ytick.minor.width'] = 1.5
+    # # # #
+    def get_marker_color(amount_array):
+        """find scatterplot marker color and size based on value with colormap
+        from http://colorbrewer2.org/#type=qualitative&scheme=Paired&n=5
+    
+        Parameters
+        ----------
+        amount_array : numpy.array
+            the average yearly sum of NOx emissions (tons) from each CEMS
+            emitting facility in the focus region
+            
+        Returns
+        ----------
+        sizes : list
+            marker sizes
+        colors : list
+            hex color code for markers
+        """
+        sizes = []
+        colors = []        
+        for value in amount_array: 
+            if (value < 25.618500000000004):
+                sizes.append(18)
+                colors.append('#a6cee3')
+            if (value >= 25.618500000000004) and (value < 134.91200000000012):
+                sizes.append(26)
+                colors.append('#1f78b4')
+            if (value >= 134.91200000000012) and (value < 1065.5449999999996):
+                sizes.append(34)
+                colors.append('#b2df8a')                          
+            if (value >= 1065.5449999999996) and (value < 3282.3063999999977):
+                sizes.append(42)
+                colors.append('#33a02c')                                  
+            if (value >= 3282.3063999999977):
+                sizes.append(50)
+                colors.append('#fb9a99')                           
+        return sizes, colors
+    # # # # 
+    # open 12Z gridded HindcastMR2 to get lat, lon coordinates
+    (lat, lon, pressure, times_mr2, co, no, no2, o3) = \
+    commensurability.open_gridded_idailyCTM('HindcastMR2', years)
+    # open emissions inventories for HindcastMR2 run and HindcastMR2 run with 
+    # temperature-dependent emissions run
+    mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
+    commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
+        years, sampling_months, sampling_hours)
+    mr2_no_emiss = \
+    commensurability.commensurate_emiss_unperturbed(mr2_castnet, castnet_sites_fr, 
+        years, sampling_months, '1x1.25_IAVanthGFED4')
+    egu_no_emiss, emiss_lats_fr, emiss_lons_fr = \
+    commensurability.commensurate_emiss_perturbed(mr2_castnet, castnet_sites_fr, 
+        years, sampling_months)
+    # convert longitude
+    lon = np.mod(lon - 180.0, 360.0) - 180.0
+    # initialize figure, axis
+    fig = plt.figure(figsize = (8, 10))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    # focus region map 
+    llcrnrlon = -93.
+    llcrnrlat = 24.
+    urcrnrlon = -66.3
+    urcrnrlat = 48.
+    m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
+                llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
+                urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
+    m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
+    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+    m.drawlsmask(ocean_color = '#dcf0fa')
+    m.drawcoastlines(color = '#888888')
+    # plot shapefile of NEUS
+    m.readshapefile(pollutants_constants.PATH_SHAPEFILES + 
+                    'cb_2015_us_state_20m', name = 'states', 
+                    drawbounds = True, color = '#888888')
+    state_names = []
+    for shape_dict in m.states_info:
+        state_names.append(shape_dict['NAME'])
+    # dict values are the AQS state codes
+    state_fips_code_listing = {'Alaska' : 2, 'Alabama' : 1, 'Arkansas' : 5, 
+        'Arizona' : 4, 'California' : 6, 'Colorado' : 8, 'Connecticut' : 9, 
+        'District of Columbia' : 11, 'Delaware' : 10, 'Florida' : 12, 
+        'Georgia' : 13, 'Hawaii' : 15, 'Iowa' : 19, 'Idaho' : 16, 
+        'Illinois' : 17, 'Indiana' : 18, 'Kansas' : 20, 'Kentucky' : 21, 
+        'Louisiana' : 22, 'Massachusetts' : 25, 'Maryland' : 24, 'Maine' : 23, 
+        'Michigan' : 26, 'Minnesota' : 27, 'Missouri' : 29, 'Mississippi' : 28, 
+        'Montana' : 30, 'North Carolina' : 37, 'North Dakota' : 38, 
+        'Nebraska' : 31, 'New Hampshire' : 33, 'New Jersey' : 34, 
+        'New Mexico' : 35, 'Nevada' : 32, 'New York' : 36, 'Ohio' : 39, 
+        'Oklahoma' : 40, 'Oregon' : 41, 'Pennsylvania' : 42, 
+        'Rhode Island' : 44, 'South Carolina' : 45, 'South Dakota' : 46, 
+        'Tennessee' : 47, 'Texas' : 48, 'Utah' : 49, 'Virginia' : 51, 
+        'Vermont' : 50, 'Washington' : 53, 'Wisconsin' : 55, 
+        'West Virginia' : 54, 'Wyoming' : 56}
+    # iterate through states, if states are in the Northeastern United States, 
+    # append shapely.geometry.polygon.Polygon obejcts to list
+    patches_union = [] 
+    for key, value in state_fips_code_listing.items():
+        if key in pollutants_constants.NORTHEAST_STATES: 
+                for info, shape in zip(m.states_info, m.states):
+                    if info['NAME'] == key:
+                        patches_union.append(sg.Polygon(shape))
+    # cascaded union can work on a list of shapes, adapted from 
+    # https://stackoverflow.com/questions/34475431/plot-unions-of-polygons-in-matplotlib
+    neus = so.cascaded_union(patches_union) 
+    ax.add_patch(PolygonPatch(neus, fill = False, ec = '#888888', 
+                              zorder = 2, linewidth = 4.0)) 
+    # import emissions information
+    facilityinfo = cems_nei.facility_attributes('/Volumes/GAIGEKERR/emissions/CEMS/')
+    emissions_nomean = cems_nei.read_emissions_nomean_easternus('/Volumes/GAIGEKERR/emissions/CEMS/')
+    # given JJA CEMS measurements for measuring period, find unique stack IDs
+    unique_orispl = np.unique(emissions_nomean['Facility ID (ORISPL)'].values)
+    # look up unique stack IDs in facility attribute files
+    facilityinfo_reduced = facilityinfo.loc[facilityinfo['Facility ID (ORISPL)'
+                                                         ].isin(unique_orispl)]
+    # group by Facility ID and find unique latitude and longtiudes at inidividual
+    # facilities; data is screwy and, for instance, some years don't have 
+    # values for facility latitude or longitude (nan) or unreasonable values.
+    # Filter away these measurements
+    facilitylon = facilityinfo_reduced.groupby('Facility ID (ORISPL)')['Facility Longitude'].unique()
+    facilitylat = facilityinfo_reduced.groupby('Facility ID (ORISPL)')['Facility Latitude'].unique()
+    # group measurements by stack ID, find sum of total NOx emissions over the 
+    # entire measuring period
+    summed_nox = emissions_nomean.groupby('Facility ID (ORISPL)')['NOx (tons)'].sum()
+    # total NOx emissions over the measuring period will be the size of the 
+    # scatterpoints on map; ensure that the stack IDs of the stacks' locations
+    # (lon/lat) in the same order as the IDs of total NOx emissions
+    if summed_nox.index.difference(facilitylat.index).shape != (0,):
+        print('mismatch between NOx sum and stack location!')
+    # find marker sizes, colors for plot
+    sizes, colors = get_marker_color(summed_nox.values)
+    xcems, ycems = m(np.concatenate(facilitylon.values), 
+             np.concatenate(facilitylat.values))      
+    m.scatter(xcems, ycems, s = sizes, color = colors, marker = 'o', 
+              edgecolor = colors, zorder = 10)
+    lonres = 1.25
+    latres = 1.              
+    # lon/lat index that will be highlighted
+    latidx, lonidx = 5, 8
+    # FIRST INSET, Transport simulation
+    axins = zoomed_inset_axes(ax, 4.5, loc = 3, bbox_to_anchor = 
+                              (-0.02, -0.02, 1,1), bbox_transform = ax.transAxes)
+    x, y = m(lon[lonidx-4], lat[latidx-1])
+    x2, y2 = m(lon[lonidx-4]+lonres, lat[latidx-1]+latres)
+    axins.set_xlim(x, x2)
+    axins.set_ylim(y, y2)
+    axins.set_yticks([])
+    axins.set_yticklabels([])
+    mark_inset(ax, axins, loc1 = 2, loc2 = 4, fc = 'none', lw = 1.5)
+    # find 6 hourly temperature at highlighted lon/lat index for a given month
+    lat_where = geo_idx(lat[latidx], lat_merra)
+    lon_where = geo_idx(lon[lonidx] + 360., lon_merra)
+    times = pd.to_datetime(times)
+    times_month = np.where((times.year == 2008) & (times.month == 6))[0]
+    T0_gc = T0[times_month, lat_where, lon_where]
+    # reshape to daily 
+    T0_gc = np.reshape(T0_gc, (-1, 4)) # 4 for six hourly
+    T0_gc = np.roll(T0_gc, 2, axis = 1)
+    # plot in twinned inset axis
+    axinst = axins.twinx()
+    axinst.plot(np.linspace(x, x2, 4), T0_gc.T, color = 'grey', lw = 0.5)
+    axinst.plot(np.linspace(x, x2, 4), np.mean(T0_gc.T, axis = 1), 
+                color = 'k', lw = 2.5)
+    axinst.set_xlim([x, x2])
+    axinst.set_xticks(np.linspace(x, x2, 8))
+    axinst.yaxis.tick_left()
+    axins.set_xticklabels(['6', '', '12', '', '18', '', '0', ''])
+    for t in axins.get_xticklabels():
+        t.set_fontsize(12)
+    axinst.text(0.96, -0.17, 'UTC', fontsize = 12, transform = axinst.transAxes)
+    axinst.set_ylim([int(T0_gc.min()) - 2, int(T0_gc.max()) + 3])
+    axinst.set_yticks(np.linspace(int(T0_gc.min()) - 2, 
+                                  int(T0_gc.max()) + 3, 5))
+    for t in axinst.get_yticklabels():
+        t.set_fontsize(12)
+    axins.set_ylabel('T$_{\mathregular{2\:m}}$ [K]', fontsize =16)
+    axins.get_yaxis().set_label_coords(-0.35, 0.5)
+    axins.set_xlabel('Transport, June 2008', fontsize = 16)
+    # SECOND INSET, + Emissions simulation
+    axins2 = zoomed_inset_axes(ax, 6, loc = 4, bbox_to_anchor = (0.02, -0.02, 1,1),
+                               bbox_transform = ax.transAxes)
+    x, y = m(lon[lonidx], lat[latidx])
+    x2, y2 = m(lon[lonidx]+lonres, lat[latidx]+latres)
+    axins2.set_xlim(x, x2)
+    axins2.set_ylim(y, y2)
+    axins2.set_yticks([])
+    axins2.set_yticklabels([])
+    mark_inset(ax, axins2, loc1 = 1, loc2 = 3, fc = 'none', lw = 1.5)
+    axins2t = axins2.twinx()
+    axins2t.plot(np.linspace(x, x2, 92), np.nanmean(egu_no_emiss, axis = 1)[0], 
+                 linewidth = 1.5, label = 'Perturbed', color = '#984ea3', 
+                 linestyle = ':')
+    # plot unperturbed emissions (n.b. loop through indices of months)
+    month_idx = [0, 30, 61, 92]
+    bm_idx = list(np.linspace(x, x2, 4))
+    i = 0
+    for a, b in zip(month_idx[:-1], month_idx[1:]):
+        axins2t.plot(np.linspace(bm_idx[i], bm_idx[i + 1], b-a), 
+                     np.nanmean(mr2_no_emiss, axis = 1)[0, a:b], linewidth = 2.,  
+                     color = '#984ea3')   
+        i = i + 1
+    axins2.set_xlim([x, x2])
+    axins2.set_xticks(np.linspace(x, x2, 4))
+    axins2.set_xticklabels(['June', 'July', 'Aug'], fontsize = 12)
+    for t in axins2t.get_yticklabels():
+        t.set_fontsize(12)  
+    axins2t.set_ylabel('NO [kg s$^{-1}$ cell$^{-1}$]', fontsize = 16, 
+                       rotation = 270)
+    axins2t.get_yaxis().set_label_coords(1.45, 0.5)
+    axins2.set_xlabel('+$\:$Emissions, 2008      ', 
+                      ha = 'center', fontsize = 16)
+    # legend for a scatter plot using a proxy artists 
+    # see http://matplotlib.sourceforge.net/users/legend_guide.html#using-proxy-artist
+    circle1 = Line2D(range(1), range(1), color = 'w', marker = 'o', 
+                     markersize = np.log(18)**1.5, 
+                     markerfacecolor = '#a6cee3', markeredgecolor = '#a6cee3',
+                     label = '$\mathregular{\Sigma}$$\,$NO$_x$$\,$<$\,$25$^{\mathregular{th}}$')
+    circle2 = Line2D(range(1), range(1), color = 'w', marker = 'o', 
+                     markersize = np.log(26)**1.5, markerfacecolor = '#1f78b4', 
+                     markeredgecolor = '#1f78b4', 
+                     label = '25$^{\mathregular{th}}$$\,$$\mathregular{\leq}$$\,$$\mathregular{\Sigma}$$\,$NO$_x$$\,$<$\,$50$^{\mathregular{th}}$')
+    circle3 = Line2D(range(1), range(1), color = 'w', marker = 'o', 
+                     markersize = np.log(34)**1.5, 
+                     markerfacecolor = '#b2df8a', markeredgecolor = '#b2df8a', 
+                     label = '50$^{\mathregular{th}}$$\,$$\mathregular{\leq}$$\,$$\mathregular{\Sigma}$$\,$NO$_x$$\,$<$\,$75$^{\mathregular{th}}$')
+    circle4 = Line2D(range(1), range(1), color = 'w', marker = 'o', 
+                     markersize = np.log(42)**1.5, 
+                     markerfacecolor = '#33a02c', markeredgecolor = '#33a02c', 
+                     label = '75$^{\mathregular{th}}$$\,$$\mathregular{\leq}$$\,$$\mathregular{\Sigma}$ NO$_x$$\,$<$\,$90$^{\mathregular{th}}$')
+    circle5 = Line2D(range(1), range(1), color = 'w', marker = 'o', 
+                     markersize = np.log(50)**1.5, 
+                     markerfacecolor = '#fb9a99', markeredgecolor = '#fb9a99', 
+                     label = '$\mathregular{\Sigma}$$\,$NO$_x$$\,$$\mathregular{\geq}$$\,$90$^{\mathregular{th}}$')
+    # add legend 
+    leg = ax.legend(loc = 9, bbox_to_anchor = (0.5, 1.2),
+                    handles = [circle1, circle2, circle3, circle4, circle5], 
+                    ncol = 2, fontsize = 16, numpoints = 1, facecolor = 'w')
+    leg.get_frame().set_linewidth(0.0)
+    plt.subplots_adjust(right = 0.85)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 'map_simulationschematic.eps', 
+                dpi = 350)
+    return
 # # # # # # # # # # # # #    
