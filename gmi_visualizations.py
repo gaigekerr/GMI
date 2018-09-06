@@ -49,7 +49,10 @@ REVISION HISTORY
     25082018 -- function 'scatter_dt2m_dmr2o3dato3eguto3' added
     28082018 -- edited function 'map_gmiaqscastnet' to prepare for publication
     29082018 -- function 'timeseries_t2m_castneto3_cemsnox' added
-    04092018 -- function 'map_simulationschematic' added
+    04092018 -- functions 'map_simulationschematic' and 
+                'contourf_merra2h500_mr2o3event' added
+    05082018 -- functions 'map_do3dt2mratio_conus', 
+                'timeseries_t2m_datnox_dato3', and 'scatter_datnox_dato3' added
     """
 # # # # # # # # # # # # #
 # change font
@@ -854,7 +857,7 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
         'Michigan' : 26, 'Minnesota' : 27, 'Missouri' : 29, 'Mississippi' : 28, 
         'Montana' : 30, 'North Carolina' : 37, 'North Dakota' : 38, 
         'Nebraska' : 31, 'New Hampshire' : 33, 'New Jersey' : 34, 
-        'New Mexico' : 35, 'Nevada' : 32, 'New York' : 36, 'Ohio' : 39, 
+        'New Mexico' : 35, 'Nevada': 32, 'New York' : 36, 'Ohio' : 39, 
         'Oklahoma' : 40, 'Oregon' : 41, 'Pennsylvania' : 42, 
         'Rhode Island' : 44, 'South Carolina' : 45, 'South Dakota' : 46, 
         'Tennessee' : 47, 'Texas' : 48, 'Utah' : 49, 'Virginia' : 51, 
@@ -1357,7 +1360,7 @@ def pdf_allgmio3(castnet, mr2, ccmi, egu, dat, mechanism, region):
         in months in 'sampling_months']                 
     dat : numpy.ndarray
         GMI CTM O3 concentrations co-located (or nearly colocated) with 
-        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        corresponding CASTNet stations for model case haa, 
         units of ppbv, [years in measuring period, days in months in 
         'sampling_months']          
     mechanism : numpy.ndarray
@@ -2047,8 +2050,8 @@ def timeseries_mr2o3dato3eguto3(transport, chemistry, emissions, obs, region):
     ax2.set_xlabel('2009', x = 0., ha = 'left', fontsize = 14)
     ax3.set_xticks([184, 214, 245])
     ax3.set_xticklabels(['Jun', 'Jul', 'Aug'], ha = 'left', fontsize = 12)
-    ax3.set_xlabel('2010', x = 0., ha = 'left', fontsize = 14)
-    ax.set_ylabel('Ozone [ppbv]', fontsize = 14)
+    ax3.set_xlabel('2010', x = 0., ha = 'left', fontsize = 16)
+    ax.set_ylabel('Ozone [ppbv]', fontsize = 16)
     for tl in ax.get_yticklabels():
         tl.set_fontsize(12)
     # remove axis tick labels overlap discontinuous lines
@@ -2063,7 +2066,7 @@ def timeseries_mr2o3dato3eguto3(transport, chemistry, emissions, obs, region):
     handles = [handles[0], handles[3], handles[2], handles[1]]
     labels = [labels[0], labels[3], labels[2], labels[1]]
     ax.legend(handles,labels, bbox_to_anchor = (1.55, 1.05), loc = 'center', 
-              ncol = 4, frameon = False, fontsize = 12)
+              ncol = 4, frameon = False, fontsize = 16)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'timeseries_mr2o3dato3eguto3_%s.eps' %(region), 
                 dpi = 300)   
@@ -2153,8 +2156,28 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
                       color = pollutants_constants.COLOR_CHEMISTRY, zorder = 6)
     axScatter.scatter(t2m, emissions, label = '+$\:$Emissions', s = 20, 
                       color = pollutants_constants.COLOR_EMISSIONS, zorder = 3)
-    axScatter.set_xlabel('T$_{\mathregular{2\:m}}$ [K]', fontsize = 14)
-    axScatter.set_ylabel('Ozone [ppbv]', fontsize = 14)
+    # add in lines of best fit 
+    obs_m = np.poly1d(np.polyfit(t2m, obs, 1))[1]
+    transport_m = np.poly1d(np.polyfit(t2m, transport, 1))[1]
+    chemistry_m = np.poly1d(np.polyfit(t2m, chemistry, 1))[1]
+    emissions_m = np.poly1d(np.polyfit(t2m, emissions, 1))[1]
+    print('m_obs = ', '%.3f' %obs_m)
+    print('m_transport = ', '%.3f' %transport_m)
+    print('m_chemistry = ', '%.3f' %chemistry_m)
+    print('m_emissions = ', '%.3f' %emissions_m)
+    axScatter.plot(np.unique(t2m), np.poly1d(np.polyfit(t2m, obs, 
+        1))(np.unique(t2m)), zorder = 30, color = 'lightgrey', lw = 2.5)
+    axScatter.plot(np.unique(t2m), np.poly1d(np.polyfit(t2m, transport, 
+        1))(np.unique(t2m)), zorder = 30,
+        color = pollutants_constants.COLOR_TRANSPORT, lw = 2.5)
+    axScatter.plot(np.unique(t2m), np.poly1d(np.polyfit(t2m, chemistry, 
+        1))(np.unique(t2m)), zorder = 20,
+        color = pollutants_constants.COLOR_CHEMISTRY, lw = 2.5)
+    axScatter.plot(np.unique(t2m), np.poly1d(np.polyfit(t2m, emissions, 
+        1))(np.unique(t2m)), zorder = 10, 
+        color = pollutants_constants.COLOR_EMISSIONS, lw = 2.5)    
+    axScatter.set_xlabel('T$_{\mathregular{2\:m}}$ [K]', fontsize = 16)
+    axScatter.set_ylabel('Ozone [ppbv]', fontsize = 16)
     for tl in axScatter.get_xticklabels():
         tl.set_fontsize(12)
     for tl in axScatter.get_yticklabels():
@@ -2167,7 +2190,7 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
                             density = True, color = 'k', lw = 0.)
     density = stats.gaussian_kde(t2m)
     axHistx.plot(x, density(x), lw = 2., color = 'k')
-    axHistx.set_ylabel('Density', fontsize = 14)
+    axHistx.set_ylabel('Density', fontsize = 16)
     axHistx.get_yaxis().set_label_coords(-0.09, 0.5)        
     # observations
     n, x, _  = axHisty.hist(obs, bins = nbins, histtype = u'step', 
@@ -2192,7 +2215,7 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     density = stats.gaussian_kde(emissions)
     axHisty.plot(density(x), x, zorder = 3, lw = 2.,
                  color = pollutants_constants.COLOR_EMISSIONS)
-    axHisty.set_xlabel('Density', fontsize = 14)
+    axHisty.set_xlabel('Density', fontsize = 16)
     axHisty.get_xaxis().set_label_coords(0.5, -0.07)        
     axHistx.set_xlim(axScatter.get_xlim())
     axHistx.spines['top'].set_visible(False)
@@ -2200,7 +2223,7 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     axHisty.set_ylim(axScatter.get_ylim())
     axHisty.spines['top'].set_visible(False)
     axHisty.spines['right'].set_visible(False)
-    axScatter.legend(ncol = 1, frameon = False, fontsize = 12)
+    axScatter.legend(ncol = 1, frameon = False, fontsize = 16)
     for ax in [axScatter, axHistx, axHisty]:
         for tl in ax.get_xticklabels():
             tl.set_fontsize(12)
@@ -2872,5 +2895,403 @@ def map_simulationschematic(lat_merra, lon_merra, T0, times, castnet_sites_fr,
     plt.subplots_adjust(right = 0.85)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 'map_simulationschematic.eps', 
                 dpi = 350)
+    return
+# # # # # # # # # # # # #    
+def contourf_merra2h500_mr2o3event(chemistry, H500, lon, lat, times, 
+    sampling_hours):
+    """function identifies days in which regionally-averaged O3 from Hindcast
+    MR2 (+ Chemistry) simulation exceeds the 90th percentile for O3 for JJA
+    2008-2010. MERRA-2 500 hPa geopotential heights on these days are aveaged 
+    and shown as the average anomaly on event days for the first output figure
+    and the geopotential height anomaly is shown for all individual O3 events 
+    for the second output figure. 
+
+    Parameters
+    ----------      
+    chemistry : numpy.ndarray            
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2, units of 
+        ppbv, [years in measuring period, days in months in 'sampling_months']     
+    H500 : numpy.ndarray
+         MERRA-2 geopotential height at 500 hPa, units of m, [time, lat, lon]
+    lon : numpy.ndarray
+        Longitude coordinates of focus region, units of degrees east, [lon,]        
+    lat : numpy.ndarray
+        Latitude coordinates of focus region, units of degrees north, [lat,]
+    times : numpy.ndarray
+        Datetime objects corresponding to each 6-hourly timestep of MERRA-2,
+        [time,]
+    sampling_hours : list 
+        Hours during which trace gas concentrations are returned        
+
+    Returns
+    ----------
+    None       
+    """
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap
+    chemistry = np.hstack(chemistry)
+    # find indices of MERRA-2 meteorological fields in 'sampling_hours;' n.b.
+    # this is meant to be for when 'sampling_hours' is 15-20 local time
+    times = pd.to_datetime(times)
+    times_intersect = np.in1d(times.hour, sampling_hours)
+    H500_intersect = H500[times_intersect]
+    # find O3 events in + Chemistry simulation (days where Northeast-averaged
+    # O3 exceeds 80th percentile)
+    events = np.where(chemistry > np.percentile(chemistry, 90))[0]
+    # geopotential height on days with O3 events
+    H500_events = H500_intersect[events]
+    # colorscale and map 
+    cmap = plt.get_cmap('Spectral_r')
+    vmin, vmax = -150, 150
+    clevs = np.linspace(vmin, vmax, 21)
+    m = Basemap(projection = 'mill', llcrnrlon = -85., llcrnrlat = 35, 
+                urcrnrlon = -66., urcrnrlat = 49., resolution = 'i', 
+                area_thresh = 10000) 
+    # convert longitude
+    lon = np.mod(lon - 180.0, 360.0) - 180.0
+    x, y = np.meshgrid(lon, lat)
+    x, y = m(x, y)    
+    # initialize figure for mean event
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    event = m.contourf(x, y, np.mean(H500_events, axis = 0) - 
+            np.mean(H500_intersect, axis = 0), clevs, cmap = cmap, 
+            vmin = vmin, vmax = vmax, extend = 'both')   
+    m.drawstates(color = '#888888', linewidth = 0.5)
+    m.drawcountries(color = '#888888', linewidth = 0.5)
+    m.drawcoastlines(color = '#888888', linewidth = 0.5)
+    #fig.subplots_adjust(right = 0.85)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.03, 0.7]) 
+    fig.colorbar(event, cax = cbar_ax, label = '$\mathregular{\Delta}$Z [m]')   
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'contourf_merra2h500_mr2meano3event.eps', dpi = 300)
+    # initialize figure for individual events 
+    fig = plt.figure()
+    for day in np.arange(0, len(events), 1):
+        # n.b. will only work for 90th %-ile/28 events 
+        ax = plt.subplot(4, 7, day + 1)
+        ax.set_title('%s' %(str(times[np.where(times_intersect == 
+            True)[0]][events][day])[:10]), fontsize = 8)
+        event = m.contourf(x, y, H500_events[day] - 
+            np.mean(H500_intersect, axis = 0), clevs, cmap = cmap, 
+            vmin = vmin, vmax = vmax, extend = 'both')   
+        m.drawstates(color = '#888888', linewidth = 0.5)
+        m.drawcountries(color = '#888888', linewidth = 0.5)
+        m.drawcoastlines(color = '#888888', linewidth = 0.5)
+    # add central colorbar
+    fig.subplots_adjust(left = 0.1, right = 0.80)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.03, 0.7]) 
+    fig.colorbar(event, cax = cbar_ax, label = '$\mathregular{\Delta}$Z [m]')   
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'contourf_merra2h500_mr2allo3event.eps', dpi = 300)
+    return    
+# # # # # # # # # # # # #
+def timeseries_t2m_datnox_dato3(transportno, transportno2, transporto3, 
+    t2m, year, years):
+    """function plots a timeseries of 2-meter temperatures from MERRA-2 and 
+    NOx and O3 from the Transport simulation for a year of interest. 
+
+    Parameters
+    ----------  
+    transportno : numpy.ndarray
+        GMI CTM NO concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']    
+    transportno2 : numpy.ndarray
+        GMI CTM NO2 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']    
+    transporto3 : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']            
+    t2m : numpy.ndarray
+        MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of K, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']     
+    year : int
+        Year of interest
+    years : list
+        Years in measuring period
+
+    Returns
+    ----------
+    None    
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    # regionally-averaged 2-meter temperature
+    t2m = np.nanmean(t2m, axis = 1)
+    transporto3 = np.hstack(transporto3)
+    transportno = np.hstack(transportno)
+    transportno2 = np.hstack(transportno2)
+    t2m = np.hstack(t2m)
+    # initialize figure, axes
+    fig = plt.figure()
+    ax1 = plt.subplot2grid((3, 3), (0, 0), colspan = 3)
+    ax2 = plt.subplot2grid((3, 3), (1, 0), colspan = 3) 
+    ax3 = plt.subplot2grid((3, 3), (2, 0), colspan = 3)
+    # plot trace gases and temperature for a particular summer
+    where_year = np.where(np.array(years) == year)[0][0]
+    # 2-meter temperatures
+    ax1.plot(t2m[92*where_year:92*(where_year+1)], lw = 1.5, color = 'k')
+    ax1.set_xlim([0, 91])
+    ax1.set_xticks([0, 30, 61])
+    ax1.set_xticklabels([''])
+    for t in ax1.get_yticklabels():
+        t.set_fontsize(12)  
+    ax1.set_ylabel('T$_{\mathregular{2\:m}}$ [K]', fontsize = 16)
+    ax1.get_yaxis().set_label_coords(-0.09, 0.5)
+    # NOx
+    ax2.plot(transportno[92*where_year:92*(where_year+1)] + 
+                         transportno2[92*where_year:92*(where_year+1)], 
+                         lw = 1.5, color = 'k')
+    ax2.set_xlim([0, 91])
+    ax2.set_xticks([0, 30, 61])
+    ax2.set_xticklabels([''])
+    for t in ax2.get_yticklabels():
+        t.set_fontsize(12)  
+    ax2.set_ylabel('NO$_{x}$ [ppbv]', fontsize = 16)
+    ax2.get_yaxis().set_label_coords(-0.09, 0.5)
+    # O3
+    ax3.plot(transporto3[92*where_year:92*(where_year+1)], lw = 1.5, color = 'k')
+    ax3.set_xlim([0, 91])
+    ax3.set_xticks([0, 30, 61])
+    ax3.set_xticklabels(['1 June', '1 July', '1 Aug %d' %year])
+    for t in ax3.get_xticklabels():
+        t.set_fontsize(12)  
+    for t in ax3.get_yticklabels():
+        t.set_fontsize(12)      
+    ax3.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    ax3.get_yaxis().set_label_coords(-0.09, 0.5)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'timeseries_t2m_datnox_dato3_%d.eps' %year, dpi = 300)
+    return
+# # # # # # # # # # # # #
+def scatter_datnox_dato3(transportno, transportno2, transporto3, t2m):
+    """function plots regionally-averaged O3 versus NOx with the colorscale
+    representing 2-meter temperatures.
+    
+    Parameters
+    ----------  
+    transportno : numpy.ndarray
+        GMI CTM NO concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']    
+    transportno2 : numpy.ndarray
+        GMI CTM NO2 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']    
+    transporto3 : numpy.ndarray
+        GMI CTM O3 concentrations co-located (or nearly colocated) with 
+        corresponding CASTNet stations for model case HindcastMR2-DiurnalAvgT, 
+        units of ppbv, [years in measuring period, days in months in 
+        'sampling_months']            
+    t2m : numpy.ndarray
+        MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+        corresponding CASTNet stations, units of K, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']     
+
+    Returns
+    ----------
+    None        
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    # regionally-averaged 2-meter temperature
+    t2m = np.nanmean(t2m, axis = 1)
+    transporto3 = np.hstack(transporto3)
+    transportno = np.hstack(transportno)
+    transportno2 = np.hstack(transportno2)
+    t2m = np.hstack(t2m)
+    # initialize figure, axis
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    mpble = ax.scatter(transportno + transportno2, transporto3, c = t2m, 
+                       cmap = plt.get_cmap('gnuplot2'))
+    plt.colorbar(mpble, label = 'T$_{\mathregular{2\:m}}$ [K]')
+    ax.set_xlabel('NO$_{x}$ [ppbv]', fontsize = 16)
+    ax.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    for t in ax.get_xticklabels():
+        t.set_fontsize(12)
+    for t in ax.get_yticklabels():
+        t.set_fontsize(12)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'scatter_datnox_dato3.eps', dpi = 300)
+# # # # # # # # # # # # #    
+def map_do3dt2mratio_conus():
+    """function opens GMI output for the continential U.S. (CONUS) and finds 
+    the ratio between the slope of the linear fit through Transport O3 versus
+    T2m and + Chemistry O3 versus T2m. These ratios are calculated for each 
+    GMI site with hourly profile data rather than as regional-averages. 
+    
+    Parameters
+    ----------       
+    None
+        
+    Returns
+    ----------      
+    None             
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap
+    # find ratio between Transport and + Chemistry O3 in each region 
+    def dO3_dT(o3, t2m):
+        """with 
+        """
+        import numpy as np
+        from scipy.stats import linregress
+        slopes = []
+        # swap axes so that dimensionality is (no. summers, no. days in summer, 
+        # no. sites)
+        o3 = np.swapaxes(o3, 1, 2)
+        t2m = np.swapaxes(t2m, 1, 2)
+        # stack year and day axes
+        o3 = np.vstack(o3)
+        t2m = np.vstack(t2m)
+        # loop through sites and find dO3/dT
+        for site in np.arange(0, t2m.shape[1], 1):
+            slope = linregress(t2m[:, site], o3[:, site]).slope
+            slopes.append(slope)
+        return np.array(slopes)
+    # # # # 
+    # CASTNet sites in continental U.S.
+    castnet_sites_neus = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP', 
+       'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 'CDR', 'VPI', 'MKG', 'KEF']
+    castnet_sites_south = ['ESP', 'SPD', 'GRS', 'BLR', 'COW', 'PNF', 'GRS', 'SND',
+        'GAS', 'CVL', 'CAD', 'SUM']
+    castnet_sites_midwest = ['PRK', 'BVL', 'VIN', 'ALH', 'OXF', 'SAL', 'LYK', 
+        'DCP', 'UVL', 'ANA']
+    castnet_sites_west = ['LAV', 'PIN', 'SEK', 'JOT', 'GLR', 'CHA', 'GRC', 'YEL', 
+        'PND', 'CNT', 'ROM', 'GTH']
+    # times to sample model
+    sampling_hours_neus = [15, 16, 17, 18, 19, 20]
+    sampling_hours_south = [15, 16, 17, 18, 19, 20]
+    sampling_hours_midwest = [16, 17, 18, 19, 20, 21]
+    sampling_hours_west = [17, 18, 19, 20, 21, 22]
+    # open daily mean (11-16 LST average) CASTNet O3 and GMI trace gases
+    # for the Northeast
+    castnet_neus, mr2_o3_neus, mr2_no_neus, mr2_no2_neus, mr2_co_neus, \
+    mr2_gmi_sites_neus = commensurability.commensurate_castnet_gmi(
+        castnet_sites_neus, 'HindcastMR2', years, sampling_months, 
+        sampling_hours_neus, 'GMT+4')
+    temp, dat_o3_neus, dat_no_neus, dat_no2_neus, dat_co_neus, \
+    dat_gmi_sites_neus = commensurability.commensurate_castnet_gmi(
+        castnet_sites_neus, 'HindcastMR2-DiurnalAvgT', years, sampling_months, 
+        sampling_hours_neus, 'GMT+4')
+    # for the South
+    castnet_south, mr2_o3_south, mr2_no_south, mr2_no2_south, mr2_co_south, \
+    mr2_gmi_sites_south = commensurability.commensurate_castnet_gmi(
+        castnet_sites_south, 'HindcastMR2', years, sampling_months, 
+        sampling_hours_south, 'GMT+4')
+    temp, dat_o3_south, dat_no_south, dat_no2_south, dat_co_south, \
+    dat_gmi_sites_south = commensurability.commensurate_castnet_gmi(
+        castnet_sites_south, 'HindcastMR2-DiurnalAvgT', years, sampling_months, 
+        sampling_hours_south, 'GMT+4')
+    # for the Midwest
+    castnet_midwest, mr2_o3_midwest, mr2_no_midwest, mr2_no2_midwest, mr2_co_midwest, \
+    mr2_gmi_sites_midwest = commensurability.commensurate_castnet_gmi(
+        castnet_sites_midwest, 'HindcastMR2', years, sampling_months, 
+        sampling_hours_midwest, 'GMT+5')
+    temp, dat_o3_midwest, dat_no_midwest, dat_no2_midwest, dat_co_midwest, \
+    dat_gmi_sites_midwest = commensurability.commensurate_castnet_gmi(
+        castnet_sites_midwest, 'HindcastMR2-DiurnalAvgT', years, sampling_months, 
+        sampling_hours_midwest, 'GMT+5')
+    # for the West
+    castnet_west, mr2_o3_west, mr2_no_west, mr2_no2_west, mr2_co_west, \
+    mr2_gmi_sites_west = commensurability.commensurate_castnet_gmi(
+        castnet_sites_west, 'HindcastMR2', years, sampling_months, 
+        sampling_hours_west, 'GMT+6')
+    temp, dat_o3_west, dat_no_west, dat_no2_west, dat_co_west, \
+    dat_gmi_sites_west = commensurability.commensurate_castnet_gmi(
+        castnet_sites_west, 'HindcastMR2-DiurnalAvgT', years, sampling_months, 
+        sampling_hours_west, 'GMT+6')
+    # look up CASTNet/GMI site locations in each region 
+    castnet_lats_neus, castnet_lons_neus, gmi_lats_neus, gmi_lons_neus = \
+    commensurability.commensurate_castnet_gmi_locations(castnet_sites_neus, 
+        sampling_months, sampling_hours_neus, 'GMT+4')
+    castnet_lats_south, castnet_lons_south, gmi_lats_south, gmi_lons_south = \
+    commensurability.commensurate_castnet_gmi_locations(castnet_sites_south, 
+        sampling_months, sampling_hours_south, 'GMT+4')
+    castnet_lats_midwest, castnet_lons_midwest, gmi_lats_midwest, gmi_lons_midwest = \
+    commensurability.commensurate_castnet_gmi_locations(castnet_sites_midwest, 
+        sampling_months, sampling_hours_midwest, 'GMT+5')
+    castnet_lats_west, castnet_lons_west, gmi_lats_west, gmi_lons_west = \
+    commensurability.commensurate_castnet_gmi_locations(castnet_sites_west, 
+        sampling_months, sampling_hours_west, 'GMT+6')
+    # find 2-meter temperatures in each region
+    (t2m_neus, t10m_neus, u2m_neus, u10m_neus, v2m_neus, v10m_neus, 
+     merra_lats_neus, merra_lons_neus) = commensurability.commensurate_MERRA2(
+        castnet_neus, castnet_sites_neus, years, sampling_months, 
+        sampling_hours_neus)        
+    (t2m_south, t10m_south, u2m_south, u10m_south, v2m_south, v10m_south, 
+     merra_lats_south, merra_lons_south) = commensurability.commensurate_MERRA2(
+        castnet_south, castnet_sites_south, years, sampling_months, 
+        sampling_hours_south)  
+    (t2m_midwest, t10m_midwest, u2m_midwest, u10m_midwest, v2m_midwest, v10m_midwest, 
+     merra_lats_midwest, merra_lons_midwest) = commensurability.commensurate_MERRA2(
+        castnet_midwest, castnet_sites_midwest, years, sampling_months, 
+        sampling_hours_midwest)  
+    (t2m_west, t10m_west, u2m_west, u10m_west, v2m_west, v10m_west, 
+     merra_lats_west, merra_lons_west) = commensurability.commensurate_MERRA2(
+        castnet_west, castnet_sites_west, years, sampling_months, 
+        sampling_hours_west)  
+    # find O3-T2m sensitivity 
+    dat_slopes_neus = dO3_dT(dat_o3_neus, t2m_neus)
+    mr2_slopes_neus = dO3_dT(mr2_o3_neus, t2m_neus)
+    dat_slopes_south = dO3_dT(dat_o3_south, t2m_south)
+    mr2_slopes_south = dO3_dT(mr2_o3_south, t2m_south)
+    dat_slopes_midwest = dO3_dT(dat_o3_midwest, t2m_midwest)
+    mr2_slopes_midwest = dO3_dT(mr2_o3_midwest, t2m_midwest)
+    dat_slopes_west = dO3_dT(dat_o3_west, t2m_west)
+    mr2_slopes_west = dO3_dT(mr2_o3_west, t2m_west)
+    # ratio of temperature sensitivities
+    ratio_neus = (dat_slopes_neus/mr2_slopes_neus)
+    ratio_south = (dat_slopes_south/mr2_slopes_south)
+    ratio_midwest = (dat_slopes_midwest/mr2_slopes_midwest)
+    ratio_west = (dat_slopes_west/mr2_slopes_west)
+    # concatenate for CONUS
+    all_lons = np.concatenate([gmi_lons_neus, gmi_lons_south, 
+                               gmi_lons_midwest, gmi_lons_west])
+    all_lats = np.concatenate([gmi_lats_neus, gmi_lats_south, 
+                               gmi_lats_midwest, gmi_lats_west])
+    all_ratio = np.concatenate([ratio_neus, ratio_south, ratio_midwest, ratio_west])
+    # initialize figure, axis
+    fig = plt.figure(figsize = (8, 10))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    # focus region map 
+    llcrnrlon = -130.
+    llcrnrlat = 24.8
+    urcrnrlon = -66.3
+    urcrnrlat = 50.
+    m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
+                llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
+                urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
+    m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
+    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+    m.drawlsmask(ocean_color = '#dcf0fa')
+    m.drawcoastlines(color = '#888888')
+    m.drawstates(color = '#888888')
+    m.drawcountries(color = '#888888')
+    cmap = plt.get_cmap('RdBu_r')
+    cmap.set_over('#67001f')
+    cmap.set_under('#053061')
+    x, y = m(all_lons, all_lats)
+    m.scatter(x, y, c = all_ratio[~np.isnan(all_ratio)],
+                vmin = 0.5, vmax = 1.5, cmap = cmap, zorder = 20)
+    m.colorbar(extend = 'both', label = 'm$_{\mathregular{Transport}}$/m$_{\mathregular{+\:Chemistry}}$')
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_do3dt2mratio_conus.eps', dpi = 300)
     return
 # # # # # # # # # # # # #    
