@@ -77,6 +77,9 @@ REVISION HISTORY
                 (n.b. before it was hardcoded for only 15-20 UTC) and 
                 function 'commensurate_castnet_gmi_diurnal_ra' edited to 
                 find diurnal cycle for all GMI simulations
+    05082018 -- timezone parameter added to functions. This allows user to pass
+                the UTC offset when opening afternoon modeled trace gas output
+                such that output can be opened over many timezones.
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -183,7 +186,7 @@ def open_gmi_singyear(case, year, sampling_months, sampling_hours):
     print('CTM data for %s loaded!' %year)        
     return o3, co, no, no2, gmi_sites, gmi_lat, gmi_lon, times_ty
 # # # # # # # # # # # # #
-def open_castnet_singyear(year, sampling_months, sampling_hours):
+def open_castnet_singyear(year, sampling_months, sampling_hours, timezone):
     """function opens yearly CASTNET observations and finds observations taken
     at the specified hours during specified months. 
     
@@ -195,6 +198,11 @@ def open_castnet_singyear(year, sampling_months, sampling_hours):
         Months of interest
     sampling_hours : list 
         Hours during which trace gas concentrations are returned
+    timezone : str
+        The UTC offset for region; final number has positive signs west of 
+        Greenwich; for example, timezone = 'GMT+4' uses the abbreviation 
+        'GMT+4' and corresponds to 4 hours behind UTC (i.e. west of Greenwich) 
+        no 4 hours ahead of UTC (i.e. east of Greenwich).
 
     Returns
     ----------        
@@ -227,7 +235,6 @@ def open_castnet_singyear(year, sampling_months, sampling_hours):
     # are in, timezone after .tz_convert is the timezone to convert to; 
     # options for timezones can be found by pytz.all_timezones. Code is set 
     # up to handle any UTC offset (i.e. 'GMT+4', 'GMT+5', etc.)
-    timezone = 'GMT+4'
     timezone = pytz.timezone('Etc/%s' %timezone)
     castnet['DATE_TIME'] = castnet['DATE_TIME'].dt.values.tz_localize(timezone).tz_convert(pytz.utc)   
     # strip off trailing +00:00 from index
@@ -288,7 +295,7 @@ def open_castnetsiting():
     return csites    
 # # # # # # # # # # # # # 
 def commensurate_castnet_gmi(castnet_sites_fr, case, years, 
-                             sampling_months, sampling_hours):
+                             sampling_months, sampling_hours, timezone):
     """function opens CASTNet and GMI O3 concentrations during the years, hours
     and months of interest and finds colocated (or nearly colocated) 
     concentrations using the locations of CASTNet sites contained in 
@@ -306,6 +313,11 @@ def commensurate_castnet_gmi(castnet_sites_fr, case, years,
         Months of interest
     sampling_hours : list 
         Hours during which trace gas concentrations are returned
+    timezone : str
+        The UTC offset for region; final number has positive signs west of 
+        Greenwich; for example, timezone = 'GMT+4' uses the abbreviation 
+        'GMT+4' and corresponds to 4 hours behind UTC (i.e. west of Greenwich) 
+        no 4 hours ahead of UTC (i.e. east of Greenwich).        
 
     Returns
     ----------      
@@ -434,7 +446,8 @@ def commensurate_castnet_gmi(castnet_sites_fr, case, years,
             '%s-01-%s' %(sampling_months[-1] + 1, year), freq = '1H')[:-1]                
         dates = dates[np.where(dates.hour.isin([x for x in sampling_hours]))[0]]
         # load CASTNet output
-        castnet = open_castnet_singyear(year, sampling_months, sampling_hours)
+        castnet = open_castnet_singyear(year, sampling_months, sampling_hours, 
+                                        timezone)
         # find GMI sites commensurate with CASTNet sites
         gmi_sites_fr = []
         for castnet_site in castnet_sites_fr:
@@ -1451,7 +1464,7 @@ def commensurate_aqstracegas_diurnal(comm_castnet, castnet_sites_fr, years,
             aqs_o3_coords)
 # # # # # # # # # # # # 
 def commensurate_castnet_gmi_diurnal(castnet_sites_fr, case, years, 
-                                     sampling_months):
+                                     sampling_months, timezone):
     """function opens CASTNet and GMI trace gas concentrations during the years
     and months of interest and finds colocated (or nearly colocated) 
     concentrations using the locations of CASTNet sites contained in 
@@ -1468,6 +1481,11 @@ def commensurate_castnet_gmi_diurnal(castnet_sites_fr, case, years,
         Years of interest
     sampling_months : list 
         Months of interest
+    timezone : str
+        The UTC offset for region; final number has positive signs west of 
+        Greenwich; for example, timezone = 'GMT+4' uses the abbreviation 
+        'GMT+4' and corresponds to 4 hours behind UTC (i.e. west of Greenwich) 
+        no 4 hours ahead of UTC (i.e. east of Greenwich).        
 
     Returns
     ----------      
@@ -1597,7 +1615,8 @@ def commensurate_castnet_gmi_diurnal(castnet_sites_fr, case, years,
         else: 
             'Input file sites do not match Strode list!'
         # load CASTNet output
-        castnet = open_castnet_singyear(year, sampling_months, sampling_hours)
+        castnet = open_castnet_singyear(year, sampling_months, sampling_hours, 
+                                        timezone)
         # find GMI sites commensurate with CASTNet sites
         gmi_sites_fr = []
         for castnet_site in castnet_sites_fr:
@@ -1646,7 +1665,7 @@ def commensurate_castnet_gmi_diurnal(castnet_sites_fr, case, years,
     return comm_castnet, comm_gmi_o3, comm_gmi_no, comm_gmi_no2, comm_gmi_co
 # # # # # # # # # # # # #
 def commensurate_castnet_gmi_locations(castnet_sites_fr, sampling_months, 
-                                       sampling_hours):
+                                       sampling_hours, timezone):
     """for mapping purposes, this function finds the latitudes and longitudes
     of CASTNet stations with observations for model configuration 'HindcastMR2'
     for the year 2008 (arbitrary) and their co-located (or nearly co-located)
@@ -1660,6 +1679,11 @@ def commensurate_castnet_gmi_locations(castnet_sites_fr, sampling_months,
         Months of interest
     sampling_hours : list 
         Hours during which trace gas concentrations are returned
+    timezone : str
+        The UTC offset for region; final number has positive signs west of 
+        Greenwich; for example, timezone = 'GMT+4' uses the abbreviation 
+        'GMT+4' and corresponds to 4 hours behind UTC (i.e. west of Greenwich) 
+        no 4 hours ahead of UTC (i.e. east of Greenwich).        
         
     Returns
     ----------
@@ -1690,7 +1714,7 @@ def commensurate_castnet_gmi_locations(castnet_sites_fr, sampling_months,
     csites = open_castnetsiting()
     # open GMI output model configuration 'HindcastMR2' for 2008 
     o3, co, no, no2, gmi_sites_i, gmi_lat, gmi_lon, times_ty = \
-    commensurability.open_gmi_singyear('HindcastMR2', 2008, sampling_months,
+    open_gmi_singyear('HindcastMR2', 2008, sampling_months,
                                        sampling_hours)
     # ensure input data matches reference table
     if set(gmi_sites) == set(gmi_sites_i):
@@ -1698,8 +1722,8 @@ def commensurate_castnet_gmi_locations(castnet_sites_fr, sampling_months,
     else: 
         'Input file sites do not match Strode list!'
     # load CASTNet output
-    castnet = commensurability.open_castnet_singyear(2008, sampling_months, 
-                                                     sampling_hours)
+    castnet = open_castnet_singyear(2008, sampling_months, sampling_hours, 
+                                    timezone)
     # find GMI sites commensurate with CASTNet sites
     gmi_sites_fr = []
     for castnet_site in castnet_sites_fr:
@@ -1732,7 +1756,7 @@ def commensurate_castnet_gmi_locations(castnet_sites_fr, sampling_months,
     return castnet_lats, castnet_lons, gmi_lats, gmi_lons
 # # # # # # # # # # # # #
 def commensurate_castnet_gmi_ra(castnet_sites_fr, years, sampling_months,
-                                sampling_hours):
+                                sampling_hours, timezone):
     """function opens CASTNet and GMI trace gas concentrations for all four 
     GMI CTM model configurations (HindcastMR2, HindcastMR2-CCMI, 
     HindcastFFIgac2, HindcastFFIgac2-HighRes) using function 
@@ -1751,6 +1775,11 @@ def commensurate_castnet_gmi_ra(castnet_sites_fr, years, sampling_months,
         Months of interest
     sampling_hours : list
         Hours of interest    
+    timezone : str
+        The UTC offset for region; final number has positive signs west of 
+        Greenwich; for example, timezone = 'GMT+4' uses the abbreviation 
+        'GMT+4' and corresponds to 4 hours behind UTC (i.e. west of Greenwich) 
+        no 4 hours ahead of UTC (i.e. east of Greenwich).        
         
     Returns
     ----------
@@ -1764,36 +1793,36 @@ def commensurate_castnet_gmi_ra(castnet_sites_fr, years, sampling_months,
     # HindcastMR2
     castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', years, 
-                             sampling_months, sampling_hours)
+                             sampling_months, sampling_hours, timezone)
     # HindcastMR2-CCMI
     temp, ccmi_o3, ccmi_no, ccmi_no2, ccmi_co, ccmi_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2-CCMI', years, 
-                             sampling_months, sampling_hours)
+                             sampling_months, sampling_hours, timezone)
     del temp
     # HindcastFFIgac2
     temp, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', years, 
-                             sampling_months, sampling_hours)
+                             sampling_months, sampling_hours, timezone)
     del temp
     # HindcastFFIgac2-HighRes
     temp, ffigac2hr_o3, ffigac2hr_no, ffigac2hr_no2, ffigac2hr_co, ffigac2hr_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2-HighRes', years, 
-                             sampling_months, sampling_hours)
+                             sampling_months, sampling_hours, timezone)
     del temp
     # EGU_T
     temp, egu_o3, egu_no, egu_no2, egu_co, egu_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'EGU_T', years, 
-                             sampling_months, sampling_hours)    
+                             sampling_months, sampling_hours, timezone)   
     del temp    
     # HindcastMR2-DiurnalAvgT
     temp, dat_o3, dat_no, dat_no2, dat_co, dat_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2-DiurnalAvgT', years, 
-                             sampling_months, sampling_hours)
+                             sampling_months, sampling_hours, timezone)
     del temp
     # HindcastMERRA    
     temp, merra_o3, merra_no, merra_no2, merra_co, merra_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMERRA', years, 
-                             sampling_months, sampling_hours)
+                             sampling_months, sampling_hours, timezone)
     del temp    
     # average over all sites in region 
     # for O3
@@ -2259,7 +2288,7 @@ def commensurate_emiss_unperturbed(comm_castnet, castnet_sites_fr, years,
     print('CTM emission data loaded!')        
     return comm_emiss
 # # # # # # # # # # # # #
-def commensurate_geos_gmi(castnet_sites_fr, sampling_hours):
+def commensurate_geos_gmi(castnet_sites_fr, sampling_hours, timezone):
     """function finds trace gas concentration from 2 hourly GEOS-Chem output 
     from Katie Travis' simulation at CASTNet sites. Concentrations are 
     averaged over hours in variable 'sampling_hours' to produce a daily 
@@ -2273,6 +2302,11 @@ def commensurate_geos_gmi(castnet_sites_fr, sampling_hours):
         CASTNET site names in focus region
     sampling_hours : list 
         Hours during which trace gas concentrations are returned
+    timezone : str
+        The UTC offset for region; final number has positive signs west of 
+        Greenwich; for example, timezone = 'GMT+4' uses the abbreviation 
+        'GMT+4' and corresponds to 4 hours behind UTC (i.e. west of Greenwich) 
+        no 4 hours ahead of UTC (i.e. east of Greenwich).        
 
     Returns
     ----------      
@@ -2358,7 +2392,8 @@ def commensurate_geos_gmi(castnet_sites_fr, sampling_hours):
         geos_idx.append(np.where(np.array(geos_hours) == hour))
     geos_idx = np.sort(np.hstack(geos_idx))
     # load CASTNet output
-    castnet = open_castnet_singyear(year, sampling_months, sampling_hours)
+    castnet = open_castnet_singyear(year, sampling_months, sampling_hours, 
+                                    timezone)
     # load CASTNet siting information 
     csites = open_castnetsiting()
     # times in year of interest with hourly timestep, retrieve only 
@@ -2411,7 +2446,7 @@ def commensurate_geos_gmi(castnet_sites_fr, sampling_hours):
     return (comm_castnet, comm_geos_o3, comm_geos_no, comm_geos_no2, 
             comm_geos_co, geos_lats_atsite, geos_lons_atsite)
 # # # # # # # # # # # # #        
-def commensurate_geos_gmi_diurnal(castnet_sites_fr):
+def commensurate_geos_gmi_diurnal(castnet_sites_fr, timezone):
     """function opens diurnal curves O3 from CASTNet sites contained in 
     'castnet_sites_fr' and finds co-located (or nearly co-located) trace 
     gas concentrations from GEOS-Chem and outputs their diurnal curves; n.b. 
@@ -2422,6 +2457,11 @@ def commensurate_geos_gmi_diurnal(castnet_sites_fr):
     ----------    
     castnet_sites_fr : list
         CASTNET site names in focus region
+    timezone : str
+        The UTC offset for region; final number has positive signs west of 
+        Greenwich; for example, timezone = 'GMT+4' uses the abbreviation 
+        'GMT+4' and corresponds to 4 hours behind UTC (i.e. west of Greenwich) 
+        no 4 hours ahead of UTC (i.e. east of Greenwich).        
 
     Returns
     ----------      
@@ -2484,7 +2524,8 @@ def commensurate_geos_gmi_diurnal(castnet_sites_fr):
     geos_lat = geos.variables['latitude_dim'][:]
     geos_lon = geos.variables['longitude_dim'][:]
     # load CASTNet output
-    castnet = open_castnet_singyear(year, sampling_months, sampling_hours)
+    castnet = open_castnet_singyear(year, sampling_months, sampling_hours, 
+                                    timezone)
     # load CASTNet siting information 
     csites = open_castnetsiting()
     # times in year of interest with hourly timestep, retrieve only 
