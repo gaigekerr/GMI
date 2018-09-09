@@ -704,7 +704,7 @@ def timeseries_castneto3gmio3(castnet, mr2_gmi, ccmi_gmi, ffigac2_gmi,
     return
 # # # # # # # # # # # # #
 def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords, 
-                      years, sampling_months, sampling_hours, region):        
+                      years, sampling_months, sampling_hours, region, timezone):        
     """for the CASTNet sites specified in variable 'castnet_sites_fr,' function
     opens the locations (latitude/longitude coordinates) of those CASTNet 
     sites and their co-located (or nearly co-located) MERRA grid cells, GMI 
@@ -761,11 +761,11 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
     # open CASTNet and GMI sites
     castnet_lats, castnet_lons, gmi_lats, gmi_lons = \
     commensurability.commensurate_castnet_gmi_locations(castnet_sites_fr, 
-        sampling_months, sampling_hours)
+        sampling_months, sampling_hours, timezone)
     # open MERRA-2 (requires a year's worth of GMI CTM output)
     mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
     commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
-        years, sampling_months, sampling_hours)        
+        years, sampling_months, sampling_hours, timezone)        
     (comm_t2m, comm_t10m, comm_u2m, comm_u10m, comm_v2m, comm_v10m, 
      merra_lats_fr, merra_lons_fr) = commensurability.commensurate_MERRA2(
         mr2_castnet, castnet_sites_fr, years, sampling_months, sampling_hours)        
@@ -800,22 +800,22 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
                      pollutants_constants.COLOR_CHEMISTRY, alpha = 1., 
                      edgecolor = 'none', linewidth = 0.0, zorder = 5)
         plt.gca().add_patch(p) 
-    # plot MERRA-2 reanalysis
-    x_merra, y_merra = m(merra_lons_fr, merra_lats_fr)
-    for xi, yi in zip(x_merra, y_merra):
-        # find longitude, latitude of every unique grid cell
-        xinverse, yinverse = m(xi, yi, inverse = True)
-        # change bounds of grid cell to map projection (MERRA-2 resolution is 
-        # 0.625˚ x 0.5˚)
-        x1, y1 = m(xinverse + 0.3125, yinverse - 0.25)
-        x2, y2 = m(xinverse + 0.3125, yinverse + 0.25)
-        x3, y3 = m(xinverse - 0.3125, yinverse + 0.25)
-        x4, y4 = m(xinverse - 0.3125, yinverse - 0.25)
-        # add patch to map
-        p = Polygon([(x1, y1),(x2, y2),(x3,y3),(x4, y4)], fill = False, 
-                     color = '#ff7f00', hatch = '///', linewidth = 0.0, 
-                     zorder = 10)
-        plt.gca().add_patch(p) 
+#    # plot MERRA-2 reanalysis
+#    x_merra, y_merra = m(merra_lons_fr, merra_lats_fr)
+#    for xi, yi in zip(x_merra, y_merra):
+#        # find longitude, latitude of every unique grid cell
+#        xinverse, yinverse = m(xi, yi, inverse = True)
+#        # change bounds of grid cell to map projection (MERRA-2 resolution is 
+#        # 0.625˚ x 0.5˚)
+#        x1, y1 = m(xinverse + 0.3125, yinverse - 0.25)
+#        x2, y2 = m(xinverse + 0.3125, yinverse + 0.25)
+#        x3, y3 = m(xinverse - 0.3125, yinverse + 0.25)
+#        x4, y4 = m(xinverse - 0.3125, yinverse - 0.25)
+#        # add patch to map
+#        p = Polygon([(x1, y1),(x2, y2),(x3,y3),(x4, y4)], fill = False, 
+#                     color = '#ff7f00', hatch = '///', linewidth = 0.0, 
+#                     zorder = 10)
+#        plt.gca().add_patch(p) 
     # plot CASTNet stations
     x_castnet, y_castnet = m(castnet_lons, castnet_lats)
     castnet_loc = m.scatter(x_castnet, y_castnet, 50, color = 'k', 
@@ -910,7 +910,7 @@ def map_gmiaqscastnet(castnet, castnet_sites_fr, aqs_co_coords, aqs_no2_coords,
     gmi_patch = patches.Patch(facecolor = pollutants_constants.COLOR_CHEMISTRY, 
                                alpha = 1., edgecolor = 'none', linewidth = 0.0,
                                label = 'GMI')
-    leg = ax.legend(handles = [castnet_loc, merra_patch, gmi_patch], 
+    leg = ax.legend(handles = [castnet_loc, gmi_patch], 
                     loc = 'upper left', ncol = 2, 
                     fontsize = 16, scatterpoints = 1, framealpha = 0.0)
     leg.get_frame().set_linewidth(0.0)    
@@ -1962,7 +1962,8 @@ def scatter_t2m_mr2o3dato3_deltat2m_delta_o3(mr2, dat, t2m, region):
                 dpi = 300)          
     return 
 # # # # # # # # # # # # #    
-def timeseries_mr2o3dato3eguto3(transport, chemistry, emissions, obs, region):
+def timeseries_mr2o3dato3eguto3(transport, chemistry, emissions, obs, region,
+                                year, years):
     """function plots time series of O3 from GMI transport simulations with 
     variability from (1) only transport; (2) transport and chemistry; and (3) 
     transport, chemistry, and emissions. Observations from CASTNet are plotted
@@ -1990,6 +1991,10 @@ def timeseries_mr2o3dato3eguto3(transport, chemistry, emissions, obs, region):
     region : str
         Region over which regionally-averaged concentrations are supplied to 
         function
+    year : int
+        Year of interest
+    years : list
+        Years in measuring period
         
     Returns
     ----------      
@@ -2005,71 +2010,112 @@ def timeseries_mr2o3dato3eguto3(transport, chemistry, emissions, obs, region):
     chemistry = np.hstack(chemistry)
     emissions = np.hstack(emissions)
     obs = np.hstack(obs)
-    f, (ax, ax2, ax3) = plt.subplots(1, 3, sharey = True, figsize=(10, 6))
-    for axt in [ax, ax2, ax3]:    
-        axt.plot(obs, '-', color = 'lightgrey', zorder = 1, lw = 2,
-                 label = 'CASTNet')
-        axt.plot(emissions, '-', color = pollutants_constants.COLOR_EMISSIONS, 
-                 label = '+$\:$Emissions')
-        axt.plot(chemistry, '-', color = pollutants_constants.COLOR_CHEMISTRY, 
-                 label = '+$\:$Chemistry')
-        axt.plot(transport, '-', color = pollutants_constants.COLOR_TRANSPORT, 
-                 label = 'Transport')
-    ax.set_xlim([0, 92 + 1])
-    ax2.set_xlim([92, 92*2 + 1])
-    ax3.set_xlim([92*2, 92*3])
-    # hide the spines between axes
-    ax.spines['right'].set_visible(False)
-    ax2.spines['left'].set_visible(False)
-    ax2.spines['right'].set_visible(False)
-    ax3.spines['left'].set_visible(False)
-    ax.yaxis.tick_left()
-    ax2.tick_params(axis = 'y', which = 'both', left = False, right = False)
-    ax3.yaxis.tick_right()
-    # add discontinuous lines to axis (diagonal lines)
-    d = .015
-    kwargs = dict(transform = ax.transAxes, color='k', lw = 0.75, clip_on=False)
-    ax.plot((1-d,1+d), (-d,+d), **kwargs)
-    ax.plot((1-d,1+d),(1-d,1+d), **kwargs)
-    kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
-    ax2.plot((-d,+d), (1-d,1+d), **kwargs)
-    ax2.plot((-d,+d), (-d,+d), **kwargs)
-    ax2.plot((1-d,1+d), (-d,+d), **kwargs)
-    ax2.plot((1-d,1+d),(1-d,1+d), **kwargs)
-    kwargs.update(transform=ax3.transAxes)
-    ax3.plot((-d,+d), (1-d,1+d), **kwargs)
-    ax3.plot((-d,+d), (-d,+d), **kwargs)
-    # move axes closer to each other
-    f.subplots_adjust(wspace = 0.05)
+    # for single year
+    yearpos = np.where(np.array(years) == year)[0][0]    
+    fig = plt.figure(figsize = (10, 4))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    ax.plot(obs[yearpos*92:(yearpos+1)*92], '-', color = 'lightgrey', 
+             zorder = 1, lw = 2, label = 'CASTNet')
+    ax.plot(emissions[yearpos*92:(yearpos+1)*92], '-', 
+            color = pollutants_constants.COLOR_EMISSIONS, 
+            label = '+$\:$Emissions')
+    ax.plot(chemistry[yearpos*92:(yearpos+1)*92],
+            '-', color = pollutants_constants.COLOR_CHEMISTRY, 
+            label = '+$\:$Chemistry')
+    ax.plot(transport[yearpos*92:(yearpos+1)*92], '-', 
+            color = pollutants_constants.COLOR_TRANSPORT, label = 'Transport')
+    ax.set_xlim([0, 91])
     # axis labels
     ax.set_xticks([0, 30, 61])
-    ax.set_xticklabels(['Jun', 'Jul', 'Aug'], ha = 'left', fontsize = 12)
-    ax.set_xlabel('2008', x = 0., ha = 'left', fontsize = 14)
-    ax2.set_xticks([92, 122, 153])
-    ax2.set_xticklabels(['Jun', 'Jul', 'Aug'], ha = 'left', fontsize = 12)
-    ax2.set_xlabel('2009', x = 0., ha = 'left', fontsize = 14)
-    ax3.set_xticks([184, 214, 245])
-    ax3.set_xticklabels(['Jun', 'Jul', 'Aug'], ha = 'left', fontsize = 12)
-    ax3.set_xlabel('2010', x = 0., ha = 'left', fontsize = 16)
+    ax.set_xticklabels(['1 June %d' %year, '1 July', '1 Aug'], ha = 'left', 
+                       fontsize = 12)
     ax.set_ylabel('Ozone [ppbv]', fontsize = 16)
     for tl in ax.get_yticklabels():
         tl.set_fontsize(12)
-    # remove axis tick labels overlap discontinuous lines
-    for axt in [ax2, ax3]:
-        i = 0
-        for t in axt.xaxis.get_ticklines(): 
-            if i == 0:
-                t.set_visible(False) 
-            i = i + 1
     # reorder and place legend
     handles, labels = ax.get_legend_handles_labels()
     handles = [handles[0], handles[3], handles[2], handles[1]]
     labels = [labels[0], labels[3], labels[2], labels[1]]
-    ax.legend(handles,labels, bbox_to_anchor = (1.55, 1.05), loc = 'center', 
+    ax.legend(handles,labels, bbox_to_anchor = (0.5, 1.08), loc = 'center', 
               ncol = 4, frameon = False, fontsize = 16)
+    print('CASTNet-DAT correlation = %.3f' %(
+            np.corrcoef(obs[yearpos*92:(yearpos+1)*92], 
+            transport[yearpos*92:(yearpos+1)*92])[0, 1]))
+    print('CASTNet-MR2 correlation = %.3f' %(
+            np.corrcoef(obs[yearpos*92:(yearpos+1)*92], 
+            chemistry[yearpos*92:(yearpos+1)*92])[0, 1]))
+    print('CASTNet-EGU correlation = %.3f' %(
+            np.corrcoef(obs[yearpos*92:(yearpos+1)*92], 
+            emissions[yearpos*92:(yearpos+1)*92])[0, 1]))     
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'timeseries_mr2o3dato3eguto3_%s.eps' %(region), 
-                dpi = 300)   
+                'timeseries_mr2o3dato3eguto3_%d_%s.eps' %(year, region), 
+                dpi = 300)
+#    # for all three years
+#    f, (ax, ax2, ax3) = plt.subplots(1, 3, sharey = True, figsize=(10, 6))
+#    for axt in [ax, ax2, ax3]:    
+#        axt.plot(obs, '-', color = 'lightgrey', zorder = 1, lw = 2,
+#                 label = 'CASTNet')
+#        axt.plot(emissions, '-', color = pollutants_constants.COLOR_EMISSIONS, 
+#                 label = '+$\:$Emissions')
+#        axt.plot(chemistry, '-', color = pollutants_constants.COLOR_CHEMISTRY, 
+#                 label = '+$\:$Chemistry')
+#        axt.plot(transport, '-', color = pollutants_constants.COLOR_TRANSPORT, 
+#                 label = 'Transport')
+#    ax.set_xlim([0, 92 + 1])
+#    ax2.set_xlim([92, 92*2 + 1])
+#    ax3.set_xlim([92*2, 92*3])
+#    # hide the spines between axes
+#    ax.spines['right'].set_visible(False)
+#    ax2.spines['left'].set_visible(False)
+#    ax2.spines['right'].set_visible(False)
+#    ax3.spines['left'].set_visible(False)
+#    ax.yaxis.tick_left()
+#    ax2.tick_params(axis = 'y', which = 'both', left = False, right = False)
+#    ax3.yaxis.tick_right()
+#    # add discontinuous lines to axis (diagonal lines)
+#    d = .015
+#    kwargs = dict(transform = ax.transAxes, color='k', lw = 0.75, clip_on=False)
+#    ax.plot((1-d,1+d), (-d,+d), **kwargs)
+#    ax.plot((1-d,1+d),(1-d,1+d), **kwargs)
+#    kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
+#    ax2.plot((-d,+d), (1-d,1+d), **kwargs)
+#    ax2.plot((-d,+d), (-d,+d), **kwargs)
+#    ax2.plot((1-d,1+d), (-d,+d), **kwargs)
+#    ax2.plot((1-d,1+d),(1-d,1+d), **kwargs)
+#    kwargs.update(transform=ax3.transAxes)
+#    ax3.plot((-d,+d), (1-d,1+d), **kwargs)
+#    ax3.plot((-d,+d), (-d,+d), **kwargs)
+#    # move axes closer to each other
+#    f.subplots_adjust(wspace = 0.05)
+#    # axis labels
+#    ax.set_xticks([0, 30, 61])
+#    ax.set_xticklabels(['Jun', 'Jul', 'Aug'], ha = 'left', fontsize = 12)
+#    ax.set_xlabel('2008', x = 0., ha = 'left', fontsize = 14)
+#    ax2.set_xticks([92, 122, 153])
+#    ax2.set_xticklabels(['Jun', 'Jul', 'Aug'], ha = 'left', fontsize = 12)
+#    ax2.set_xlabel('2009', x = 0., ha = 'left', fontsize = 14)
+#    ax3.set_xticks([184, 214, 245])
+#    ax3.set_xticklabels(['Jun', 'Jul', 'Aug'], ha = 'left', fontsize = 12)
+#    ax3.set_xlabel('2010', x = 0., ha = 'left', fontsize = 16)
+#    ax.set_ylabel('Ozone [ppbv]', fontsize = 16)
+#    for tl in ax.get_yticklabels():
+#        tl.set_fontsize(12)
+#    # remove axis tick labels overlap discontinuous lines
+#    for axt in [ax2, ax3]:
+#        i = 0
+#        for t in axt.xaxis.get_ticklines(): 
+#            if i == 0:
+#                t.set_visible(False) 
+#            i = i + 1
+#    # reorder and place legend
+#    handles, labels = ax.get_legend_handles_labels()
+#    handles = [handles[0], handles[3], handles[2], handles[1]]
+#    labels = [labels[0], labels[3], labels[2], labels[1]]
+#    ax.legend(handles,labels, bbox_to_anchor = (1.55, 1.05), loc = 'center', 
+#              ncol = 4, frameon = False, fontsize = 16)
+#    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+#                'timeseries_mr2o3dato3eguto3_%s.eps' %(region), 
+#                dpi = 300)   
     return
 # # # # # # # # # # # # #    
 def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m, 
@@ -2191,6 +2237,8 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     density = stats.gaussian_kde(t2m)
     axHistx.plot(x, density(x), lw = 2., color = 'k')
     axHistx.set_ylabel('Density', fontsize = 16)
+    axHistx.text(0.25, 0.7, 'T$_{\mathregular{2\:m}}$', transform = axHistx.transAxes, 
+                 fontsize = 20)    
     axHistx.get_yaxis().set_label_coords(-0.09, 0.5)        
     # observations
     n, x, _  = axHisty.hist(obs, bins = nbins, histtype = u'step', 
@@ -2216,6 +2264,8 @@ def scatterhist_mr2o3dato3eguto3(transport, chemistry, emissions, obs, t2m,
     axHisty.plot(density(x), x, zorder = 3, lw = 2.,
                  color = pollutants_constants.COLOR_EMISSIONS)
     axHisty.set_xlabel('Density', fontsize = 16)
+    axHisty.text(0.25, 0.8, 'Ozone', transform = axHisty.transAxes, 
+                 fontsize = 20)
     axHisty.get_xaxis().set_label_coords(0.5, -0.07)        
     axHistx.set_xlim(axScatter.get_xlim())
     axHistx.spines['top'].set_visible(False)
@@ -2530,12 +2580,12 @@ def timeseries_t2m_castneto3_cemsnox(castnet, t2m, year, years,
     mpl.rcParams['ytick.major.width'] = 1.5
     mpl.rcParams['ytick.minor.width'] = 1.5
     # load CEMS NOx emissions in NEUS
-#    states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 
-#                 'RI', 'VA', 'VT', 'WV']
-#    nox_state, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
-#            '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
-#    nox = nox_state['%d-0%d-01'%(year, sampling_months[0]):
-#                    '%d-0%d-31'%(year, sampling_months[-1])].values
+    states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 
+                 'RI', 'VA', 'VT', 'WV']
+    nox_state, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
+            '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
+    nox = nox_state['%d-0%d-01'%(year, sampling_months[0]):
+                    '%d-0%d-31'%(year, sampling_months[-1])].values
     # select year of interest
     yearpos = np.where(np.array(years) == year)[0][0]
     t2m = t2m[yearpos]
@@ -2576,14 +2626,22 @@ def timeseries_t2m_castneto3_cemsnox(castnet, t2m, year, years,
     # CEMS NOx plot
     ax3.text(0.03, 0.84, '(c)', ha = 'center', va = 'center', 
              transform = ax3.transAxes, fontsize = 20)    
-    ax3.plot(nox, lw = 2., color = '#984ea3')
+    ax3.plot(nox, lw = 2., color = '#377eb8')
     ax3.set_xlim([0, len(nox) - 1])
     ax3.set_xticks([0, 30, 61])
-    ax3.set_xticklabels(['1 Jun', '1 Jul', '1 Aug'], fontsize = 12)
+    ax3.set_xticklabels(['1 June %d' %year, '1 July', '1 Aug'], fontsize = 12)
     for t in ax3.get_yticklabels():
         t.set_fontsize(12)
     ax3.set_ylabel('NO$_{x}$ [tons]', fontsize = 16)
     ax3.get_yaxis().set_label_coords(-0.07, 0.5)
+    #
+    pc = (nox - np.mean(nox))/np.mean(nox) * 100.
+    ax3t = ax3.twinx()
+    ax3t.plot(pc, lw = 1.0)
+    for t in ax3t.get_yticklabels():
+        t.set_fontsize(12)    
+    ax3t.set_ylabel('Change [%]', rotation = 270, fontsize = 16)   
+    ax3t.get_yaxis().set_label_coords(1.09, 0.5)
     ax3.xaxis.set_ticks_position('both')
     ax3.yaxis.set_ticks_position('both')
     plt.subplots_adjust(hspace = 0.3)
@@ -3133,7 +3191,11 @@ def map_do3dt2mratio_conus():
     """function opens GMI output for the continential U.S. (CONUS) and finds 
     the ratio between the slope of the linear fit through Transport O3 versus
     T2m and + Chemistry O3 versus T2m. These ratios are calculated for each 
-    GMI site with hourly profile data rather than as regional-averages. 
+    GMI site with hourly profile data rather than as regional-averages. Four 
+    outplot maps include (1) O3-T2m correlation coefficients, (2) O3-T2m 
+    sensitivity for the Transport simulation, (3) O3-T2m sensitivity for the 
+    + Chemistry simulation, and (4) the aforementioned ratio for all GMI
+    sites. 
     
     Parameters
     ----------       
@@ -3148,7 +3210,25 @@ def map_do3dt2mratio_conus():
     from mpl_toolkits.basemap import Basemap
     # find ratio between Transport and + Chemistry O3 in each region 
     def dO3_dT(o3, t2m):
-        """with 
+        """calculate slope through ozone versus 2-meter temperature, the ozone-
+        temperature sensitivity at individual GMI/CASTNet sites. 
+        
+        Parameters
+        ----------  
+        o3 : numpy.ndarray
+            O3 concentrations co-located (or nearly colocated) with 
+            corresponding CASTNet stations, units of ppbv, [years in measuring 
+            period, days in months in 'sampling_months']            
+        t2m : numpy.ndarray        
+            MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+            corresponding CASTNet stations, units of K, [years in measuring 
+            period, stations in 'castnet_sites_fr', days in months in 
+            'sampling_months'] 
+            
+        Returns
+        ----------               
+        slopes : list
+            The O3-T2m sensitivity for each GMI/CASTNet site
         """
         import numpy as np
         from scipy.stats import linregress
@@ -3166,6 +3246,43 @@ def map_do3dt2mratio_conus():
             slopes.append(slope)
         return np.array(slopes)
     # # # # 
+    def r_O3_dT(o3, t2m):
+        """calculate Pearson correlation coefficient between ozone and 2-meter 
+        temperature at individual GMI/CASTNet sites. 
+       
+        Parameters
+        ----------  
+        o3 : numpy.ndarray
+            O3 concentrations co-located (or nearly colocated) with 
+            corresponding CASTNet stations, units of ppbv, [years in measuring 
+            period, days in months in 'sampling_months']            
+        t2m : numpy.ndarray        
+            MERRA-2 2-meter temperatures co-located (or nearly colocated) with 
+            corresponding CASTNet stations, units of K, [years in measuring 
+            period, stations in 'castnet_sites_fr', days in months in 
+            'sampling_months'] 
+            
+        Returns
+        ----------               
+        correlations : list
+            The O3-T2m correlation coefficient for each GMI/CASTNet site 
+        """
+        import numpy as np
+        from scipy.stats import linregress
+        correlations = []
+        # swap axes so that dimensionality is (no. summers, no. days in summer, 
+        # no. sites)
+        o3 = np.swapaxes(o3, 1, 2)
+        t2m = np.swapaxes(t2m, 1, 2)
+        # stack year and day axes
+        o3 = np.vstack(o3)
+        t2m = np.vstack(t2m)
+        # loop through sites and find dO3/dT
+        for site in np.arange(0, t2m.shape[1], 1):
+            correlation = linregress(t2m[:, site], o3[:, site]).rvalue
+            correlations.append(correlation)
+        return correlations
+    # # # #    
     # CASTNet sites in continental U.S.
     castnet_sites_neus = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP', 
        'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 'CDR', 'VPI', 'MKG', 'KEF']
@@ -3256,6 +3373,85 @@ def map_do3dt2mratio_conus():
     mr2_slopes_midwest = dO3_dT(mr2_o3_midwest, t2m_midwest)
     dat_slopes_west = dO3_dT(dat_o3_west, t2m_west)
     mr2_slopes_west = dO3_dT(mr2_o3_west, t2m_west)
+    # find O3-T2m correlations
+    mr2_correl_neus = r_O3_dT(mr2_o3_neus, t2m_neus)
+    mr2_correl_south = r_O3_dT(mr2_o3_south, t2m_south)
+    mr2_correl_midwest = r_O3_dT(mr2_o3_midwest, t2m_midwest)
+    mr2_correl_west = r_O3_dT(mr2_o3_west, t2m_west)    
+    # concatenate for CONUS
+    all_lons = np.concatenate([gmi_lons_neus, gmi_lons_south, 
+                               gmi_lons_midwest, gmi_lons_west])
+    all_lats = np.concatenate([gmi_lats_neus, gmi_lats_south, 
+                               gmi_lats_midwest, gmi_lats_west]) 
+    # focus region map 
+    llcrnrlon = -130.
+    llcrnrlat = 24.8
+    urcrnrlon = -66.3
+    urcrnrlat = 50.
+    m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
+                llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
+                urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
+    x, y = m(all_lons, all_lats)
+    # # # #
+    # plot O3-T2m correlation
+    fig = plt.figure(figsize = (8, 10))
+    ax = plt.subplot2grid((1, 1), (0, 0))    
+    m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
+    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+    m.drawlsmask(ocean_color = '#dcf0fa')
+    m.drawcoastlines(color = '#888888')
+    m.drawstates(color = '#888888')
+    m.drawcountries(color = '#888888')    
+    cmap = plt.get_cmap('brg')    
+    correl_chemistry = np.concatenate([mr2_correl_neus, mr2_correl_south, 
+                                       mr2_correl_midwest, mr2_correl_west])
+    m.scatter(x, y, c = correl_chemistry[~np.isnan(correl_chemistry)], 
+              vmin = -1., vmax = 1.0, cmap = cmap, zorder = 20)
+    m.colorbar(extend = 'both', label = 'r')    
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_mr2o3t2mcorrelation_conus.eps', dpi = 300)
+    # # # #
+    # plot O3-T2m sensitivity in Transport simulation
+    fig = plt.figure(figsize = (8, 10))
+    ax = plt.subplot2grid((1, 1), (0, 0))    
+    m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
+    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+    m.drawlsmask(ocean_color = '#dcf0fa')
+    m.drawcoastlines(color = '#888888')
+    m.drawstates(color = '#888888')
+    m.drawcountries(color = '#888888')    
+    cmap = plt.get_cmap('brg')    
+    slope_transport = np.concatenate([dat_slopes_neus, dat_slopes_south, 
+                                      dat_slopes_midwest, dat_slopes_west])
+    m.scatter(x, y, c = slope_transport[~np.isnan(slope_transport)], 
+              vmin = -0.25, vmax = 1.25, cmap = cmap, zorder = 20)
+    m.colorbar(extend = 'both', 
+               label = r'$\frac{\delta \mathregular{O}_' +
+               '{\mathregular{3, Transport}}}' +
+               '{\delta \mathregular{T}_{\mathregular{2\:m}}}$')
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_ddato3dt2m_conus.eps', dpi = 300)    
+    # # # # 
+    # plot O3-T2m sensitivity in + Chemistry simulation 
+    fig = plt.figure(figsize = (8, 10))
+    ax = plt.subplot2grid((1, 1), (0, 0))    
+    m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
+    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+    m.drawlsmask(ocean_color = '#dcf0fa')
+    m.drawcoastlines(color = '#888888')
+    m.drawstates(color = '#888888')
+    m.drawcountries(color = '#888888')    
+    cmap = plt.get_cmap('brg')    
+    slope_chemistry = np.concatenate([mr2_slopes_neus, mr2_slopes_south, 
+                                      mr2_slopes_midwest, mr2_slopes_west])
+    m.scatter(x, y, c = slope_chemistry[~np.isnan(slope_chemistry)], 
+              vmin = -0.25, vmax = 1.25, cmap = cmap, zorder = 20)
+    m.colorbar(extend = 'both', 
+               label = r'$\frac{\delta \mathregular{O}_' +
+               '{\mathregular{3, +\:Chemistry}}}' +
+               '{\delta \mathregular{T}_{\mathregular{2\:m}}}$')    
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_dmr2o3dt2m_conus.eps', dpi = 300)    
     # ratio of temperature sensitivities
     ratio_neus = (dat_slopes_neus/mr2_slopes_neus)
     ratio_south = (dat_slopes_south/mr2_slopes_south)
@@ -3270,27 +3466,17 @@ def map_do3dt2mratio_conus():
     # initialize figure, axis
     fig = plt.figure(figsize = (8, 10))
     ax = plt.subplot2grid((1, 1), (0, 0))
-    # focus region map 
-    llcrnrlon = -130.
-    llcrnrlat = 24.8
-    urcrnrlon = -66.3
-    urcrnrlat = 50.
-    m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
-                llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
-                urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
     m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
     m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
     m.drawlsmask(ocean_color = '#dcf0fa')
     m.drawcoastlines(color = '#888888')
     m.drawstates(color = '#888888')
     m.drawcountries(color = '#888888')
-    cmap = plt.get_cmap('RdBu_r')
-    cmap.set_over('#67001f')
-    cmap.set_under('#053061')
-    x, y = m(all_lons, all_lats)
-    m.scatter(x, y, c = all_ratio[~np.isnan(all_ratio)],
-                vmin = 0.5, vmax = 1.5, cmap = cmap, zorder = 20)
-    m.colorbar(extend = 'both', label = 'm$_{\mathregular{Transport}}$/m$_{\mathregular{+\:Chemistry}}$')
+    cmap = plt.get_cmap('brg')
+    m.scatter(x, y, c = all_ratio[~np.isnan(all_ratio)], vmin = 0.5, 
+              vmax = 1.5, cmap = cmap, zorder = 20)
+    m.colorbar(extend = 'both', 
+               label = 'm$_{\mathregular{Transport}}$/m$_{\mathregular{+\:Chemistry}}$')
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'map_do3dt2mratio_conus.eps', dpi = 300)
     return
