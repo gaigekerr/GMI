@@ -3382,8 +3382,53 @@ def map_do3dt2mratio_conus():
     all_lons = np.concatenate([gmi_lons_neus, gmi_lons_south, 
                                gmi_lons_midwest, gmi_lons_west])
     all_lats = np.concatenate([gmi_lats_neus, gmi_lats_south, 
-                               gmi_lats_midwest, gmi_lats_west]) 
-    # focus region map 
+                               gmi_lats_midwest, gmi_lats_west])
+    slope_transport = np.concatenate([dat_slopes_neus, dat_slopes_south, 
+                                      dat_slopes_midwest, dat_slopes_west])   
+    slope_chemistry = np.concatenate([mr2_slopes_neus, mr2_slopes_south, 
+                                      mr2_slopes_midwest, mr2_slopes_west])
+    correl_chemistry = np.concatenate([mr2_correl_neus, mr2_correl_south, 
+                                       mr2_correl_midwest, mr2_correl_west]) 
+    # ratio of temperature sensitivities
+    ratio_neus = (dat_slopes_neus/mr2_slopes_neus)
+    ratio_south = (dat_slopes_south/mr2_slopes_south)
+    ratio_midwest = (dat_slopes_midwest/mr2_slopes_midwest)
+    ratio_west = (dat_slopes_west/mr2_slopes_west)
+    all_ratio = np.concatenate([ratio_neus, ratio_south, ratio_midwest, ratio_west])
+    # Eastern U.S. focus region map
+    llcrnrlon = -94.
+    llcrnrlat = 34.
+    urcrnrlon = -66.3
+    urcrnrlat = 50.
+    m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
+                llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
+                urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
+    x, y = m(all_lons, all_lats)
+    fig = plt.figure(figsize = (8, 10))
+    ax = plt.subplot2grid((1, 1), (0, 0))    
+    m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
+    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+    m.drawlsmask(ocean_color = '#dcf0fa')
+    m.drawcoastlines(color = '#888888')
+    m.drawstates(color = '#888888')
+    m.drawcountries(color = '#888888')    
+    cmap = plt.get_cmap('brg')        
+    # find where O3-T2m correlation is less than threshold and set to nan.
+    correl_chemistry_color = []
+    for i in correl_chemistry:
+        if i > 0.3:
+            correl_chemistry_color.append(150)
+        if i < 0.3:
+            correl_chemistry_color.append(0)
+    m.scatter(x, y, c = all_ratio[~np.isnan(all_ratio)], 
+              s = (correl_chemistry_color), vmin = 0.3, vmax = 1.0, 
+              cmap = cmap, zorder = 20)
+    cb = m.colorbar(extend = 'both')
+    cb.ax.tick_params(labelsize = 12)
+    cb.set_label(label = 'Ratio O$_{3}$-T$_{\mathregular{2\:m}}$', size = 16)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_do3dt2mratio_conus_highcorrel.eps', dpi = 300)
+    # Continental U.S. focus region map 
     llcrnrlon = -130.
     llcrnrlat = 24.8
     urcrnrlon = -66.3
@@ -3403,8 +3448,6 @@ def map_do3dt2mratio_conus():
     m.drawstates(color = '#888888')
     m.drawcountries(color = '#888888')    
     cmap = plt.get_cmap('brg')    
-    correl_chemistry = np.concatenate([mr2_correl_neus, mr2_correl_south, 
-                                       mr2_correl_midwest, mr2_correl_west])
     m.scatter(x, y, c = correl_chemistry[~np.isnan(correl_chemistry)], 
               vmin = -1., vmax = 1.0, cmap = cmap, zorder = 20)
     m.colorbar(extend = 'both', label = 'r')    
@@ -3421,8 +3464,6 @@ def map_do3dt2mratio_conus():
     m.drawstates(color = '#888888')
     m.drawcountries(color = '#888888')    
     cmap = plt.get_cmap('brg')    
-    slope_transport = np.concatenate([dat_slopes_neus, dat_slopes_south, 
-                                      dat_slopes_midwest, dat_slopes_west])
     m.scatter(x, y, c = slope_transport[~np.isnan(slope_transport)], 
               vmin = -0.25, vmax = 1.25, cmap = cmap, zorder = 20)
     m.colorbar(extend = 'both', 
@@ -3442,8 +3483,6 @@ def map_do3dt2mratio_conus():
     m.drawstates(color = '#888888')
     m.drawcountries(color = '#888888')    
     cmap = plt.get_cmap('brg')    
-    slope_chemistry = np.concatenate([mr2_slopes_neus, mr2_slopes_south, 
-                                      mr2_slopes_midwest, mr2_slopes_west])
     m.scatter(x, y, c = slope_chemistry[~np.isnan(slope_chemistry)], 
               vmin = -0.25, vmax = 1.25, cmap = cmap, zorder = 20)
     m.colorbar(extend = 'both', 
@@ -3451,19 +3490,9 @@ def map_do3dt2mratio_conus():
                '{\mathregular{3, +\:Chemistry}}}' +
                '{\delta \mathregular{T}_{\mathregular{2\:m}}}$')    
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'map_dmr2o3dt2m_conus.eps', dpi = 300)    
-    # ratio of temperature sensitivities
-    ratio_neus = (dat_slopes_neus/mr2_slopes_neus)
-    ratio_south = (dat_slopes_south/mr2_slopes_south)
-    ratio_midwest = (dat_slopes_midwest/mr2_slopes_midwest)
-    ratio_west = (dat_slopes_west/mr2_slopes_west)
-    # concatenate for CONUS
-    all_lons = np.concatenate([gmi_lons_neus, gmi_lons_south, 
-                               gmi_lons_midwest, gmi_lons_west])
-    all_lats = np.concatenate([gmi_lats_neus, gmi_lats_south, 
-                               gmi_lats_midwest, gmi_lats_west])
-    all_ratio = np.concatenate([ratio_neus, ratio_south, ratio_midwest, ratio_west])
-    # initialize figure, axis
+                'map_dmr2o3dt2m_conus.eps', dpi = 300)        
+    # # # #
+    # plot ratio of temperature sensitivities
     fig = plt.figure(figsize = (8, 10))
     ax = plt.subplot2grid((1, 1), (0, 0))
     m.drawmapboundary(color = '#888888', fill_color = '#dcf0fa')
