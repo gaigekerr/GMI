@@ -9,7 +9,9 @@ PROGRAMMER
     Gaige Hunter Kerr
 REVISION HISTORY
     24062018 -- initial version created and function 'boxplot_tracegas_byenv' 
-                added 
+                added
+    19092018 -- function 'map_diffaqsctmtracegas_conus' added to show 
+                differences in observations and CTM at overpass2 time
 """
 # # # # # # # # # # # # #
 # change font
@@ -350,9 +352,9 @@ def boxplot_tracegas_byenv_gridded(all_obs, rural_obs, urban_obs, suburban_obs,
     hatch_patch = mpatches.Patch(facecolor = 'w', edgecolor = 'k',
                                  alpha = 1., hatch = r'////', 
                                  label = 'GMI CTM')
-    plt.legend(handles=[plain_patch, hatch_patch])
+    plt.legend(handles = [plain_patch, hatch_patch], frameon = False)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'boxplot_tracegas_byenv_gridded_%s.eps' %(filename), dpi = 300)
+                'boxplot_tracegas_byenv_gridded_%s.png' %(filename), dpi = 300)
 # # # # # # # # # # # # #    
 def map_gmiaqsbias(obs, gmi, lat, lon, species, filename):
     """function replaces CTM trace gas concentrations with NaNs if no 
@@ -380,8 +382,8 @@ def map_gmiaqsbias(obs, gmi, lat, lon, species, filename):
         Used for labeling the colorbar of the map
     filename : str
         Used for the filename extension and plot's title, this variable should
-        define which environment (i.e., rural, urban, sururban, all) 
-        observations are derived from
+        define from which environment (i.e., rural, urban, sururban, all) 
+        observations are derived
 
     Returns
     ----------
@@ -520,122 +522,314 @@ def map_aqsstations(rural_coords, urban_coords, suburban_coords, filename):
                 %filename, dpi = 300)
     return 
 # # # # # # # # # # # # #    
-import numpy as np
-import sys
-sys.path.append('/Users/ghkerr/phd/')
-import pollutants_constants
-sys.path.append('/Users/ghkerr/phd/GMI')
-import commensurability
-# values for Northeast U.S.
-region = 'northeast'
-castnet_sites_fr = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
-                    'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
-                    'CDR', 'VPI', 'MKG', 'KEF']
-years = [2008, 2009, 2010]
-sampling_months = [6, 7, 8]
-sampling_hours = [15, 16, 17, 18, 19, 20]
-# CTM hourly/CASTNet
-comm_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
-commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
-    years, sampling_months, sampling_hours)  
-# AQS at all sites
-aqs_co, aqs_no2, aqs_o3, aqs_co_coords, aqs_no2_coords, aqs_o3_coords = \
-commensurability.commensurate_aqstracegas(castnet_sites_fr, years, sampling_months, 
-                                       sampling_hours)
-# AQS at specific environments
-(comm_co_su, comm_co_r, comm_co_u, coords_co_su, coords_co_r, coords_co_u, 
- comm_no2_su, comm_no2_r, comm_no2_u, coords_no2_su, coords_no2_r, 
- coords_no2_u, comm_o3_su, comm_o3_r, comm_o3_u, coords_o3_su, coords_o3_r, 
- coords_o3_u) = commensurability.commensurate_aqstracegas_siting(
- castnet_sites_fr, years, sampling_months, sampling_hours)
-# average over sites 
-# for CO
-co_all = np.nanmean(aqs_co, axis = 1)
-co_u = np.nanmean(comm_co_u, axis = 1)
-co_su = np.nanmean(comm_co_su, axis = 1)
-co_r = np.nanmean(comm_co_r, axis = 1)
-mr2_co = np.nanmean(mr2_co, axis = 1)
-# for NO2
-no2_all = np.nanmean(aqs_no2, axis = 1)
-no2_u = np.nanmean(comm_no2_u, axis = 1)
-no2_su = np.nanmean(comm_no2_su, axis = 1)
-no2_r = np.nanmean(comm_no2_r, axis = 1)
-mr2_no2 = np.nanmean(mr2_no2, axis = 1)
-# for O3
-o3_all_castnet = np.nanmean(comm_castnet, axis = 1)
-o3_all = np.nanmean(aqs_o3, axis = 1)
-o3_u = np.nanmean(comm_o3_u, axis = 1)
-o3_su = np.nanmean(comm_o3_su, axis = 1)
-o3_r = np.nanmean(comm_o3_r, axis = 1)
-mr2_o3 = np.nanmean(mr2_o3, axis = 1)
-# CTM 12Z gridded
-(lat, lon, pressure, times, co, no, no2, o3) = \
-commensurability.open_gridded_idailyCTM('HindcastMR2', years)
-# load AQS observations
-COdf, NO2df, O3df = commensurability.load_aqshourly(years)
-# retrieve ALL AQS observations in CTM grid cells for NO2
-no2_station_coordinates, colocated_no2obs = \
-commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
-                                                  [])
-# retrieve RURAL AQS observations in CTM grid cells
-no2_station_coordinates_rural, colocated_no2obs_rural = \
-commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
-                                                  ['RURAL'])
-# retrieve URBAN AQS observations in CTM grid cells
-no2_station_coordinates_urban, colocated_no2obs_urban = \
-commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
-                                                  ['URBAN AND CENTER CITY'])
-# retrieve SUBURAN AQS observations in CTM grid cells
-no2_station_coordinates_suburban, colocated_no2obs_suburban = \
-commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
-                                                  ['SUBURBAN'])
-# retrieve ALL AQS observations in CTM grid cells for CO
-co_station_coordinates, colocated_coobs = \
-commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
-                                                  [])
-# retrieve RURAL AQS observations in CTM grid cells
-co_station_coordinates_rural, colocated_coobs_rural = \
-commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
-                                                  ['RURAL'])
-# retrieve URBAN AQS observations in CTM grid cells
-co_station_coordinates_urban, colocated_coobs_urban = \
-commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
-                                                  ['URBAN AND CENTER CITY'])
-# retrieve SUBURAN AQS observations in CTM grid cells
-co_station_coordinates_suburban, colocated_coobs_suburban = \
-commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
-                                                  ['SUBURBAN'])
-# boxplot of hourly observations and CTM output by environment
-boxplot_tracegas_byenv(co_all, co_u, co_su, co_r, mr2_co, no2_all, 
-                       no2_u, no2_su, no2_r, mr2_no2, o3_all_castnet, 
-                       o3_all, o3_u, o3_su, o3_r, mr2_o3, years, region)
-# boxplot of 12Z observations and CTM output by environment
-boxplot_tracegas_byenv_gridded(colocated_no2obs, colocated_no2obs_rural, 
-    colocated_no2obs_urban, colocated_no2obs_suburban, no2[:, 0], 
-    'NO$_{2}$ [ppbv]', 'no2')
-boxplot_tracegas_byenv_gridded(colocated_coobs, colocated_coobs_rural, 
-    colocated_coobs_urban, colocated_coobs_suburban, co[:, 0], 
-    'CO [ppmv]', 'co')
-# plot maps of bias by environment
-map_gmiaqsbias(colocated_no2obs, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
-               'All')
-map_gmiaqsbias(colocated_no2obs_rural, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
-               'Rural')
-map_gmiaqsbias(colocated_no2obs_urban, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
-               'Urban')
-map_gmiaqsbias(colocated_no2obs_suburban, no2[:, 0] * 1e9, lat, lon, 
-               'NO$_{2}$', 'Suburban')
-map_gmiaqsbias(colocated_coobs, co[:, 0] * 1e6, lat, lon, 'CO', 
-               'All')
-map_gmiaqsbias(colocated_coobs_rural, co[:, 0] * 1e6, lat, lon, 'CO', 
-               'Rural')
-map_gmiaqsbias(colocated_coobs_urban, co[:, 0] * 1e6, lat, lon, 'CO', 
-               'Urban')
-map_gmiaqsbias(colocated_coobs_suburban, co[:, 0] * 1e6, lat, lon, 
-               'CO', 'Suburban')
-# plot locations of rural, urban, and suburban AQS stations
-map_aqsstations(no2_station_coordinates_rural, no2_station_coordinates_urban, 
-                no2_station_coordinates_suburban, 'no2')
-# plot locations of rural, urban, and suburban AQS stations
-map_aqsstations(co_station_coordinates_rural, co_station_coordinates_urban, 
-                co_station_coordinates_suburban, 'co')
+def map_diffaqsctmtracegas_conus(tracegas_aqs, tracegas_gmi, gmi_lat, gmi_lon,
+    vmin, vmax, cblabel, tg, env): 
+    """for AQS observations and CTM output for a given trace gas (n.b., AQS has 
+    observations of O3, CO, and NO2) function calculates the time average of 
+    daily trace gas observations and thereafter finds the mean difference 
+    between AQS observations and CTM output and plots the difference in CTM 
+    grid cells containing AQS sites. E.g., negative differences on map mean 
+    that CTM has a high bias. 
+    
+    Parameters
+    ----------
+    tracegas_aqs : numpy.ndarray 
+        Daily mean (1300-1400 hours local time) trace gas measurements averaged
+        over AQS sites in a particular environment within individual GMI CTM 
+        grid cells for JJA 2008-2010, [time, lat, lon]
+    tracegas_gmi : numpy.ndarray
+        Surface-level trace gas CTM output from overpass2 time, [time, lat, 
+        lon]
+    gmi_lat : numpy.ndarray
+        Latitude of GMI stations, degrees north, [lat,]
+    gmi_lon : numpy.ndarray
+        Longitude of GMI stations, degrees east, [lon,]
+    vmin : float
+        Colormap minimum 
+    vmax : float
+        Colormap maximum
+    cblabel : string
+        Label for colorbar
+    tg : string
+        Name of trace gas for output file name
+    env : string
+        Name of environment for output file name
+
+    Returns
+    ----------      
+    None
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap
+    from matplotlib.colors import rgb2hex, Normalize
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.patches import Polygon
+    from matplotlib.colorbar import ColorbarBase
+    gmi_lon = np.mod(gmi_lon - 180.0, 360.0) - 180.0
+    # find time-average of observations and model output 
+    tracegas_aqs = np.nanmean(tracegas_aqs, axis = 0)
+    tracegas_gmi = np.nanmean(tracegas_gmi, axis = 0)
+    # continental U.S. focus region map 
+    llcrnrlon = -130.
+    llcrnrlat = 24.8
+    urcrnrlon = -66.3
+    urcrnrlat = 50.
+    m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
+                llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
+                urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
+    # map for O3-T2m correlation
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    cmap = plt.get_cmap('seismic', 9)
+    norm = Normalize(vmin = vmin, vmax = vmax)
+    mapper = ScalarMappable(norm = norm, cmap = cmap)
+    # CTM resolution 
+    rlon = np.diff(gmi_lon).mean()
+    rlat = np.diff(gmi_lat).mean()
+    # loop through GMI latitude and longitude coordinatesion
+    for i, lat_gb in enumerate(gmi_lat):
+        for j, lon_gb in enumerate(gmi_lon):
+            lon_left = lon_gb - (rlon/2.)
+            lon_right = lon_gb + (rlon/2.)
+            lat_top = lat_gb + (rlat/2.)
+            lat_bottom = lat_gb - (rlat/2.) 
+            x1, y1 = m(lon_right, lat_bottom)
+            x2, y2 = m(lon_right, lat_top)
+            x3, y3 = m(lon_left, lat_top)
+            x4, y4 = m(lon_left, lat_bottom)
+            # add patch to map
+            if np.isnan((tracegas_aqs - tracegas_gmi)[i, j]) != True:
+                color = rgb2hex(mapper.to_rgba((tracegas_aqs - tracegas_gmi)[i, j]))
+                p = Polygon([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], 
+                             facecolor = color,
+                             edgecolor = 'none', linewidth = 0.0, zorder = 5, 
+                             alpha = 1.0) 
+                ax.add_patch(p) 
+    m.drawmapboundary(fill_color = '#EBF4FA')
+    m.fillcontinents(color = '#CCCCCC', lake_color = '#EBF4FA')
+    m.drawstates(color = 'k', linewidth = 0.5)
+    m.drawcountries(color = 'k', linewidth = 1.5)
+    m.drawcoastlines(color = 'k', linewidth = 1.5)
+    # colorbar 
+    cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
+    cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
+                      orientation = 'horizontal', extend = 'both')
+    cb.set_ticks(np.linspace(vmin, vmax, 10))
+    cb.set_label(label = cblabel, size = 16)
+    # denote mean bias as figure's title
+    ax.set_title('$\overline{\mathregular{AQS}}$ - ' +
+                 '$\overline{\mathregular{GMI}}$  = %.3f' 
+                 %np.nanmean((tracegas_aqs - tracegas_gmi)), x = 0.05, 
+                 ha = 'left', fontsize = 16)
+    cb.ax.tick_params(labelsize = 12)
+    plt.subplots_adjust(bottom = 0.2)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_diffaqsctm%s_conus_%s.eps' %(tg, env), dpi = 300)
+    return
+# # # # # # # # # # # # #    
+#import numpy as np
+#import sys
+#sys.path.append('/Users/ghkerr/phd/')
+#import pollutants_constants
+#sys.path.append('/Users/ghkerr/phd/GMI')
+#import commensurability
+## values for Northeast U.S.
+#region = 'northeast'
+#castnet_sites_fr = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
+#                    'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
+#                    'CDR', 'VPI', 'MKG', 'KEF']
+#years = [2008, 2009, 2010]
+#sampling_months = [6, 7, 8]
+#sampling_hours = [15, 16, 17, 18, 19, 20]
+## CTM hourly/CASTNet
+#comm_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
+#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
+#    years, sampling_months, sampling_hours, 'GMT+4')
+## AQS at all sites
+#aqs_co, aqs_no2, aqs_o3, aqs_co_coords, aqs_no2_coords, aqs_o3_coords = \
+#commensurability.commensurate_aqstracegas(castnet_sites_fr, years, sampling_months, 
+#                                       sampling_hours, 'GMT+4')
+## AQS at specific environments
+#(comm_co_su, comm_co_r, comm_co_u, coords_co_su, coords_co_r, coords_co_u, 
+# comm_no2_su, comm_no2_r, comm_no2_u, coords_no2_su, coords_no2_r, 
+# coords_no2_u, comm_o3_su, comm_o3_r, comm_o3_u, coords_o3_su, coords_o3_r, 
+# coords_o3_u) = commensurability.commensurate_aqstracegas_siting(
+# castnet_sites_fr, years, sampling_months, sampling_hours, 'GMT+4')
+## average over sites 
+## for CO
+#co_all = np.nanmean(aqs_co, axis = 1)
+#co_u = np.nanmean(comm_co_u, axis = 1)
+#co_su = np.nanmean(comm_co_su, axis = 1)
+#co_r = np.nanmean(comm_co_r, axis = 1)
+#mr2_co = np.nanmean(mr2_co, axis = 1)
+## for NO2
+#no2_all = np.nanmean(aqs_no2, axis = 1)
+#no2_u = np.nanmean(comm_no2_u, axis = 1)
+#no2_su = np.nanmean(comm_no2_su, axis = 1)
+#no2_r = np.nanmean(comm_no2_r, axis = 1)
+#mr2_no2 = np.nanmean(mr2_no2, axis = 1)
+## for O3
+#o3_all_castnet = np.nanmean(comm_castnet, axis = 1)
+#o3_all = np.nanmean(aqs_o3, axis = 1)
+#o3_u = np.nanmean(comm_o3_u, axis = 1)
+#o3_su = np.nanmean(comm_o3_su, axis = 1)
+#o3_r = np.nanmean(comm_o3_r, axis = 1)
+#mr2_o3 = np.nanmean(mr2_o3, axis = 1)
+## CTM 12Z gridded
+#(lat, lon, pressure, times, co, no, no2, o3) = \
+#commensurability.open_gridded_idailyCTM('HindcastMR2', years)
+## load AQS observations
+#COdf, NO2df, O3df = commensurability.load_aqshourly(years)
+## retrieve ALL AQS observations in CTM grid cells for NO2
+#no2_station_coordinates, colocated_no2obs = \
+#commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
+#                                                  [])
+## retrieve RURAL AQS observations in CTM grid cells
+#no2_station_coordinates_rural, colocated_no2obs_rural = \
+#commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
+#                                                  ['RURAL'])
+## retrieve URBAN AQS observations in CTM grid cells
+#no2_station_coordinates_urban, colocated_no2obs_urban = \
+#commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
+#                                                  ['URBAN AND CENTER CITY'])
+## retrieve SUBURAN AQS observations in CTM grid cells
+#no2_station_coordinates_suburban, colocated_no2obs_suburban = \
+#commensurability.commensurate_aqstracegas_gridded(NO2df, no2, times, lat, lon, 
+#                                                  ['SUBURBAN'])
+## retrieve ALL AQS observations in CTM grid cells for CO
+#co_station_coordinates, colocated_coobs = \
+#commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
+#                                                  [])
+## retrieve RURAL AQS observations in CTM grid cells
+#co_station_coordinates_rural, colocated_coobs_rural = \
+#commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
+#                                                  ['RURAL'])
+## retrieve URBAN AQS observations in CTM grid cells
+#co_station_coordinates_urban, colocated_coobs_urban = \
+#commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
+#                                                  ['URBAN AND CENTER CITY'])
+## retrieve SUBURAN AQS observations in CTM grid cells
+#co_station_coordinates_suburban, colocated_coobs_suburban = \
+#commensurability.commensurate_aqstracegas_gridded(COdf, co, times, lat, lon, 
+#                                                  ['SUBURBAN'])
+## boxplot of hourly observations and CTM output by environment
+#boxplot_tracegas_byenv(co_all, co_u, co_su, co_r, mr2_co, no2_all, 
+#                       no2_u, no2_su, no2_r, mr2_no2, o3_all_castnet, 
+#                       o3_all, o3_u, o3_su, o3_r, mr2_o3, years, region)
+## boxplot of 12Z observations and CTM output by environment
+#boxplot_tracegas_byenv_gridded(colocated_no2obs, colocated_no2obs_rural, 
+#    colocated_no2obs_urban, colocated_no2obs_suburban, no2[:, 0], 
+#    'NO$_{2}$ [ppbv]', 'no2')
+#boxplot_tracegas_byenv_gridded(colocated_coobs, colocated_coobs_rural, 
+#    colocated_coobs_urban, colocated_coobs_suburban, co[:, 0], 
+#    'CO [ppmv]', 'co')
+## plot maps of bias by environment
+#map_gmiaqsbias(colocated_no2obs, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
+#               'All')
+#map_gmiaqsbias(colocated_no2obs_rural, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
+#               'Rural')
+#map_gmiaqsbias(colocated_no2obs_urban, no2[:, 0] * 1e9, lat, lon, 'NO$_{2}$', 
+#               'Urban')
+#map_gmiaqsbias(colocated_no2obs_suburban, no2[:, 0] * 1e9, lat, lon, 
+#               'NO$_{2}$', 'Suburban')
+#map_gmiaqsbias(colocated_coobs, co[:, 0] * 1e6, lat, lon, 'CO', 
+#               'All')
+#map_gmiaqsbias(colocated_coobs_rural, co[:, 0] * 1e6, lat, lon, 'CO', 
+#               'Rural')
+#map_gmiaqsbias(colocated_coobs_urban, co[:, 0] * 1e6, lat, lon, 'CO', 
+#               'Urban')
+#map_gmiaqsbias(colocated_coobs_suburban, co[:, 0] * 1e6, lat, lon, 
+#               'CO', 'Suburban')
+## plot locations of rural, urban, and suburban AQS stations
+#map_aqsstations(no2_station_coordinates_rural, no2_station_coordinates_urban, 
+#                no2_station_coordinates_suburban, 'no2')
+## plot locations of rural, urban, and suburban AQS stations
+#map_aqsstations(co_station_coordinates_rural, co_station_coordinates_urban, 
+#                co_station_coordinates_suburban, 'co')
+    
+
+
+
+
+
+
+
+
+# 19 september 2018 (plane to Japan)
+
+# load CTM output from HindcastMR2 overpass2
+#(gmi_lat, gmi_lon, eta, times, co, no, no2, o3, cloudfraction, gridboxheight) = \
+#commensurability.open_overpass2('HindcastMR2', years)
+
+
+
+
+
+# load 
+    
+#suburban_o3, urban_o3, rural_o3, all_o3  = \
+#commensurability.commensurate_aqstracegas_overpass2(O3df, gmi_lat, gmi_lon)
+
+#suburban_no2, urban_no2, rural_no2, all_no2  = \
+#commensurability.commensurate_aqstracegas_overpass2(NO2df, gmi_lat, gmi_lon)
+
+#suburban_co, urban_co, rural_co, all_co  = \
+#commensurability.commensurate_aqstracegas_overpass2(COdf, gmi_lat, gmi_lon)
+
+
+##trace gas
+#tg = 'o3'
+#
+#cblabel = 'O$_{\mathregular{3}}$ [ppbv]'
+
+
+
+#vmin = -9.; vmax = 9.
+#
+#
+#
+#map_diffaqsctmtracegas_conus(all_o3 * 1000., o3 * 1e9, gmi_lat, gmi_lon,
+#    vmin, vmax, cblabel, 'o3', 'all')
+#map_diffaqsctmtracegas_conus(rural_o3 * 1000., o3 * 1e9, gmi_lat, gmi_lon,
+#    vmin, vmax, cblabel, 'o3', 'rural')
+#
+#map_diffaqsctmtracegas_conus(suburban_o3 * 1000., o3 * 1e9, gmi_lat, gmi_lon,
+#    vmin, vmax, cblabel, 'o3', 'suburban')
+#
+#map_diffaqsctmtracegas_conus(urban_o3 * 1000., o3 * 1e9, gmi_lat, gmi_lon,
+#    vmin, vmax, cblabel, 'o3', 'urban')    
+#    
+
+#
+# 
+#map_diffaqsctmtracegas_conus(all_no2, no2 * 1e9, gmi_lat, gmi_lon,
+#    -4, 4, 'NO$_{\mathregular{2}}$ [ppbv]', 'no2', 'all')
+#    
+#map_diffaqsctmtracegas_conus(rural_no2, no2 * 1e9, gmi_lat, gmi_lon,
+#    -4, 4, 'NO$_{\mathregular{2}}$ [ppbv]', 'no2', 'rural')
+#
+#map_diffaqsctmtracegas_conus(urban_no2, no2 * 1e9, gmi_lat, gmi_lon,
+#    -4, 4, 'NO$_{\mathregular{2}}$ [ppbv]', 'no2', 'urban')
+#
+#map_diffaqsctmtracegas_conus(suburban_no2, no2 * 1e9, gmi_lat, gmi_lon,
+#    -4, 4, 'NO$_{\mathregular{2}}$ [ppbv]', 'no2', 'suburban')
+
+#map_diffaqsctmtracegas_conus(all_co, co * 1e6, gmi_lat, gmi_lon,
+#    -.5, .5, 'CO [ppmv]', 'co', 'all')
+#    
+#map_diffaqsctmtracegas_conus(rural_co, co * 1e6, gmi_lat, gmi_lon,
+#    -.5, .5, 'CO [ppmv]', 'co', 'rural')
+#
+#map_diffaqsctmtracegas_conus(urban_co, co * 1e6, gmi_lat, gmi_lon,
+#    -.5, .5, 'CO [ppmv]', 'co', 'urban')
+#
+#map_diffaqsctmtracegas_conus(suburban_co, co * 1e6, gmi_lat, gmi_lon,
+#    -.5, .5, 'CO [ppmv]', 'co', 'suburban')
+
+
+
+
+
+
+
