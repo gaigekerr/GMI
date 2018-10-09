@@ -80,6 +80,7 @@ REVISION HISTORY
     05082018 -- timezone parameter added to functions. This allows user to pass
                 the UTC offset when opening afternoon modeled trace gas output
                 such that output can be opened over many timezones.
+    19082018 -- function 'open_overpass2'
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -958,8 +959,8 @@ def load_aqshourly(years):
                           usecols = cols) 
     return COdf, NO2df, O3df 
 # # # # # # # # # # # # # 
-def commensurate_aqstracegas(castnet_sites_fr, years, 
-                             sampling_months, sampling_hours): 
+def commensurate_aqstracegas(castnet_sites_fr, years, sampling_months, 
+                             sampling_hours, timezone): 
     """function loads hourly AQS CO, NO2, and O3 observations and identifies 
     observations near CASTNet sites which have data for the years of interest
     in the focus region. In this case the variable 'searchrad' constitutes 
@@ -1038,7 +1039,7 @@ def commensurate_aqstracegas(castnet_sites_fr, years,
     # measuring period
     comm_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
     commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', years, 
-                             sampling_months, sampling_hours)    
+                             sampling_months, sampling_hours, timezone)    
     # convert time
     CO['Date GMT'] = pd.to_datetime(CO['Date GMT'])
     NO2['Date GMT'] = pd.to_datetime(NO2['Date GMT'])
@@ -1219,7 +1220,7 @@ def commensurate_aqstracegas_gridded(df, gmi, times, lat, lon, environment):
     # CTM resolution 
     latres = np.diff(lat).mean()
     lonres = np.diff(lon).mean()
-    # loop through GMI latitude and longitude coordinatesion
+    # loop through GMI latitude and longitude coordinates
     for i, ilat in enumerate(lat):
         for j, jlon in enumerate(lon):
             # convert longitude from (0-360) to (-180 to 180)
@@ -2565,7 +2566,7 @@ def commensurate_geos_gmi_diurnal(castnet_sites_fr, timezone):
     return comm_castnet, comm_geos_o3, comm_geos_no, comm_geos_no2, comm_geos_co                   
 # # # # # # # # # # # # #
 def commensurate_aqstracegas_siting(castnet_sites_fr, years, sampling_months,
-                                    sampling_hours):
+                                    sampling_hours, timezone):
     """same as 'commensurate_aqstracegas' but function separates AQS CO, NO2, 
     and O3 based on their siting environment (i.e. rural, suburban, or 
     rural) for all AQS stations within the radius from CASTNet stations 
@@ -2581,6 +2582,11 @@ def commensurate_aqstracegas_siting(castnet_sites_fr, years, sampling_months,
         Months of interest
     sampling_hours : list
         Hours of interest
+    timezone : str
+        The UTC offset for region; final number has positive signs west of 
+        Greenwich; for example, timezone = 'GMT+4' uses the abbreviation 
+        'GMT+4' and corresponds to 4 hours behind UTC (i.e. west of Greenwich) 
+        no 4 hours ahead of UTC (i.e. east of Greenwich). 
         
     Returns
     ----------
@@ -2668,7 +2674,7 @@ def commensurate_aqstracegas_siting(castnet_sites_fr, years, sampling_months,
     comm_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
     commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
                                               years, sampling_months, 
-                                              sampling_hours)  
+                                              sampling_hours, timezone)  
     # find lat/lon of CASTNet sites in focus region
     csites = commensurability.open_castnetsiting()
     # read AQS site file containing information about the siting of AQS
@@ -3230,3 +3236,291 @@ def open_profile_multimonth(case, months, year, species, stations, levels):
     return (col_latitude, col_longitude, station_labels, pressure, 
             const_multiyear, times_multiyear)
 # # # # # # # # # # # # #
+def open_overpass2(case, years):
+    """for the specified model case and years, function opens trace gas, cloud
+    fraction, and grid box height output from GMI overpass2 files. Input files
+    are adapted from original global files and represented (typically) surface-
+    level fields over the continential United States. 
+
+    Parameters
+    ----------   
+    case : str
+        Hindcast family (i.e., HindcastMR2, HindcastMR2-DiurnalAvgT)
+    years : list 
+        Years of interest (n.b., as of 18 September 2018 files for 2008-2010 
+        are saved locally)
+
+    Returns
+    ----------
+    lat : numpy.ndarrayn
+        Latitude coordinates of focus region, units of degrees north, [lat,]
+    lon : numpy.ndarray
+        Longitude coordinates of focus region, units of degrees east, [lon,]
+    eta : numpy.ndarray
+        Pressure coordinates of CTM, units of hPa, [eta,]
+    times : numpy.ndarray
+        datetime.datetime objects corresponding to 1300 hour local time CTM
+        output corresponding to satellite overpass, [time,]
+    co : numpy.ndarray
+        Surface-level carbon monoxide, units of volume mixing ratio, [time, 
+        lat, lon]
+    no : numpy.ndarray
+        Surface-level nitrogen oxide, units of volume mixing ratio, [time, 
+        lat, lon]
+    no2 : numpy.ndarray
+        Surface-level nitrogen dioxide, units of volume mixing ratio, [time, 
+        lat, lon]
+    o3 : numpy.ndarray
+        Surface-level ozone, units of volume mixing ratio, [time, lat, lon]        
+    cloudfraction : numpy.ndarray
+        Total cloud fraction, unitless, [time, eta, lat, lon] 
+    gridboxheight : numpy.ndarray
+        Grid box height, units of meters, [time, eta, lat, lon] 
+    """
+    import numpy as np
+    from datetime import datetime, timedelta
+    from netCDF4 import Dataset
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # # # #
+    # to generate time dimension for netCDF file 
+    def perdelta(start, end, delta):
+        curr = start
+        while curr < end:
+            yield curr
+            curr += delta
+    # # # #
+    co, no, no2, o3, cloudfraction, gridboxheight = [], [], [], [], [], []
+    times = []
+    # loop through years of interest
+    for year in years: 
+        # latitudinal/longitudinal bounds of file are hard-coded; would have
+        # to change if examining other regions
+        infile = Dataset(pollutants_constants.PATH_GMI + 'overpass2/' + 
+                         '%s/gmic_%s_%d_jja_25N_230E_50N_300E.overpass2.nc'
+                         %(case, case, year), 'r')
+        # extract dimensional information only on the first iteration of year
+        # loop 
+        if year == years[0]:
+            lat = infile.variables['latitude_dim'][:]
+            lon = infile.variables['longitude_dim'][:]
+            eta = infile.variables['eta_dim'][:]
+        # append 
+        co.append(infile.variables['co'][:])
+        no.append(infile.variables['no'][:])
+        no2.append(infile.variables['no2'][:])
+        o3.append(infile.variables['o3'][:])
+        cloudfraction.append(infile.variables['cloudFraction_overpass'][:])
+        gridboxheight.append(infile.variables['gridBoxHeight_overpass'][:])
+        # n.b. currently this is set up to calculate the overpass times at 
+        # the nearest hour; could add minutes, if needed. 
+        meanTime_overpass2 = np.mean([infile.variables['begTime_overpass2'][0], 
+                                     infile.variables['endTime_overpass2'][0]])
+        time = []
+        for result in perdelta(datetime(year, 6, 1, meanTime_overpass2), 
+                               datetime(year, 9, 1, meanTime_overpass2), 
+                               timedelta(hours = 24)):
+            time.append(result)     
+        times.append(time)
+    # convert lists to arrays
+    times = np.hstack(np.vstack(times))
+    co = np.vstack(co)
+    no = np.vstack(no)
+    no2 = np.vstack(no2)
+    o3 = np.vstack(o3)
+    cloudfraction = np.vstack(cloudfraction)
+    gridboxheight = np.vstack(gridboxheight)
+    return (lat, lon, eta, times, co, no, no2, o3, cloudfraction, 
+            gridboxheight)  
+# # # # # # # # # # # # #
+def commensurate_aqstracegas_overpass2(df, gmi_lat, gmi_lon): 
+    """for AQS measurements of a trace gas, function finds all hourly summer 
+    (JJA) observations within the bounds of a GMI CTM grid cell for each day 
+    in the measuring period JJA 2008-2010. These AQS observations within a cell 
+    are sampled at the overpass2 times (1300 and 1400 hours local time) and 
+    averaged over like environments within a cell. E.g., if a GMI CTM grid cell 
+    contains 5 AQS sites (3 urban and 2 rural), the value in the rural output 
+    grid would be the simple arithmetic average of the 2 rural sites in the 
+    cell. 
+    
+    Parameters
+    ----------
+    df : pandas.core.frame.DataFrame
+        Raw AQS hourly summary trace gas observations for U.S. for years of 
+        interest, [no. obs, 5]    
+    gmi_lat : numpy.ndarray
+        Latitude of GMI stations, degrees north, [lat,]
+    gmi_lon : numpy.ndarray
+        Longitude of GMI stations, degrees east, [lon,]
+
+    Returns
+    ----------      
+    suburban_grid : numpy.ndarray 
+        Daily mean (1300-1400 hours local time) trace gas measurements averaged
+        over suburban AQS sites within particular GMI CTM grid cells for JJA
+        2008-2010, [time, lat, lon]
+    urban_grid : numpy.ndarray
+        Daily mean (1300-1400 hours local time) trace gas measurements averaged
+        over urban AQS sites within particular GMI CTM grid cells for JJA
+        2008-2010, [time, lat, lon]    
+    rural_grid : numpy.ndarray
+        Daily mean (1300-1400 hours local time) trace gas measurements averaged
+        over rural AQS sites within particular GMI CTM grid cells for JJA
+        2008-2010, [time, lat, lon]    
+    all_grid : numpy.ndarray
+        Daily mean (1300-1400 hours local time) trace gas measurements averaged
+        over all AQS sites within particular GMI CTM grid cells for JJA 
+        2008-2010, [time, lat, lon]    
+    """
+    import numpy as np
+    import pandas as pd
+    import datetime
+    import pytz
+    import timezonefinder
+    # overpass2 times
+    local_times = [13, 14]
+    # define date range
+    date_idx = []
+    for year in np.arange(2008, 2011, 1):
+        date_idx.append(pd.date_range('06-01-%d' %year, '08-31-%d' %year))
+    # aggregate over years
+    date_idx = np.hstack(date_idx)
+    # restrict trace gas observations to summer (JJA)
+    df['Date GMT'] = pd.to_datetime(df['Date GMT'])
+    df = df.loc[df['Date GMT'].dt.month.isin([6, 7, 8])]
+    # read AQS site file containing information about the siting of AQS
+    # sites
+    datapath = '/Users/ghkerr/phd/aqs_station_siting/data/'
+    aqs_sites = pd.read_csv((datapath + 'aqs_sites.csv'), header = 0)
+    site_cols = ['State Code', 'County Code',	 'Site Number', 'Latitude',
+                 'Longitude', 'Datum', 'Elevation', 'Land Use',	
+                 'Location Setting', 'Site Established Date', 
+                 'Site Closed Date', 'Met Site State Code', 
+                 'Met Site County Code', 'Met Site Site Number', 
+                 'Met Site Type', 'Met Site Distance', 'Met Site Direction', 
+                 'GMT Offset', 'Owning Agency', 'Local Site Name', 'Address', 
+                 'Zip Code', 'State Name', 'County Name', 'City Name', 
+                 'CBSA Name', 'Tribe Name', 'Extraction Date']
+    aqs_sites = pd.DataFrame(aqs_sites, columns = site_cols)  
+    # convert GMI lon from (0 to 360) to (-180 to 180)
+    gmi_lon = np.mod(gmi_lon - 180.0, 360.0) - 180.0
+    latres = np.diff(gmi_lat).mean()
+    lonres = np.diff(gmi_lon).mean()
+    # create grids to be filled with AQS trace gas observations from urban, 
+    # rural, suburban, and all sites 
+    suburban_grid = np.empty([276, gmi_lat.shape[0], gmi_lon.shape[0]])
+    suburban_grid[:] = np.nan
+    urban_grid = np.empty([276, gmi_lat.shape[0], gmi_lon.shape[0]])
+    urban_grid[:] = np.nan
+    rural_grid = np.empty([276, gmi_lat.shape[0], gmi_lon.shape[0]])
+    rural_grid[:] = np.nan
+    all_grid = np.empty([276, gmi_lat.shape[0], gmi_lon.shape[0]])
+    all_grid[:] = np.nan
+    # loop through GMI latitude and longitude coordinates
+    for i, ilat in enumerate(gmi_lat):
+        for j, jlon in enumerate(gmi_lon):
+            # find AQS trace gas measurements in grid cell 
+            df_ingrid = df.loc[(df['Latitude'] > ilat - latres/2.) & 
+                               (df['Latitude'] <= ilat + latres/2.) &
+                               (df['Longitude'] > jlon - lonres/2.) &
+                               (df['Longitude'] <= jlon + lonres/2.)]
+            if df_ingrid.empty != True:
+                tf = timezonefinder.TimezoneFinder()
+                timezone_str = tf.timezone_at(lat = ilat, lng = jlon)
+                if timezone_str:
+                    tz = pytz.timezone(timezone_str)
+                    # dummy summer date (to pick up on DST)
+                    dt = datetime.datetime.strptime('2010-06-01', '%Y-%m-%d')
+                    offset = int(tz.utcoffset(dt).total_seconds() / 3600.0)
+                    # find overpass2 time (1300-1400 local time) in UTC
+                    times_incell = [time - (offset) for time in local_times]
+                    # select AQS trace gas measurements at overpass time
+                    df_ingrid = df_ingrid.loc[df_ingrid['Time GMT'].isin(
+                            ['%d:00' %(x) for x in times_incell])] 
+                    # temporary lists, all AQS observations within a particular
+                    # grid cell at a certain environment will be stored here 
+                    # and then averaged
+                    suburban_t = []
+                    rural_t = []
+                    urban_t = []
+                    all_t = []            
+                    # loop through unique latitude and longitudes and find whether 
+                    # they are urban, rural, or suburban 
+                    uniquesites = df_ingrid.groupby(['Latitude', 'Longitude'
+                                                     ]).size().reset_index(name = 'Freq')
+                    for index, row in uniquesites.iterrows():
+                        # find index in AQS site record corresponding to station's 
+                        # observations
+                        siting_lat = np.where(np.around(
+                                aqs_sites['Latitude'].values, 1) == np.around(row['Latitude'], 1))
+                        siting_lon = np.where(np.around(
+                                aqs_sites['Longitude'].values, 1) == np.around(row['Longitude'], 1))
+                        siting = np.intersect1d(siting_lat, siting_lon)
+                        # if > 1 station selected (this part is clunky)
+                        if siting.shape[0] > 1:
+                            smin = []
+                            for s in siting: 
+                                slat = aqs_sites['Latitude'].values[s]
+                                slon = aqs_sites['Longitude'].values[s]
+                                latd = (row['Latitude'] - slat)
+                                lond = (row['Longitude'] - slon)
+                                smin.append(np.abs(np.mean([latd, lond])))
+                            siting = siting[np.where(np.array(smin) == 
+                                                     np.min(smin))[0][0]]
+                        else: 
+                            siting = siting[0]
+                        siting = aqs_sites.iloc[siting]['Location Setting']
+                        # average of suburban sites in cell                  
+                        if siting == 'SUBURBAN':
+                            suburban = df_ingrid.loc[df_ingrid['Latitude'].isin(
+                                [row['Latitude']]) & df_ingrid['Longitude'].isin(
+                                [row['Longitude']])]
+                            # average all sites/hours in cell for daily average at 
+                            # overpass time
+                            suburban = suburban.groupby(['Date GMT']).mean()
+                            suburban.index = pd.DatetimeIndex(suburban.index)
+                            suburban = suburban.reindex(date_idx, 
+                                fill_value = np.nan)
+                            suburban_t.append(suburban['Sample Measurement'].values)
+                        # average of rural sites in cell     
+                        if siting == 'RURAL':
+                            rural = df_ingrid.loc[df_ingrid['Latitude'].isin(
+                                [row['Latitude']]) & df_ingrid['Longitude'].isin(
+                                [row['Longitude']])]
+                            rural = rural.groupby(['Date GMT']).mean()
+                            rural.index = pd.DatetimeIndex(rural.index)
+                            rural = rural.reindex(date_idx, fill_value = np.nan)
+                            rural_t.append(rural['Sample Measurement'].values)
+                        # average of urban sites in cell                             
+                        if siting == 'URBAN AND CENTER CITY':
+                            urban = df_ingrid.loc[df_ingrid['Latitude'].isin(
+                                [row['Latitude']]) & df_ingrid['Longitude'].isin(
+                                [row['Longitude']])]
+                            urban = urban.groupby(['Date GMT']).mean()
+                            urban.index = pd.DatetimeIndex(urban.index)
+                            urban = urban.reindex(date_idx, 
+                                fill_value = np.nan)
+                            urban_t.append(urban['Sample Measurement'].values)                               
+                        # average of all sites in cell 
+                        if (siting == 'SUBURBAN') or (siting == 'RURAL') or \
+                        (siting == 'URBAN AND CENTER CITY'):
+                            all = df_ingrid.loc[df_ingrid['Latitude'].isin(
+                                [row['Latitude']]) & df_ingrid['Longitude'].isin(
+                                [row['Longitude']])]
+                            all = all.groupby(['Date GMT']).mean()
+                            all.index = pd.DatetimeIndex(all.index)
+                            all = all.reindex(date_idx, 
+                                fill_value = np.nan)
+                            all_t.append(all['Sample Measurement'].values)   
+                        # average over same environments in grid cell     
+                        if len(suburban_t) != 0:                    
+                            suburban_grid[:, i, j] = np.nanmean(np.vstack(suburban_t), axis = 0)
+                        if len(rural_t) != 0:                    
+                            rural_grid[:, i, j] = np.nanmean(np.vstack(rural_t), axis = 0)
+                        if len(urban_t) != 0:                    
+                            urban_grid[:, i, j] = np.nanmean(np.vstack(urban_t), axis = 0)
+                        if len(all_t) != 0:             
+                            all_grid[:, i, j] = np.nanmean(np.vstack(all_t), axis = 0)
+    return suburban_grid, urban_grid, rural_grid, all_grid
+# # # # # # # # # # # # #    
