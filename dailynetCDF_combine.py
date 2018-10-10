@@ -14,7 +14,9 @@ REVISION HISTORY
                 simulation name as an argument.
     18072018 -- filename changed to 'dailynetCDF_combine.py' and function 
                 'tavg1_2d_aer_Nx_combine' added. 
-    27072018 -- function 'inst1_2d_asm_Nx_combine' added
+    27072018 -- function 'inst1_2d_asm_Nx_combine' added 
+    10102018 -- function 'inst1_2d_asm_Nx_combine' edited to extract 
+                sea level pressure from daily netCDF files
 """
 # # # # # # # # # # # # #
 def yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, case, year):
@@ -450,7 +452,7 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
     from netCDF4 import Dataset
     import glob
     # path to MERRA-2 data holdings
-    path = '/mnt/scratch3/gkerr4/data/MERRA-2/inst6_3d_ana_Np/'
+    path = '/mnt/scratch1/gaige/data/MERRA-2/'
     # file names with wildcard character for date
     mfstring = 'MERRA2_300.inst1_2d_asm_Nx.%s*.SUB.nc4' %year
     infiles = []
@@ -458,7 +460,7 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
         infiles.append(file)
     # sort input files by date (YYYYMMDD format)
     infiles.sort()
-    PS, T2M, T10M, TS, U2M, U10M, V2M, V10M = [], [], [], [], [], [], [], []
+    SLP, PS, T2M, T10M, TS, U2M, U10M, V2M, V10M = [], [], [], [], [], [], [], [], []
     for file in infiles:     
         infile = Dataset(file, 'r')
         if file == infiles[0]:
@@ -475,6 +477,8 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
             lat = lat[llat:ulat+1]    
         # extract relevant variables and append 4-hourly fields to JJA 
         # list
+        # sea level pressure 
+        SLP.append(infile.variables['SLP'][:, llat:ulat+1, llon:rlon+1])        
         # surface_pressure
         PS.append(infile.variables['PS'][:, llat:ulat+1, llon:rlon+1])
         # 2-meter_air_temperature
@@ -491,8 +495,6 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
         V2M.append(infile.variables['V2M'][:, llat:ulat+1, llon:rlon+1])    
         # 10-meter_northward_wind
         V10M.append(infile.variables['V10M'][:, llat:ulat+1, llon:rlon+1])    
-        
-    
     # create output file; naming convention is the same as input file, 
     # with trailing values corresponding to: lower latitude, left longitude, 
     # upper latitude, right longitude
@@ -504,6 +506,8 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
     lon_dim = outfile.createDimension('lon', len(lon))
     time_dim = outfile.createDimension('time', None)
     # create coordinate variables for variables
+    SLP_dataset = outfile.createVariable('SLP', np.float32, 
+        ('time', 'lat', 'lon')) 
     PS_dataset = outfile.createVariable('PS', np.float32, 
         ('time', 'lat', 'lon')) 
     T2M_dataset = outfile.createVariable('T2M', np.float32, 
@@ -522,7 +526,6 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
         ('time', 'lat', 'lon')) 
     lat_dim = outfile.createVariable('lat', np.float32, ('lat'))
     lon_dim = outfile.createVariable('lon', np.float32, ('lon'))
-    pressure_dim = outfile.createVariable('lev', np.float32, ('lev'))
     # add data and define their attributes
     # latitude
     lat_dim[:] = lat[:]
@@ -532,6 +535,11 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
     lon_dim[:] = lon
     lon_dim.standard_name = 'longitude'
     lon_dim.units = 'degree_east'
+    # sea level pressure
+    SLP_dataset[:] = np.vstack(SLP)
+    SLP_dataset.standard_name = 'sea_level_pressure'
+    SLP_dataset.long_name = 'sea_level_pressure'
+    SLP_dataset.units = 'Pa'    
     # surface_pressure
     PS_dataset[:] = np.vstack(PS)
     PS_dataset.standard_name = 'surface_pressure'
@@ -584,9 +592,9 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
 # # # # # # # # # # # # #    
 # define function inputs 
 ulat = 50.
-llat = 35.
-llon = 275.
-rlon = 295.
+llat = 25.
+llon = 230.
+rlon = 300.
 presslevel = 15
 # for HindcastMR2-DiurnalAvgT
 yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, 
