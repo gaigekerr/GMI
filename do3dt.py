@@ -22,7 +22,11 @@ REVISION HISTORY
     11102018 -- funciton 'castnet_r_do3d2t' edited to sample CASTNet stations 
                 only at 1300 hours local time (time of overpass); function 
                 'map_ro3t2m_do3dt2m_conus' edited to include both O3-T2m 
-                sensitivity and correlation coefficient side-by-side. 
+                sensitivity and correlation coefficient side-by-side
+    12102018 -- function 'timeseries_mr2o3dato3t2m_atpoint' added
+    14102018 -- function 'map_meanmr2o3meancastneto3_conus' added
+    
+    
 """
 # # # # # # # # # # # # #
 # change font
@@ -132,11 +136,86 @@ def outline_region(ax, m, focus_region_states):
     # cascaded union can work on a list of shapes, adapted from 
     # https://stackoverflow.com/questions/34475431/plot-unions-of-polygons-in-matplotlib
     neus = so.cascaded_union(patches) 
-    ax.add_patch(PolygonPatch(neus, fc = 'None', #CC.to_rgba([249/255., 246/255., 216/255.]),
-                              ec = 'k', 
-                              alpha = 1.0, zorder = 1, linewidth = 2.))      
+    ax.add_patch(PolygonPatch(neus, fc = 'None', ec = 'k', alpha = 1.0, 
+                 zorder = 11, linewidth = 2.))      
     return 
 # # # # # # # # # # # # #    
+def find_grid_in_region(m, focus_region_states, gmi_lat, gmi_lon): 
+    """given a region comprised of states in variable 'focus_region_states' 
+    and a gridded coordinate surface, function finds which grid cells are in 
+    the region. The returned array is boolean: 0s mean that the grid cell is 
+    not in region and 1s mean that grid cell is. 
+    
+    Parameters
+    ----------  
+    m : mpl_toolkits.basemap.Basemap
+        Basemap with specified coordinates and map projection
+    focus_region_states : list
+        State names (string format) in region      
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]  
+        
+    Returns
+    ----------     
+    None         
+    """
+    from matplotlib.patches import Polygon
+    import numpy as np
+    import shapely.geometry as sg
+    import shapely       
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants        
+    print('finding grid cells in region...')
+    # read in shapefile
+    m.readshapefile(pollutants_constants.PATH_SHAPEFILES + 
+        'cb_2015_us_state_20m', name = 'states', drawbounds = True)
+    state_names = []
+    for shape_dict in m.states_info:
+        state_names.append(shape_dict['NAME'])
+    # dict values are the AQS state codes
+    state_fips_code_listing = {'Alaska' : 2, 'Alabama' : 1, 'Arkansas' : 5, 
+        'Arizona' : 4, 'California' : 6, 'Colorado' : 8, 'Connecticut' : 9, 
+        'District of Columbia' : 11, 'Delaware' : 10, 'Florida' : 12, 
+        'Georgia' : 13, 'Hawaii' : 15, 'Iowa' : 19, 'Idaho' : 16, 
+        'Illinois' : 17, 'Indiana' : 18, 'Kansas' : 20, 'Kentucky' : 21, 
+        'Louisiana' : 22, 'Massachusetts' : 25, 'Maryland' : 24, 'Maine' : 23, 
+        'Michigan' : 26, 'Minnesota' : 27, 'Missouri' : 29, 'Mississippi' : 28, 
+        'Montana' : 30, 'North Carolina' : 37, 'North Dakota' : 38, 
+        'Nebraska' : 31, 'New Hampshire' : 33, 'New Jersey' : 34, 
+        'New Mexico' : 35, 'Nevada' : 32, 'New York' : 36, 'Ohio' : 39, 
+        'Oklahoma' : 40, 'Oregon' : 41, 'Pennsylvania' : 42, 
+        'Rhode Island' : 44, 'South Carolina' : 45, 'South Dakota' : 46, 
+        'Tennessee' : 47, 'Texas' : 48, 'Utah' : 49, 'Virginia' : 51, 
+        'Vermont' : 50, 'Washington' : 53, 'Wisconsin' : 55, 
+        'West Virginia' : 54, 'Wyoming' : 56}
+    # iterate through states, if states are in region append 
+    # shapely.geometry.polygon.Polygon object to list
+    patches = [] 
+    patches_state = []
+    for key, value in state_fips_code_listing.items():
+        if key in focus_region_states:
+                for info, shape in zip(m.states_info, m.states):
+                    if info['NAME'] == key:
+                        patches.append(sg.Polygon(shape))
+                        patches_state.append(Polygon(np.array(shape), True))  
+    where_region = np.empty(shape = np.meshgrid(gmi_lon, gmi_lat)[0].shape)
+    where_region[:] = 0.
+    # loop through patches; each patch is a shapely.geometry.polygon.Polygon
+    # object
+    for patch in patches:
+        # for each patch, loop through model grid and check if grid cells
+        # are in patch (SEMI-SLOW)
+        for i, slat in enumerate(gmi_lat):
+            for j, slon in enumerate(gmi_lon): 
+                x1, y1 = m(slon, slat)
+                point = shapely.geometry.Point(x1, y1)
+                if patch.contains(point) == True:
+                    where_region[i, j] = 1.
+    return where_region
+# # # # # # # # # # # # #     
 def get_merged_csv(flist, **kwargs):
     """function reads CSV files in the list comprehension loop, this list of
     DataFrames will be passed to the pd.concat() function which will return 
@@ -845,7 +924,6 @@ def map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, do3dt2m, r, lat_castnet,
     from matplotlib.colorbar import ColorbarBase
     import matplotlib.pyplot as plt
     from mpl_toolkits.basemap import Basemap
-    from matplotlib.cm import ScalarMappable    
     import sys
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
@@ -985,7 +1063,7 @@ def map_sensitivityratio_conus(gmi_lat, gmi_lon, dat_sens, mr2_sens):
                 dpi = 300)    
     return 
 # # # # # # # # # # # # #    
-def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
+def map_std_90ptile(t2m_overpass, o3, dat_o3, gmi_lat, gmi_lon):
     """function plots standard deviations of MERRA-2 2-meter temperature 
     fields at overpass2 time, O3 from Transport and + Chemistry simulations, 
     the difference of standard deviation between O3 from Transport and 
@@ -1002,7 +1080,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     o3 : numpy.ndarray
         GMI CTM surface-level ozone at overpass time from MR2/+ Chemistry 
         simulation, units of volume mixing ratio, [time, lat, lon]        
-    o3_dat : numpy.ndarray
+    dat_o3 : numpy.ndarray
         GMI CTM surface-level ozone at overpass time from Diurnal-AvgT/
         Transport simulation, units of volume mixing ratio, [time, lat, lon]      
     gmi_lat : numpy.ndarray
@@ -1021,7 +1099,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     from mpl_toolkits.basemap import Basemap
     from matplotlib.cm import ScalarMappable   
     from MidpointNormalize import MidpointNormalize    
-    m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.8, 
+    m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 25., 
                 urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'h', 
                 area_thresh = 1000)
     # map of 2-meter temperature variability
@@ -1038,7 +1116,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.5)
     m.drawcoastlines(color = 'k', linewidth = 1.5)
-    fill_oceans(ax)
+    fill_oceans(ax, m)
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
@@ -1060,7 +1138,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.5)
     m.drawcoastlines(color = 'k', linewidth = 1.5)
-    fill_oceans(ax)
+    fill_oceans(ax, m)
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
@@ -1083,7 +1161,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.5)
     m.drawcoastlines(color = 'k', linewidth = 1.5)
-    fill_oceans(ax)
+    fill_oceans(ax, m)
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
@@ -1105,7 +1183,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.5)
     m.drawcoastlines(color = 'k', linewidth = 1.5)
-    fill_oceans(ax)
+    fill_oceans(ax, m)
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
@@ -1128,7 +1206,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.5)
     m.drawcoastlines(color = 'k', linewidth = 1.5)
-    fill_oceans(ax)
+    fill_oceans(ax, m)
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
@@ -1151,7 +1229,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.5)
     m.drawcoastlines(color = 'k', linewidth = 1.5)
-    fill_oceans(ax)
+    fill_oceans(ax, m)
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
@@ -1175,7 +1253,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.5)
     m.drawcoastlines(color = 'k', linewidth = 1.5)
-    fill_oceans(ax)
+    fill_oceans(ax, m)
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
@@ -1186,27 +1264,29 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     plt.subplots_adjust(bottom = 0.2)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
                 'map_diff90ptileo3_conus_gmi_MR2_Diurnal-AvgT.eps', dpi = 300)
-    # map of the ratio of O3 variability between + Chemistry and Transport 
+    # map of the ratio of O3 variability between Transport and + Chemistry 
     # simulations    
     fig = plt.figure()
     ax = plt.subplot2grid((1, 1), (0, 0))
-    vmin = 0.95; vmax = 1.25
-    cmap = plt.get_cmap('terrain_r', 6)
+    vmin = 0.78; vmax = 1.06
+    cmap = plt.get_cmap('Spectral_r', 14)
     norm = Normalize(vmin = vmin, vmax = vmax)
-    clevs = np.linspace(vmin, vmax, 7, endpoint = True)
-    m.contourf(x, y, np.std(o3 * 1e9, axis = 0)/
-               np.std(dat_o3 * 1e9, axis = 0), clevs, cmap = cmap, 
+    clevs = np.linspace(vmin, vmax, 15, endpoint = True)
+    m.contourf(x, y, np.std(dat_o3 * 1e9, axis = 0)/
+               np.std(o3 * 1e9, axis = 0), clevs, cmap = cmap, 
                extend = 'both')
     m.drawstates(color = 'k', linewidth = 0.5)
-    m.drawcountries(color = 'k', linewidth = 1.5)
-    m.drawcoastlines(color = 'k', linewidth = 1.5)
+    m.drawcountries(color = 'k', linewidth = 1.0)
+    m.drawcoastlines(color = 'k', linewidth = 1.0)
+    fill_oceans(ax, m)    
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
     cb.set_label(label = '$\mathregular{\sigma}_{\mathregular{O_' +
-                 '{\mathregular{3, + Chemistry}}}}:\mathregular{\sigma}_' +
-                 '{\mathregular{O_{\mathregular{3, Transport}}}}$', 
+                 '{\mathregular{3, Transport}}}}:\mathregular{\sigma}_' +
+                 '{\mathregular{O_{\mathregular{3, +\:Chemistry}}}}$', 
                  size = 16)
+    cb.set_ticks(np.linspace(vmin, vmax, 8))
     cb.ax.tick_params(labelsize = 12)
     plt.subplots_adjust(bottom = 0.2)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
@@ -1224,6 +1304,7 @@ def map_std_90ptile(t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.5)
     m.drawcoastlines(color = 'k', linewidth = 1.5)
+    fill_oceans(ax, m)    
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
@@ -1333,7 +1414,7 @@ def map_rdato3mr2o3_conus(o3, dat_o3, gmi_lat, gmi_lon):
     o3 : numpy.ndarray
         GMI CTM surface-level ozone at overpass time from MR2/+ Chemistry 
         simulation, units of volume mixing ratio, [time, lat, lon]        
-    o3_dat : numpy.ndarray
+    dat_o3 : numpy.ndarray
         GMI CTM surface-level ozone at overpass time from Diurnal-AvgT/
         Transport simulation, units of volume mixing ratio, [time, lat, lon]      
     gmi_lat : numpy.ndarray
@@ -1446,6 +1527,183 @@ def map_rmr2o3gridboxheight_conus(o3, gridboxheight, gmi_lat, gmi_lon):
                 dpi = 300)
     return 
 # # # # # # # # # # # # #    
+def timeseries_mr2o3dato3t2m_atpoint(t2m_overpass, o3, dat_o3, gmi_lat, 
+    gmi_lon):
+    """in the southeastern U.S. the correlations between O3 and temperature 
+    and the O3-temperature sensitivity are low; however, the difference between
+    the Transport and + Chemistry simulations still can give information about
+    the role of transport and deposition on O3 variability. This functions
+    plots a time series of O3 from the Transport and + Chemistry simulations
+    and T2m for the summer of 2010 at a grid cell in the southeastern U.S. 
+    and calculates relevant correlation coefficients and sensitivities. 
+    
+    Parameters
+    ----------  
+    t2m_atoverpass : numpy.ndarry
+        The MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
+        resolution of the CTM, units of K, [time, lat, lon]    
+    o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time from MR2/+ Chemistry 
+        simulation, units of volume mixing ratio, [time, lat, lon]        
+    dat_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time from Diurnal-AvgT/
+        Transport simulation, units of volume mixing ratio, [time, lat, lon]      
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]  
+        
+    Returns
+    ----------     
+    None         
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # indices of 
+    slon_idx = 33
+    slat_idx = 8
+    print('(%.1f, %.1f) is chosen coordinate point...' 
+          %(gmi_lat[slat_idx], gmi_lon[slon_idx]))   
+    # select values at point
+    o3_atpoint = o3[184:, slat_idx, slon_idx] * 1e9
+    dato3_atpoint = dat_o3[184:, slat_idx, slon_idx] * 1e9
+    t2m_atpoint = t2m_overpass[184:, slat_idx, slon_idx]
+    # calculate correlation coefficients/sensitivity
+    print('r(Transport O3, + Chemistry O3) = %.3f' 
+          %(np.corrcoef(o3_atpoint, dato3_atpoint)[0, 1]))
+    print('r(+ Chemistry O3, T2m) = %.3f' 
+          %(np.corrcoef(o3_atpoint, t2m_atpoint)[0, 1]))
+    print('d(+ Chemistry O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_atpoint, o3_atpoint, 1)[0]))
+    print('d(Transport O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_atpoint, dato3_atpoint, 1)[0]))
+    print('Mean/Std Transport O3 = %.3f, %.3f' 
+          %(np.mean(dato3_atpoint), np.std(dato3_atpoint)))
+    print('Mean + Chemistry O3 = %.3f, %.3f' 
+          %(np.mean(o3_atpoint), np.std(o3_atpoint)))
+    # initialize figure, axis 
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    lns1 = ax.plot(o3_atpoint, lw = 2., 
+                   c = pollutants_constants.COLOR_CHEMISTRY, 
+                   label = 'Transport', zorder = 10)
+    lns2 = ax.plot(dato3_atpoint, lw = 2., 
+                   c = pollutants_constants.COLOR_TRANSPORT,
+                   label = '+ Chemistry', zorder = 5)
+    ax.set_xlim([0, len(o3_atpoint) - 1])
+    for t in ax.get_yticklabels():
+        t.set_fontsize(12)   
+    ax.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    # twin axis
+    ax2 = ax.twinx()
+    lns3 = ax2.plot(t2m_atpoint, lw = 2., color = '#377eb8',
+             label = 'T$_{\mathregular{2\:m}}$', zorder = 1)
+    ax2.set_xlim([0, len(t2m_atpoint) - 1])
+    ax2.set_xticks([0, 14, 29, 45, 61, 76])
+    ax2.set_xticklabels(['1 June', '', '1 July', '', '1 August 2010', ''])
+    ax2.set_ylabel('T$_{\mathregular{2\:m}}$ [K]', rotation = 270, fontsize = 16)   
+    ax2.get_yaxis().set_label_coords(1.15, 0.53)
+    for t in ax.get_xticklabels():
+        t.set_fontsize(12)
+    for t in ax2.get_yticklabels():
+        t.set_fontsize(12)    
+    # add legend
+    lns = lns1 + lns2 + lns3
+    labs = [l.get_label() for l in lns]
+    ax.legend(lns, labs, loc = 9, ncol = 3, frameon = False, 
+              fontsize = 16, bbox_to_anchor = (0.52, 1.17))
+    plt.subplots_adjust(right = 0.85)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/'
+                'timeseries_mr2o3dato3t2m_%dN_%dW_2010.eps' 
+                %(gmi_lat[slat_idx], gmi_lon[slon_idx]), dpi = 300)
+    return
+# # # # # # # # # # # # #    
+def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
+    lat_castnet, lon_castnet):
+    """function plots mean O3 fields from + Chemistry/MR2 simulation and 
+    mean CASTNet observations for the measuring period 2008-2010. To illustrate
+    the model resolution, parallels and meridians at the CTM's resolution 
+    are also plotted. 
+    
+    Parameters
+    ----------  
+    o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time from MR2/+ Chemistry 
+        simulation, units of volume mixing ratio, [time, lat, lon]        
+    o3_castnet : list
+        Daily 1300 hours local time O3 at each CASTNet site, units of ppbv, 
+        [no. sites,]        
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]    
+    lat_castnet : list
+        Latitudes of CASTNet sites, units of degrees north, [no. sites,]
+    lon_castnet : list
+        Longitudes of CASTNet sites, units of degrees west, [no. sites,]
+        
+    Returns
+    ----------     
+    None 
+    """
+    import numpy as np
+    from matplotlib.colors import Normalize
+    from matplotlib.colorbar import ColorbarBase
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # show mean JJA O3 as simulated by + Chemistry/HindcastMR2 simulation
+    o3_mean = np.mean(o3, axis = 0)
+    # from CASTNet
+    o3_castnet_mean = np.nanmean(np.array(o3_castnet), axis = 1)
+    m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 25., 
+            urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'h', 
+            area_thresh = 1000)
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    x, y = np.meshgrid(gmi_lon, gmi_lat)
+    x, y = m(x, y)
+    vmin = 26; vmax = 56
+    cmap = plt.get_cmap('gist_earth', 15)
+    norm = Normalize(vmin = vmin, vmax = vmax)
+    clevs = np.linspace(vmin, vmax, 16, endpoint = True)
+    m.contourf(x, y, o3_mean * 1e9, clevs, cmap = cmap, extend = 'both')
+    fill_oceans(ax, m)
+    # draw parallels and meridians to indicate the resolution of the CTM
+    # label parallels on right and top
+    # meridians on bottom and left
+    parallels = np.arange(gmi_lat[0], gmi_lat[-1], np.diff(gmi_lat).mean())
+    # labels = [left, right, top, bottom]
+    m.drawparallels(parallels, color = 'lightgrey', linewidth = 0.3,
+                    dashes = [1, 0], labels = [False, False, False, False])
+    meridians = np.arange(gmi_lon[0], gmi_lon[-1], np.diff(gmi_lon).mean())
+    m.drawmeridians(meridians, color = 'lightgrey', linewidth = 0.3, 
+                    dashes = [1, 0], labels = [False, False, False, False])
+    # add mean CASTNet data
+    x_castnet, y_castnet = m(lon_castnet, lat_castnet)
+    m.scatter(x_castnet, y_castnet, c = o3_castnet_mean, s = 20, cmap = cmap, 
+              vmin = vmin, vmax = vmax, zorder = 30, linewidth = 1., 
+              edgecolor = 'k')    
+    # add countries, states, etc here so they sit atop the gridlines
+    m.drawstates(color = 'k', linewidth = 0.5, zorder = 10)
+    m.drawcountries(color = 'k', linewidth = 1.0, zorder = 10)
+    m.drawcoastlines(color = 'k', linewidth = 1.0, zorder = 10)  
+    outline_region(ax, m, pollutants_constants.NORTHEAST_STATES)    
+    cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
+    cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
+                      orientation = 'horizontal', extend = 'both')
+    cb.set_label(label = '<O$_{\mathregular{3, +\:Chemistry\:|\:CASTNet}}$>', 
+                 size = 16)
+    cb.ax.tick_params(labelsize = 12)
+    plt.subplots_adjust(bottom = 0.2)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/'
+                'map_meanmr2o3meancastneto3_conus.eps', dpi = 300)
+# # # # # # # # # # # # #    
 import numpy as np
 import pandas as pd
 import sys
@@ -1476,20 +1734,20 @@ years = [2008, 2009, 2010]
 #calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, dat_o3, ps)
 ## correlation coefficients, O3-T2m sensitivity at AQS sites
 #r, do3dt2m = aqs_mda8_r_do3dt2m(ozone_nomean_mda8, merra_lat, merra_lon)
-# correlation coefficients, O3-T2m sensitivity at CASTNet sites
+## correlation coefficients, O3-T2m sensitivity at CASTNet sites
 #r_castnet, do3dt2m_castnet, lat_castnet, lon_castnet, t_castnet, o3_castnet, sites_castnet = \
 #castnet_r_do3d2t(castnet, t2m, merra_lat, merra_lon, times_all)
 # # # # # # # # # # # # #
 # visualizations
 ## modeled dO3-dT2m and correlation coefficients
-map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, mr2_sens, mr2_r, lat_castnet, 
-    lon_castnet, r_castnet, do3dt2m_castnet, 'MR2')
+#map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, mr2_sens, mr2_r, lat_castnet, 
+#    lon_castnet, r_castnet, do3dt2m_castnet, 'MR2')
 #map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, dat_sens, dat_r, lat_castnet, 
 #    lon_castnet, r_castnet, do3dt2m_castnet, 'Diurnal-AvgT')
 ## ratio of O3-T2m sensitivities from Transport and + Chemistry simulations
 #map_sensitivityratio_conus(gmi_lat, gmi_lon, dat_sens, mr2_sens)
 ## standard deviations of various fields
-#map_std_90ptile(mr2_t2m_overpass, o3, o3_dat, gmi_lat, gmi_lon)
+#map_std_90ptile(mr2_t2m_overpass, o3, dat_o3, gmi_lat, gmi_lon)
 ## timeseries and scatterplots of O3, T2m at sites with maximum, median, 
 ## and minimum sensitivities
 #timeseriesscatter_castnetdo3dt2m_cases(do3dt2m_castnet, t_castnet, o3_castnet)
@@ -1497,3 +1755,25 @@ map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, mr2_sens, mr2_r, lat_castnet,
 #map_rdato3mr2o3_conus(o3, dat_o3, gmi_lat, gmi_lon)
 ## correlation between O3 from + Chemistry and CTM grid box height
 #map_rmr2o3gridboxheight_conus(o3, gridboxheight, gmi_lat, gmi_lon) 
+## time series of O3 and T2m at a grid point with negative O3-T2m correlation 
+## and sensitivity
+#timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, o3, dat_o3, gmi_lat, 
+#    gmi_lon)
+
+#import numpy as np
+#import matplotlib.pyplot as plt
+#from mpl_toolkits.basemap import Basemap    
+#
+#m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.8, 
+#            urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
+#            area_thresh = 1000)
+#neus_states = pollutants_constants.NORTHEAST_STATES
+#
+#
+#neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
+
+
+
+
+
+
