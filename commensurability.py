@@ -80,7 +80,9 @@ REVISION HISTORY
     05082018 -- timezone parameter added to functions. This allows user to pass
                 the UTC offset when opening afternoon modeled trace gas output
                 such that output can be opened over many timezones.
-    19082018 -- function 'open_overpass2'
+    19082018 -- function 'open_overpass2' added
+    10102018 -- functions 'load_MERRA2' and 'commensurate_MERRA2' edited to 
+                also extract surface pressure
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -604,7 +606,9 @@ def load_MERRA2(years):
         MERRA-2 hourly 2-meter northward wind, units of m s-1, [time, lat, lon]
     v10m : numpy.ndarray
         MERRA-2 hourly 10-meter northward wind, units of m s-1, [time, lat, 
-        lon]    
+        lon]
+    ps : numpy.ndarray
+        MERRA-2 hourly sea level pressure, units of Pa, [time, lat, lon]        
     lat : numpy.ndarray
         MERRA-2 latitude coordinates, units of degrees north, [lat,]
     lon : numpy.ndarray
@@ -620,7 +624,7 @@ def load_MERRA2(years):
     sys.path.append('/Users/ghkerr/phd/GMI/')
     from generate_times import generate_times
     path = '/Users/ghkerr/phd/meteorology/data/inst1_2d_asm_Nx/'
-    t2m, t10m, u2m, u10m, v2m, v10m = [], [], [], [], [], []
+    t2m, t10m, u2m, u10m, v2m, v10m, ps = [], [], [], [], [], [], []
     times_all = []
     for year in years:
         mfstring = 'MERRA2_300.inst1_2d_asm_Nx_%s*.nc' %year
@@ -631,7 +635,8 @@ def load_MERRA2(years):
         u2m.append(infile.variables['U2M'][:])
         u10m.append(infile.variables['U10M'][:])
         v2m.append(infile.variables['V2M'][:])
-        v10m.append(infile.variables['V10M'][:])  
+        v10m.append(infile.variables['V10M'][:]) 
+        ps.append(infile.variables['SLP'][:])
         # extract coordinate information
         if year == years[-1]:
             lat = infile.variables['lat'][:]
@@ -646,8 +651,9 @@ def load_MERRA2(years):
     u10m = np.vstack(u10m)
     v2m = np.vstack(v2m)
     v10m = np.vstack(v10m)
+    ps = np.vstack(ps)
     times_all = np.hstack(times_all)
-    return t2m, t10m, u2m, u10m, v2m, v10m, lat, lon, times_all
+    return t2m, t10m, u2m, u10m, v2m, v10m, ps, lat, lon, times_all
 # # # # # # # # # # # # #
 def commensurate_MERRA2(comm_castnet, castnet_sites_fr, years, sampling_months, 
     sampling_hours):
@@ -699,8 +705,13 @@ def commensurate_MERRA2(comm_castnet, castnet_sites_fr, years, sampling_months,
         period, stations in 'castnet_sites_fr', days in months in 
         'sampling_months']    
     comm_v10m : numpy.ndarray
-        MERRA-2 1m-meter northward wind co-located (or nearly colocated) with 
+        MERRA-2 10-meter northward wind co-located (or nearly colocated) with 
         corresponding CASTNet stations, units of m s-1, [years in measuring 
+        period, stations in 'castnet_sites_fr', days in months in 
+        'sampling_months']    
+    comm_ps : numpy.ndarray
+        MERRA-2 surface pressure co-locatted (or nearly colocated) with 
+        corresponding CASTNet stations, unitst of Pa, [years in measuring 
         period, stations in 'castnet_sites_fr', days in months in 
         'sampling_months']    
     merra_lats_fr : list  
@@ -739,8 +750,11 @@ def commensurate_MERRA2(comm_castnet, castnet_sites_fr, years, sampling_months,
     comm_v10m = np.empty([len(years), len(castnet_sites_fr), sos], 
                          dtype = float)
     comm_v10m[:] = np.nan    
+    comm_ps = np.empty([len(years), len(castnet_sites_fr), sos], 
+                         dtype = float)
+    comm_ps[:] = np.nan       
     # load MERRA-2 meteorology
-    t2m, t10m, u2m, u10m, v2m, v10m, lat, lon, times = load_MERRA2(years)
+    t2m, t10m, u2m, u10m, v2m, v10m, ps, lat, lon, times = load_MERRA2(years)
     # find entries in reanalysis output in sampling hours
     times = pd.to_datetime(times)
     times_sh = np.where(np.in1d(times.hour, 
@@ -751,6 +765,7 @@ def commensurate_MERRA2(comm_castnet, castnet_sites_fr, years, sampling_months,
     u10m = u10m[times_sh]
     v2m = v2m[times_sh]
     v10m = v10m[times_sh]
+    ps = ps[times_sh]
     times = times[times_sh]
     # average over each day (i.e., might be multiple sampling hours 
     # entry in a single day)
@@ -766,6 +781,8 @@ def commensurate_MERRA2(comm_castnet, castnet_sites_fr, years, sampling_months,
         len(sampling_hours), len(lat), len(lon)), axis = 1)
     v10m = np.mean(v10m.reshape(int(len(times)/len(sampling_hours)), 
         len(sampling_hours), len(lat), len(lon)), axis = 1)
+    ps = np.mean(ps.reshape(int(len(times)/len(sampling_hours)), 
+        len(sampling_hours), len(lat), len(lon)), axis = 1)    
     # find lat/lon of CASTNet sites in focus region
     csites = open_castnetsiting()
     # create lists to be filled with MERRA grid cell locations
@@ -793,17 +810,19 @@ def commensurate_MERRA2(comm_castnet, castnet_sites_fr, years, sampling_months,
                 u10m_atsite = u10m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
                 v2m_atsite = v2m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
                 v10m_atsite = v10m[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
+                ps_atsite = ps[sos*counter1:sos*(counter1 + 1), lat_idx, lon_idx]
                 comm_t2m[counter1, counter2] = t2m_atsite
                 comm_t10m[counter1, counter2] = t10m_atsite
                 comm_u2m[counter1, counter2] = u2m_atsite
                 comm_u10m[counter1, counter2] = u10m_atsite
                 comm_v2m[counter1, counter2] = v2m_atsite
-                comm_v10m[counter1, counter2] = v10m_atsite                
+                comm_v10m[counter1, counter2] = v10m_atsite     
+                comm_ps[counter1, counter2] = ps_atsite                     
                 merra_lats_fr.append(lat[lat_idx]) 
                 merra_lons_fr.append(lon[lon_idx])
         print('MERRA-2 data for %s loaded!' %year)
     return (comm_t2m, comm_t10m, comm_u2m, comm_u10m, comm_v2m, comm_v10m, 
-            merra_lats_fr, merra_lons_fr)
+            comm_ps, merra_lats_fr, merra_lons_fr)
 # # # # # # # # # # # # #   
 def commensurate_t2m(comm_castnet, castnet_sites_fr, years, sampling_months):
     """function loads MERRA 2 meter temperatures and identifes MERRA grid cells 
@@ -3298,7 +3317,7 @@ def open_overpass2(case, years):
         # latitudinal/longitudinal bounds of file are hard-coded; would have
         # to change if examining other regions
         infile = Dataset(pollutants_constants.PATH_GMI + 'overpass2/' + 
-                         '%s/gmic_%s_%d_jja_25N_230E_50N_300E.overpass2.nc'
+                         '%s/gmic_%s_%d_jja_23N_230E_50N_300E.overpass2.nc'
                          %(case, case, year), 'r')
         # extract dimensional information only on the first iteration of year
         # loop 
