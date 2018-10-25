@@ -34,6 +34,8 @@ REVISION HISTORY
     19102018 -- functions 'timeseries_castneto3allgmio3' and 
                 'scatterhist_castneto3allgmio3' added
     24102018 -- function 'map_allgmio3_percentcontribution' added
+    25102018 -- edited 'map_allgmio3_percentcontribution' to calculated 
+                Northeast-averaged values for differences on hot/cold days
 """
 # # # # # # # # # # # # #
 # change font
@@ -2492,7 +2494,8 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
     simulation divided by the hot-median O3 average from the + Emissions 
     simulations. For the "+ Emissions" subplot it is the difference in
     the hot-median O3 average between + Emissions and + Chemistry simulations
-    divided by the difference in the + Emissions simulation. 
+    divided by the difference in the + Emissions simulation. Function also 
+    prints out Northeast-averaged values. 
     
     Parameters
     ----------       
@@ -2638,7 +2641,7 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
     outline_region(ax2, m, pollutants_constants.NORTHEAST_STATES)    
     # contributions from + Emissions simulation
     ax3 = plt.subplot2grid((3, 1), (2, 0))
-    ax2.set_title('(c) +$\:$Emissions', ha = 'left', fontsize = 16, x = 0.03, 
+    ax3.set_title('(c) +$\:$Emissions', ha = 'left', fontsize = 16, x = 0.03, 
                   y = 1.03)
     m.contourf(x, y, pc_emiss_hot, clevs, cmap = cmap, extend = 'both')
     m.drawstates(color = 'k', linewidth = 0.5)
@@ -2646,7 +2649,8 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
     outline_region(ax3, m, pollutants_constants.NORTHEAST_STATES)    
-    cbar_ax = fig.add_axes([0.85, 0.2, 0.05, 0.6])
+    plt.subplots_adjust(right = 0.7)
+    cbar_ax = fig.add_axes([0.75, 0.2, 0.05, 0.6])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, 
                       orientation = 'vertical')
     cb.set_ticks(np.linspace(vmin, vmax, 11))
@@ -2686,7 +2690,8 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
     outline_region(ax3, m, pollutants_constants.NORTHEAST_STATES)    
-    cbar_ax = fig.add_axes([0.85, 0.2, 0.05, 0.6])
+    plt.subplots_adjust(right = 0.7)
+    cbar_ax = fig.add_axes([0.75, 0.2, 0.05, 0.6])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, 
                       orientation = 'vertical')
     cb.set_ticks(np.linspace(vmin, vmax, 11))
@@ -2695,6 +2700,34 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'map_allgmio3_percentcontribution_cold.eps', dpi = 300)            
     plt.show()
+    # find Northeast averages of quantities
+    m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
+                urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
+                area_thresh = 1000)
+    neus_states = pollutants_constants.NORTHEAST_STATES
+    neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
+    # Northeast-averaged O3 on median days from + Emissions simulation
+    neus_emiss_med = np.nanmean(np.nanmedian(emiss_o3 * 1e9 * neus))  
+    # hot days       
+    neus_dat_p90 = np.nanmean(dat_o3_p90 * neus)
+    neus_mr2_p90 = np.nanmean(mr2_o3_p90 * neus)
+    neus_emiss_p90 = np.nanmean(emiss_o3_p90 * neus)    
+    print('NEUS Transport Hot /+ Emissions Avg difference = %.3f ppbv' 
+          %(neus_dat_p90 - neus_emiss_med))  
+    print('NEUS + Chemistry Hot /+ Emissions Avg difference = %.3f ppbv' 
+          %(neus_mr2_p90 - neus_emiss_med))
+    print('NEUS + Emission Hot /+ Emissions Avg difference = %.3f ppbv' 
+          %(neus_emiss_p90 - neus_emiss_med))        
+    # cool days
+    neus_dat_p10 = np.nanmean(dat_o3_p10 * neus)
+    neus_mr2_p10 = np.nanmean(mr2_o3_p10 * neus)
+    neus_emiss_p10 = np.nanmean(emiss_o3_p10 * neus)    
+    print('NEUS Transport Cold /+ Emissions Avg difference = %.3f ppbv' 
+          %(neus_dat_p10 - neus_emiss_med))  
+    print('NEUS + Chemistry Cold /+ Emissions Avg difference = %.3f ppbv' 
+          %(neus_mr2_p10 - neus_emiss_med))
+    print('NEUS + Emission Cold /+ Emissions Avg difference = %.3f ppbv' 
+          %(neus_emiss_p10 - neus_emiss_med))    
     return 
 # # # # # # # # # # # # #    
 #import numpy as np
@@ -2811,11 +2844,6 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
 ## 2-meter temperatures and O3 from the + Emissions simulation
 #scatter_dmr2o3dt2m_ddato3dt2m_rt2memisso3_conus(mr2_sens, dat_sens, emiss_r, 
 #    gmi_lat, gmi_lon)
-# plot percentage contribution from simulations on hot and cold days
-map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, mr2_t2m_overpass, 
-    gmi_lat, gmi_lon)
-
-
-
-
-
+## plot percentage contribution from simulations on hot and cold days
+#map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, mr2_t2m_overpass, 
+#    gmi_lat, gmi_lon)
