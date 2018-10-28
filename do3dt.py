@@ -35,7 +35,14 @@ REVISION HISTORY
                 'scatterhist_castneto3allgmio3' added
     24102018 -- function 'map_allgmio3_percentcontribution' added
     25102018 -- edited 'map_allgmio3_percentcontribution' to calculated 
-                Northeast-averaged values for differences on hot/cold days
+                Northeast-averaged values for differences on hot/cold days  
+    27102018 -- printed regionally-averaged slopes in function 
+                'scatterhist_castneto3allgmio3' removed because they were 
+                showing the slope fit through regionally-averaged O3 and 
+                2-meter temperature whereas we're interested in the slope 
+                averaged over the region (not calculated with regionally-
+                averaged quantities)
+    28102018 -- function 'calculate_statistics_region' added
 """
 # # # # # # # # # # # # #
 # change font
@@ -2117,10 +2124,6 @@ def scatterhist_castneto3allgmio3(transport, chemistry, emissions, obs, t2m,
     transport_m = np.poly1d(np.polyfit(t2m, transport, 1))[1]
     chemistry_m = np.poly1d(np.polyfit(t2m, chemistry, 1))[1]
     emissions_m = np.poly1d(np.polyfit(t2m, emissions, 1))[1]
-    print('m_obs = ', '%.3f' %obs_m)
-    print('m_transport = ', '%.3f' %transport_m)
-    print('m_chemistry = ', '%.3f' %chemistry_m)
-    print('m_emissions = ', '%.3f' %emissions_m)
     axScatter.plot(np.unique(t2m), np.poly1d(np.polyfit(t2m, obs, 
         1))(np.unique(t2m)), zorder = 30, color = 'darkgrey', lw = 2.5)
     axScatter.plot(np.unique(t2m), np.poly1d(np.polyfit(t2m, transport, 
@@ -2730,6 +2733,125 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
           %(neus_emiss_p10 - neus_emiss_med))    
     return 
 # # # # # # # # # # # # #    
+def calculate_statistics_region(region, o3_castnet, region_castnet, 
+    do3dt2m_castnet, sites_castnet, dat_o3, mr2_o3, emiss_o3, dat_sens, 
+    mr2_sens, emiss_sens): 
+    """"function calculates mean O3 concentrations in region, standard 
+    deviation of O3 concentrations in region, and the O3-climate penalty for 
+    GMI simulations and CASTNet observations. Note that this function 
+    calculates regional averages by spatially-averaging the "final" field. 
+    For instance, for the the regionally-averaged standard deviation, the 
+    standard deviation is first found at every grid cell or CASTNet site in 
+    a region and thereafter averaged (alternatively, it could be calculated 
+    by first finding regionally-averaged O3 and then taking the standard 
+    deviation of the regionally-averaged values. 
+    
+    Parameters
+    ----------  
+    region : numpy.ndarray
+        CTM grid where grid cells within region have a value of 1 and grid 
+        cells not in region have a value of NaN, [lat, lon]    
+    o3_castnet : list
+        Daily 1300 hours local time O3 at each CASTNet site, units of ppbv, 
+        [no. sites,]
+    region_castnet : list
+        Site IDs for CASTNet sites in region, [no. sites in region,]    
+    do3dt2m_castnet : list
+        The O3-T2m sensitivity (slope of linear regression) at each CASTNet
+        site, [no. CASTNet stations,]        
+    sites_castnet : list
+        CASTNet site names, [no. sites,]
+    dat_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        HindcastMR2-DiurnalAvgT, units of volume mixing ratio, [time, lat, lon] 
+    mr2_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        HindcastMR2, units of volume mixing ratio, [time, lat, lon] 
+    emiss_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        GHKerr-DailyEmiss, units of volume mixing ratio, [time, lat, lon] 
+    dat_sens : numpy.ndarray    
+        The O3-climate penalty at each GMI grid cell from the Transport
+        simulation, units of ppbv K^-1, [lat, lon]      
+    mr2_sens : numpy.ndarray    
+        The O3-climate penalty at each GMI grid cell from the + Chemistry
+        simulation, units of ppbv K^-1, [lat, lon]         
+    emiss_sens : numpy.ndarray    
+        The O3-climate penalty at each GMI grid cell from the + Emissions
+        simulation, units of ppbv K^-1, [lat, lon]            
+        
+    Returns
+    ----------     
+    None
+    """
+    import numpy as np
+    # find CASTNet sites in region 
+    where_region = np.in1d(sites_castnet, region_castnet)
+    where_region = np.where(where_region == True)[0]
+    # standard deviations of regionally-averaged O3 
+    # from Transport simulation 
+    print('Mean regionally-averaged O3 from Transport ' + 
+          'simulation = %.4f ppbv' %(np.nanmean(dat_o3 * 1e9 * region)))
+    print('Standard deviation of regionally-averaged O3 from Transport ' + 
+          'simulation = %.4f ppbv' 
+          %(np.nanmean(np.nanstd(dat_o3 * 1e9, axis = 0) * region)))
+    print('Mean O3-climate penalty from Transport simulation = '
+          '%.4f ppbv/K' %np.nanmean(dat_sens * region))
+    # from + Chemistry simulation
+    print('Mean regionally-averaged O3 from + Chemistry ' + 
+          'simulation = %.4f ppbv' %(np.nanmean(mr2_o3 * 1e9 * region)))
+    print('Standard deviation of regionally-averaged O3 from + Chemistry ' + 
+          'simulation = %.4f ppbv' 
+          %(np.nanmean(np.nanstd(mr2_o3 * 1e9, axis = 0) * region)))
+    print('Mean O3-climate penalty from + Chemistry simulation = '
+          '%.4f ppbv/K' %np.nanmean(mr2_sens * region))
+    # from + Emissions simulation
+    print('Mean regionally-averaged O3 from + Emissions ' + 
+          'simulation = %.4f ppbv' %(np.nanmean(emiss_o3 * 1e9 * region)))
+    print('Standard deviation of regionally-averaged O3 from + Emissions ' + 
+          'simulation = %.4f ppbv' 
+          %(np.nanmean(np.nanstd(emiss_o3 * 1e9, axis = 0) * region)))
+    print('Mean O3-climate penalty from + Emissions simulation = '
+          '%.4f ppbv/K' %np.nanmean(emiss_sens * region))
+    # from CASTNet 
+    print('Mean regionally-averaged O3 from CASTNet = %.4f ppbv' 
+          %(np.nanmean(np.array(o3_castnet)[where_region])))
+    print('Standard deviation of regionally-averaged O3 from CASTNet ='
+          ' %.4f ppbv' 
+          %np.nanmean(np.nanstd(np.array(o3_castnet)[where_region], axis = 1)))
+    print('Mean O3-climate penalty from CASTNet = %.4f ppbv/K' 
+          %np.nanmean(np.array(do3dt2m_castnet)[where_region]))
+    
+        
+    
+    # find CASTNet O3 and 2-meter temperatures in region to find enhancement on 
+    # hot/cold days
+    o3_in = np.array(o3_castnet)[where_region]
+    t2m_in = np.array(t_castnet)[where_region]
+    # to fill with the difference in O3 on hot versus median (and cold versus 
+    # median) days for each site in region
+    delta_castnet_cold, delta_castnet_hot = [], []
+    # find O3, 2-meter temperatures at each site
+    for o3_as, t2m_as in zip(o3_in, t2m_in):
+        # identify days with temperature extremes 
+        p90 = np.percentile(t2m_as, 90, axis = 0)
+        p10 = np.percentile(t2m_as, 10, axis = 0)    
+        where_p90 = np.where(t2m_as > p90)[0]
+        where_p10 = np.where(t2m_as < p10)[0]
+        # find O3 on days with temperature extremes 
+        o3_p90 = o3_as[where_p90]
+        o3_p10 = o3_as[where_p10]
+        # median O3
+        o3_med = np.nanmedian(o3_as)
+        # difference on hot/cold days
+        delta_castnet_hot.append(np.nanmean(o3_p90) - o3_med)
+        delta_castnet_cold.append(np.nanmean(o3_p10) - o3_med)
+    print('CASTNet O3 difference on hot - median days = %.4f ppbv'
+          %(np.mean(delta_castnet_hot)))
+    print('CASTNet O3 difference on cold - median days = %.4f ppbv'
+          %(np.mean(delta_castnet_cold)))        
+    return 
+# # # # # # # # # # # # #    
 #import numpy as np
 #import pandas as pd
 #import matplotlib.pyplot as plt
@@ -2801,7 +2923,7 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
 ## # # # load AQS MDA8 O3
 #sc = list(pollutants_constants.EPA_DICT.values()    
 #ozone_mean_mda8, ozone_nomean_mda8, ozone_mda8 = find_conus_aqsmda8(sc)
-# correlation coefficients, O3-T2m sensitivity at AQS sites
+## correlation coefficients, O3-T2m sensitivity at AQS sites
 #r, do3dt2m = aqs_mda8_r_do3dt2m(ozone_nomean_mda8, merra_lat, merra_lon)
 # # # # # # # # # # # # #
 # visualizations
@@ -2847,3 +2969,17 @@ def map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, t2m_overpass,
 ## plot percentage contribution from simulations on hot and cold days
 #map_allgmio3_percentcontribution(dat_o3, mr2_o3, emiss_o3, mr2_t2m_overpass, 
 #    gmi_lat, gmi_lon)
+
+
+
+## regionally-averaged statistics
+#calculate_statistics_region(neus, o3_castnet, neus_castnet, 
+#    do3dt2m_castnet, sites_castnet, dat_o3, mr2_o3, emiss_o3, dat_sens, 
+#    mr2_sens, emiss_sens)    
+
+
+
+
+
+
+    
