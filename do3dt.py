@@ -3757,132 +3757,6 @@ def map_simulationschematic(gmi_lat, gmi_lon):
                 dpi = 300)
     return
 # # # # # # # # # # # # #    
-def boxplot_cemsnox_castneto3_neus(neus_castnet):
-    """plots boxplots of regionally-summed daily NOx emissions from CEMS in 
-    the Northeastern United States for JJA 2000 - 2013 and boxplots of 
-    regionally-averaged daily O3 from 1300-1400 hours (local time) for the 
-    same period and region. 
-    
-    Parameters
-    ----------
-    neus_castnet : list
-        Site IDs for CASTNet sites in Northeastern U.S., [no. sites in region,]
-        
-    Returns
-    ----------
-    None
-    """
-    import numpy as np
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import sys
-    sys.path.append('/Users/ghkerr/phd/emissions/')
-    import AQSCEMSobs      
-    sampling_months = [6, 7, 8]
-    years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 
-             2011, 2012, 2013]
-    states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 
-                 'RI', 'VA', 'VT', 'WV']
-    afternoon_times = [13, 14]
-    # extract CASTNet observations from 2000-2012
-    castnet = find_conus_castnet(years)
-    castnet['DATE_TIME'] = pd.to_datetime(castnet['DATE_TIME'])
-    # load CEMS NOx emissions in NEUS
-    nox_state, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
-            '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
-    nox = nox_state['%d-0%d-01'%(years[0], sampling_months[0]):
-                    '%d-0%d-31'%(years[-1], sampling_months[-1])].values
-    # define date range
-    date_idx = []
-    for year in np.arange(years[0], years[-1]+1, 1):
-        date_idx.append(pd.date_range('06-01-%d' %year, '08-31-%d' %year))
-    # aggregate over years
-    date_idx = np.hstack(date_idx)
-    # lists to be filled with data from CASTNet sites
-    lat_all, lon_all, o3_all, sites_all = [], [], [], []
-    for siteid in np.unique(castnet['SITE_ID'].values):
-        castnet_atsite = castnet.loc[castnet['SITE_ID'] == siteid]
-        # only proceed if there are observations at site 
-        if castnet_atsite['OZONE'].isnull().all() != True:
-            lat_atsite = np.nanmean(castnet_atsite['Latitude'].values)
-            lon_atsite = np.nanmean(castnet_atsite['Longitude'].values)
-            # find CASTNet observations in afternoon 
-            castnet_atsite = castnet_atsite.loc[
-                    castnet_atsite['DATE_TIME'].dt.hour.isin(afternoon_times)]
-            # sort by time
-            castnet_atsite = castnet_atsite.sort_values(by = 'DATE_TIME')    
-            # find daily average
-            castnet_atsite = castnet_atsite.groupby(castnet_atsite['DATE_TIME'].dt.date).mean()
-            # add missing values             
-            if castnet_atsite.shape[0] != 276:
-                castnet_atsite = castnet_atsite.reindex(date_idx, 
-                    fill_value = np.nan)
-            # add daily values at each sites to lists
-            o3_all.append(castnet_atsite['OZONE'].values)
-            sites_all.append(siteid)
-            lat_all.append(lat_atsite)
-            lon_all.append(lon_atsite)
-    # find sites in Northeast
-    where_neus = np.in1d(sites_all, neus_castnet)
-    where_neus = np.where(where_neus == True)[0]
-    # O3 at CASTNet sites in region
-    o3_neus = np.array(o3_all)[where_neus]
-    # find daily regional average
-    o3_neus = np.nanmean(o3_neus, axis = 0)
-    # reshape such that first dimension is the year and the second dimension
-    # is the number of days in JJA (92)
-    o3_neus = np.reshape(o3_neus, (len(years), 92))
-    nox = np.reshape(nox, (len(years), 92))
-    # initialize figure, axes
-    fig = plt.figure(figsize = (11, 4))
-    ax1 = plt.subplot2grid((1, 2), (0, 0))
-    ax2 = plt.subplot2grid((1, 2), (0, 1))
-    for i in np.arange(nox.shape[0]):  
-        nox_box = ax1.boxplot(nox[i], positions = [i], patch_artist = True, 
-                              whis = 1.5, vert = True, sym = '', widths = 0.6)
-        ozone_box = ax2.boxplot(o3_neus[i], positions = [i], patch_artist = True, 
-                                whis = 1.5, vert = True, sym = '', widths = 0.6)
-        # for NOx boxplots
-        plt.setp(nox_box['boxes'], color = '#377eb8', facecolor = '#377eb8')
-        plt.setp(nox_box['whiskers'], linestyle = '-', color = '#377eb8', 
-                 linewidth = 2)
-        plt.setp(nox_box['medians'], color = 'w')           
-        plt.setp(nox_box['caps'], color = 'k', alpha = 0.0)  
-        # for O3 boxplots
-        plt.setp(ozone_box['boxes'], color = 'darkgrey', facecolor = 'darkgrey')
-        plt.setp(ozone_box['whiskers'], linestyle = '-', color = 'darkgrey',
-                 linewidth = 2)                 
-        plt.setp(ozone_box['medians'], color = 'w')           
-        plt.setp(ozone_box['caps'], color = 'k', alpha = 0.0)          
-    # titles
-    ax1.set_title('(a)', fontsize = 16, x = 0.1, y = 1.03)
-    ax2.set_title('(b)', fontsize = 16, x = 0.1, y = 1.03)
-    # x-axis
-    ax1.set_xticks(np.arange(-1,  14.5))
-    ax2.set_xticks(np.arange(-1,  14.5))
-    ax1.set_xticklabels(['', '2000', '', '2002', '', '2004', '', '2006', '', 
-                         '2008', '', '2010', '', '2012', ''], fontsize = 12)
-    ax2.set_xticklabels(['', '2000', '', '2002', '', '2004', '', '2006', '', 
-                         '2008', '', '2010', '', '2012', ''], fontsize = 12)
-    # y-axis    
-    ax1.set_ylabel('NO$_{x}$ [tons day$^{\mathregular{-1}}$]', fontsize = 16)
-    ax1.get_yaxis().set_label_coords(-0.18, 0.53)    
-    ax2.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16, 
-                   rotation = 270)
-    ax2.get_yaxis().set_label_coords(1.18, 0.53)
-    ax2.yaxis.set_label_position('right')
-    ax1.tick_params(right = True, left = True, top = False, 
-                    labelright = False, labelleft = True)
-    for t in ax1.get_yticklabels():
-        t.set_fontsize(12)    
-    ax2.tick_params(right = True, left = True, top = False, 
-                    labelright = True, labelleft = False)
-    for t in ax2.get_yticklabels():
-        t.set_fontsize(12) 
-    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'boxplot_cemsnox_castneto3_neus.eps', dpi = 300)
-    return
-# # # # # # # # # # # # #    
 def compare_regional_averaging(neus, t_castnet, o3_castnet, castnet_t2m_neus, 
     castnet_o3_neus, sites_castnet, neus_castnet, t2m_overpass, emiss_o3, 
     emiss_t2m_neus, emiss_o3_neus, emiss_sens, do3dt2m_castnet):
@@ -4439,6 +4313,193 @@ def scatter_inventorynonox_noxo3(t2m_overpass, mr2_no, mr2_no2, mr2_o3,
           np.polyfit((delta_emiss_nox - delta_mr2_nox), 
           (delta_emiss_o3 - delta_mr2_o3), 1)[0])
     return std_inventory_daily, np.hstack(std_o3_neus)
+# # # # # # # # # # # # #
+def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily, 
+    std_o3_neus):
+    """plots boxplots of regionally-summed daily NOx emissions from CEMS in 
+    the Northeastern United States for JJA 2000 - 2013 and boxplots of 
+    regionally-averaged daily O3 from 1300-1400 hours (local time) for the 
+    same period and region. The summertime mean emission inventory NO and O3
+    from the Std. simulation in Strode et al. (2015) for 2000-2010 is plotted.
+    
+    Parameters
+    ----------
+    neus_castnet : list
+        Site IDs for CASTNet sites in Northeastern U.S., [no. sites in region,]
+    std_inventory_daily : numpy.ndarray   
+        Daily Northeast-averaged NO emissions from Strode et al. [2015] 
+        emissions inventory Std simulation for the measuring period 2000 - 
+        2010, units of kg grid cell-1 s-1, [time,]
+    std_o3_neus : numpy.ndarray
+        Daily Northeast-averaged O3 from Strode et al. [2015] 
+        emissions inventory Std simulation for the measuring period 2000 - 
+        2010, units of ppbv, [time,]        
+        
+    Returns
+    ----------
+    None
+    """
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import sys
+    sys.path.append('/Users/ghkerr/phd/emissions/')
+    import AQSCEMSobs      
+    sampling_months = [6, 7, 8]
+    years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 
+             2011, 2012, 2013]
+    states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 
+                 'RI', 'VA', 'VT', 'WV']
+    afternoon_times = [13, 14]
+    # extract CASTNet observations from 2000-2012
+    castnet = find_conus_castnet(years)
+    castnet['DATE_TIME'] = pd.to_datetime(castnet['DATE_TIME'])
+    # load CEMS NOx emissions in NEUS
+    nox_state, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
+            '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
+    nox = nox_state['%d-0%d-01'%(years[0], sampling_months[0]):
+                    '%d-0%d-31'%(years[-1], sampling_months[-1])].values
+    # define date range
+    date_idx = []
+    for year in np.arange(years[0], years[-1]+1, 1):
+        date_idx.append(pd.date_range('06-01-%d' %year, '08-31-%d' %year))
+    # aggregate over years
+    date_idx = np.hstack(date_idx)
+    # lists to be filled with data from CASTNet sites
+    lat_all, lon_all, o3_all, sites_all = [], [], [], []
+    for siteid in np.unique(castnet['SITE_ID'].values):
+        castnet_atsite = castnet.loc[castnet['SITE_ID'] == siteid]
+        # only proceed if there are observations at site 
+        if castnet_atsite['OZONE'].isnull().all() != True:
+            lat_atsite = np.nanmean(castnet_atsite['Latitude'].values)
+            lon_atsite = np.nanmean(castnet_atsite['Longitude'].values)
+            # find CASTNet observations in afternoon 
+            castnet_atsite = castnet_atsite.loc[
+                    castnet_atsite['DATE_TIME'].dt.hour.isin(afternoon_times)]
+            # sort by time
+            castnet_atsite = castnet_atsite.sort_values(by = 'DATE_TIME')    
+            # find daily average
+            castnet_atsite = castnet_atsite.groupby(castnet_atsite['DATE_TIME'].dt.date).mean()
+            # add missing values             
+            if castnet_atsite.shape[0] != 276:
+                castnet_atsite = castnet_atsite.reindex(date_idx, 
+                    fill_value = np.nan)
+            # add daily values at each sites to lists
+            o3_all.append(castnet_atsite['OZONE'].values)
+            sites_all.append(siteid)
+            lat_all.append(lat_atsite)
+            lon_all.append(lon_atsite)
+    # reshape results from Strode et al. (2015) to a single value for each 
+    # summer
+    strode_inventory_sm = np.reshape(strode_inventory, (11, 92))
+    strode_inventory_sm = np.mean(strode_inventory_sm, axis = 1)
+    strode_o3_sm = np.reshape(strode_o3, (11, 92))
+    strode_o3_sm = np.mean(strode_o3_sm, axis = 1)
+    # find sites in Northeast
+    where_neus = np.in1d(sites_all, neus_castnet)
+    where_neus = np.where(where_neus == True)[0]
+    # O3 at CASTNet sites in region
+    o3_neus = np.array(o3_all)[where_neus]
+    # find daily regional average
+    o3_neus = np.nanmean(o3_neus, axis = 0)
+    # reshape such that first dimension is the year and the second dimension
+    # is the number of days in JJA (92)
+    o3_neus = np.reshape(o3_neus, (len(years), 92))
+    nox = np.reshape(nox, (len(years), 92))
+    # initialize figure, axes
+    fig = plt.figure(figsize = (11, 4))
+    ax1 = plt.subplot2grid((1, 2), (0, 0))
+    ax2 = plt.subplot2grid((1, 2), (0, 1))
+    for i in np.arange(nox.shape[0]):  
+        nox_box = ax1.boxplot(nox[i], positions = [i], patch_artist = True, 
+                              whis = 1.5, vert = True, sym = '', widths = 0.6)
+        ozone_box = ax2.boxplot(o3_neus[i], positions = [i], patch_artist = True, 
+                                whis = 1.5, vert = True, sym = '', widths = 0.6)
+        # for NOx boxplots
+        plt.setp(nox_box['boxes'], color = '#d95f02', facecolor = '#d95f02')
+        plt.setp(nox_box['whiskers'], linestyle = '-', color = '#d95f02', 
+                 linewidth = 2)
+        plt.setp(nox_box['medians'], color = 'w')           
+        plt.setp(nox_box['caps'], color = 'k', alpha = 0.0)  
+        # for O3 boxplots
+        plt.setp(ozone_box['boxes'], color = '#d95f02', facecolor = '#d95f02')
+        plt.setp(ozone_box['whiskers'], linestyle = '-', color = '#d95f02',
+                 linewidth = 2)                 
+        plt.setp(ozone_box['medians'], color = 'w')           
+        plt.setp(ozone_box['caps'], color = 'k', alpha = 0.0)          
+    # titles
+    ax1.set_title('(a)', fontsize = 16, x = 0.1, y = 1.03)
+    ax2.set_title('(b)', fontsize = 16, x = 0.1, y = 1.03)
+    # x-axis
+    ax1.set_xticks(np.arange(-1, 14.5))
+    ax2.set_xticks(np.arange(-1, 14.5))
+    ax1.set_xticklabels(['', '2000', '', '2002', '', '2004', '', '2006', '', 
+                         '2008', '', '2010', '', '2012', ''], fontsize = 12)
+    ax2.set_xticklabels(['', '2000', '', '2002', '', '2004', '', '2006', '', 
+                         '2008', '', '2010', '', '2012', ''], fontsize = 12)
+    # y-axis    
+    ax1.set_ylabel('NO$_{x}$ [tons day$^{\mathregular{-1}}$]', fontsize=16, 
+                   color='#d95f02')
+    ax1.get_yaxis().set_label_coords(-0.15, 0.53)    
+    ax2.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize=16, color='#d95f02')
+    ax2.get_yaxis().set_label_coords(-0.11, 0.50)               
+    ax1.tick_params(right = True, left = True, top = True, 
+                    labelright = False, labelleft = True)
+    for t in ax1.get_yticklabels():
+        t.set_fontsize(12)    
+        t.set_color('#d95f02')
+    ax2.tick_params(right = True, left = True, top = True)
+    for t in ax2.get_yticklabels():
+        t.set_fontsize(12) 
+        t.set_color('#d95f02')       
+    # add results from Strode et al. (2015) for NO emission inventory
+    ax1b = ax1.twinx()
+    ax1b.plot(np.arange(0, 11, 1), strode_inventory_sm, 'o-', lw=2.,  
+              markersize=6, color='#666666')
+    for t in ax1b.get_yticklabels():
+        t.set_fontsize(12) 
+        t.set_color('#666666')          
+    ax1b.set_ylim([2.5, 5.0])
+    ax1b.set_ylabel('NO [kg s$^{\mathregular{-1}}$ grid cell$'+
+                    '^{\mathregular{-1}}$]', color = '#666666', fontsize = 16, 
+                    rotation = 270)
+    ax1b.get_yaxis().set_label_coords(1.21, 0.50)
+    # add results from Strode et al. (2015) for O3
+    ax2b = ax2.twinx()
+    ax2b.plot(np.arange(0, 11, 1), strode_o3_sm, 'o-', lw=2., markersize=6, 
+              color='#666666')
+    ax2b.set_ylim([45, 65])
+    ax2b.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize=16, color='#666666',
+                    rotation=270)
+    for t in ax2b.get_yticklabels():
+        t.set_fontsize(12) 
+        t.set_color('#666666')    
+    ax2b.get_yaxis().set_label_coords(1.24, 0.53)
+    plt.subplots_adjust(bottom=0.3, wspace=0.45)
+    # create fake boxplot to represent this study's data
+    fdat = np.random.normal(loc=0., scale=0.5, size=500)
+    # add axis for legend and customize
+    axleg = fig.add_axes([0.33, 0.12, 0.3, 0.1])
+    # remove spines
+    for side in ['top', 'bottom', 'right', 'left']:
+        axleg.spines[side].set_visible(False)
+    leg = axleg.boxplot([fdat], positions = [0], patch_artist=True, whis=1.5,
+                        vert=False, sym='', widths=[0.45])
+    axleg.plot([3], [0], 'o', lw=2., markersize=6, color='#666666')
+    axleg.plot([2.5, 3.5], [0, 0], '-', lw=2., markersize=6, color='#666666')
+    axleg.set_xticks([0, 3])
+    axleg.set_xticklabels(['this study', 'Strode et al. (2015)'], fontsize = 16)
+    axleg.tick_params(axis='x', colors='w', labelcolor='k')
+    axleg.set_yticks([])
+    axleg.set_yticklabels([])
+    plt.setp(leg['boxes'], color = '#d95f02', facecolor = '#d95f02')
+    plt.setp(leg['whiskers'], linestyle = '-', color = '#d95f02',
+             linewidth = 2)                 
+    plt.setp(leg['medians'], color = 'w')           
+    plt.setp(leg['caps'], color = 'k', alpha = 0.0)  
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'boxplot_cemsnox_castneto3_neus.eps', dpi = 300)
+    return
 # # # # # # # # # # # # #    
 #import numpy as np
 #import pandas as pd
@@ -4579,7 +4640,8 @@ def scatter_inventorynonox_noxo3(t2m_overpass, mr2_no, mr2_no2, mr2_o3,
 #timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, mr2_o3, dat_o3, gmi_lat, 
 #    gmi_lon)
 ## plot boxplots of CEMS NOx and CASTNet O3
-#boxplot_cemsnox_castneto3_neus(neus_castnet)
+#boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily, 
+#    std_o3_neus)
 ## compare different methods of regional averaging
 #compare_regional_averaging(neus, t_castnet, o3_castnet, castnet_t2m_neus, 
 #    castnet_o3_neus, sites_castnet, neus_castnet, emiss_t2m_overpass, 
