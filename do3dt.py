@@ -63,24 +63,40 @@ REVISION HISTORY
                 and one with low O3-T correlation
     13112018 -- functions 'map_simulationschematic' and 
                 'boxplot_cemsnox_castneto3_neus' added
+    26112018 -- maximum and minimum biases and which CASTNet they occur at 
+                recorded in function 'map_meanmr2o3meancastneto3_conus' 
+    28112018 -- function 'scatter_inventorynonox_noxo3' added
 """
 # # # # # # # # # # # # #
 # change font
-import matplotlib 
-prop = matplotlib.font_manager.FontProperties(fname = 
+import matplotlib as mpl
+import scipy as sp
+import matplotlib.pyplot as plt    
+prop = mpl.font_manager.FontProperties(fname = 
     '/Users/ghkerr/Library/Fonts/cmunbmr.ttf')
-matplotlib.rcParams['font.family'] = prop.get_name()
-prop = matplotlib.font_manager.FontProperties(fname = 
+mpl.rcParams['font.family'] = prop.get_name()
+prop = mpl.font_manager.FontProperties(fname = 
     '/Users/ghkerr/Library/Fonts/cmunbbx.ttf')
-matplotlib.rcParams['mathtext.bf'] = prop.get_name()
+mpl.rcParams['mathtext.bf'] = prop.get_name()
 # for unicode minus/negative sign implementation
-matplotlib.rcParams['axes.unicode_minus'] = False
+mpl.rcParams['axes.unicode_minus'] = False
 # change width and thickness of ticks/spines
-matplotlib.rcParams['axes.linewidth'] = 1.5
-matplotlib.rcParams['xtick.major.width'] = 1.5
-matplotlib.rcParams['xtick.minor.width'] = 1.5
-matplotlib.rcParams['ytick.major.width'] = 1.5
-matplotlib.rcParams['ytick.minor.width'] = 1.5    
+mpl.rcParams['axes.linewidth'] = 1.5
+mpl.rcParams['xtick.major.width'] = 1.5
+mpl.rcParams['xtick.minor.width'] = 1.5
+mpl.rcParams['ytick.major.width'] = 1.5
+mpl.rcParams['ytick.minor.width'] = 1.5    
+# # # # # # # # # # # # #
+class MidpointNormalize(mpl.colors.Normalize):
+    def __init__(self, vmin, vmax, midpoint=0, clip=False):
+        self.midpoint = midpoint
+        mpl.colors.Normalize.__init__(self, vmin, vmax, clip)
+    def __call__(self, value, clip=None):
+        normalized_min = max(0, 1 / 2 * (1 - abs((self.midpoint - self.vmin) / (self.midpoint - self.vmax))))
+        normalized_max = min(1, 1 / 2 * (1 + abs((self.vmax - self.midpoint) / (self.midpoint - self.vmin))))
+        normalized_mid = 0.5
+        x, y = [self.vmin, self.midpoint, self.vmax], [normalized_min, normalized_mid, normalized_max]
+        return sp.ma.masked_array(sp.interp(value, x, y))
 # # # # # # # # # # # # #
 def fill_oceans(ax, m):
     """fill oceans with solid color on Basemap; using maskoceans in 
@@ -270,6 +286,49 @@ def get_merged_csv(flist, **kwargs):
     import pandas as pd
     return pd.concat([pd.read_csv(f, **kwargs) for f in flist], 
                       ignore_index = True)
+# # # # # # # # # # # # #    
+def o3_givent2mpercentile(o3, t2m_overpass, ptile, gtlt):
+    """for a given tempeature percentile function identifies the days which 
+    exceed or are less than that threshold and the average O3 on those days 
+    in each CTM grid cell. 
+
+    Parameters
+    ----------  
+    o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, units of volume mixing 
+        ratio, [time, lat, lon]
+    t2m_overpass : numpy.ndarray
+        MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
+        resolution of the CTM, units of K, [time, lat, lon]
+    ptile : int
+        The percentile of interest
+    gtlt : string
+        Either 'less' or 'greater.' If 'less' ('greater') function finds days 
+        with 2-meter temperatures less than (greater than) percentile threshold 
+        
+    Returns
+    ----------     
+    o3_p : numpy.ndarray
+        The mean O3 concentrations in each GMI CTM grid cell averaged over days
+        which are less than/greater than 2-meter temperature thresholds, 
+        units of ppbv, [lat, lon]
+    """
+    import numpy as np
+    o3 = o3 * 1e9
+    # find 90th percentile at each grid cell
+    p = np.percentile(t2m_overpass, ptile, axis = 0)
+    o3_p = np.empty(shape = (p.shape))
+    for i in np.arange(0, len(gmi_lat), 1):
+        for j in np.arange(0, len(gmi_lon), 1):
+            # find days which exceed 90th percentile at each grid cell 
+            if gtlt == 'less':
+                pdays = np.where(t2m_overpass[:, i, j] < p[i, j])[0]
+            if gtlt == 'greater':
+                pdays = np.where(t2m_overpass[:, i, j] > p[i, j])[0]            
+            # find mean O3 on hot days
+            o3_pdays = o3[pdays, i, j]
+            o3_p[i, j] = o3_pdays.mean()
+    return o3_p
 # # # # # # # # # # # # #    
 def find_conus_aqsmda8(region_sc):
     """ function opens yearly AQS observations of MDA8 O3 for the measuring 
@@ -906,13 +965,13 @@ def calculate_castnet_r_do3dt2m_regionmean(t_castnet, o3_castnet,
     o3_p10 = np.mean(o3_region[p10])
     # print out the following values 
     print('For CASTNet...')
-    print('Mean regionally-averaged O3 = %.4f ppbv' %(np.nanmean(o3_region)))
-    print('Standard deviation of regionally-averaged O3 = %.4f ppbv' 
+    print('Mean = %.4f ppbv' %(np.nanmean(o3_region)))
+    print('Standard deviation = %.4f ppbv' 
           %(np.nanstd(o3_region)))
-    print('P10 of regionally-averaged O3 = %.4f ppbv' 
-          %(np.percentile(o3_region, 10)))  
-    print('P90 of regionally-averaged O3 = %.4f ppbv' 
-          %(np.percentile(o3_region, 90)))
+    print('P10 - median = %.4f ppbv' 
+          %(np.percentile(o3_region, 10) - o3_med))  
+    print('P90 - median = %.4f ppbv' 
+          %(np.percentile(o3_region, 90) - o3_med))
     print('O3-climate penalty with OLS = %.4f ppbv/K' %do3dt2m)
     print('O3-climate penalty with total least squares = %.4f ppbv/K' %beta[0])        
     print('O3 difference on hot - median days = %.4f ppbv' %(o3_p90 - o3_med))
@@ -980,24 +1039,26 @@ def calculate_gmi_r_do3dt2m_regionmean(t2m_overpass, o3, region, case):
     output = odr.run()            
     beta = output.beta
     # identify days with temperature extremes 
-    p90 = np.percentile(t2m_alldays, 90, axis = 0)
-    p90 = np.where(t2m_alldays > p90)[0]
-    p10 = np.percentile(t2m_alldays, 10, axis = 0)    
-    p10 = np.where(t2m_alldays < p10)[0]
-    o3_med = np.nanmedian(o3_alldays)    
+    t_p90 = np.percentile(t2m_alldays, 90, axis = 0)
+    t_p90 = np.where(t2m_alldays > t_p90)[0]
+    t_p10 = np.percentile(t2m_alldays, 10, axis = 0)    
+    t_p10 = np.where(t2m_alldays < t_p10)[0]
+    o3_med = np.nanmedian(o3_alldays)
     # find O3 on days with temperature extremes 
-    o3_p90 = np.mean(np.array(o3_alldays)[p90])
-    o3_p10 = np.mean(np.array(o3_alldays)[p10])
+    o3_p90 = np.mean(np.array(o3_alldays)[t_p90])
+    o3_p10 = np.mean(np.array(o3_alldays)[t_p10])
     # print out the following values 
     print('For %s simulation...' %case)
-    print('Mean regionally-averaged O3 = %.4f ppbv' 
+    print('Mean = %.4f ppbv' 
           %(np.nanmean(o3 * region)))
-    print('Standard deviation of regionally-averaged O3 = %.4f ppbv' 
+    print('Standard deviation = %.4f ppbv' 
           %(np.std(np.nanmean(o3 * region, axis = tuple((1, 2))))))
-    print('P10 of regionally-averaged O3 = %.4f ppbv' 
-          %(np.percentile(np.nanmean((o3 * region), axis = tuple((1, 2))), 10)))    
-    print('P90 of regionally-averaged O3 = %.4f ppbv' 
-          %(np.percentile(np.nanmean((o3 * region), axis = tuple((1, 2))), 90)))
+    print('P10 - median = %.4f ppbv' 
+          %(np.percentile(np.nanmean((o3 * region), axis = tuple((1, 2))), 10) - 
+          o3_med))
+    print('P90 - median = %.4f ppbv' 
+          %(np.percentile(np.nanmean((o3 * region), axis = tuple((1, 2))), 90) - 
+          o3_med))
     print('O3-climate penalty with OLS = %.4f ppbv/K' %do3dt2m)
     print('O3-climate penalty with total least squares = %.4f ppbv/K' %beta[0])    
     print('O3 difference on hot - median days = %.4f ppbv' %(o3_p90 - o3_med))
@@ -1200,7 +1261,7 @@ def map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, do3dt2m, r, lat_castnet,
         resolution = 'h', area_thresh = 1000)
     x, y = np.meshgrid(gmi_lon, gmi_lat)
     x, y = m(x, y)    
-    fig = plt.figure(figsize = (11, 5))
+    fig = plt.figure(figsize = (10, 5))
     # O3-T2m correlation map
     m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
                 llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
@@ -1225,8 +1286,7 @@ def map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, do3dt2m, r, lat_castnet,
     cax = fig.add_axes([0.125, 0.25, 0.352, 0.05])
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
-    cb.set_label(label = r'$r$(O$_{\mathregular{3}}$' + 
-                 ', T)', size = 16, y = 0.25)    
+    cb.set_label(label = r'$r$(T, O$_{\mathregular{3}}$)', size = 16, y = 0.25)    
     cb.ax.tick_params(labelsize = 12)
     cb.set_ticks(np.linspace(vmin, vmax, 6))    
     # O3-T2m sensitivity map         
@@ -1836,11 +1896,13 @@ def map_rmr2o3gridboxheight_conus(o3, gridboxheight, gmi_lat, gmi_lon):
     return 
 # # # # # # # # # # # # #    
 def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
-    lat_castnet, lon_castnet):
+    lat_castnet, lon_castnet, region_castnet, sites_castnet):
     """function plots mean O3 fields from + Chemistry/MR2 simulation and 
     mean CASTNet observations for the measuring period 2008-2010. To illustrate
     the model resolution, parallels and meridians at the CTM's resolution 
-    are also plotted. 
+    are also plotted. A second figure showing the bias at each CASTNet site 
+    is plotted and the mean CASTNet-GMI bias and the bias in a specified region
+    are output. Here bias = GMI O3 - CASTNet O3.
     
     Parameters
     ----------  
@@ -1858,6 +1920,11 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
         Latitudes of CASTNet sites, units of degrees north, [no. sites,]
     lon_castnet : list
         Longitudes of CASTNet sites, units of degrees west, [no. sites,]
+    region_castnet : list
+        Site IDs for CASTNet sites in region, [no. sites in region,]
+    sites_castnet : list
+        CASTNet site names, [no. sites,]        
+        
         
     Returns
     ----------     
@@ -1871,7 +1938,8 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     import sys
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
-    # show mean JJA O3 as simulated by + Chemistry/HindcastMR2 simulation
+    from geo_idx import geo_idx    
+    # # # # plot mean JJA O3 as simulated by + Emissions/HindcastMR2 simulation
     o3_mean = np.mean(o3, axis = 0)
     # from CASTNet
     o3_castnet_mean = np.nanmean(np.array(o3_castnet), axis = 1)
@@ -1912,12 +1980,62 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
     cb.set_ticks(np.linspace(vmin, vmax, 6))
-    cb.set_label(label = '<O$_{\mathregular{3, +\:Emissions\:|\:CASTNet}}$>', 
+    cb.set_label(label = 'O$_{\mathregular{3, GMI\:|\:CASTNet}}$', 
                  size = 16)
     cb.ax.tick_params(labelsize = 12)
     plt.subplots_adjust(bottom = 0.25)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'
                 'map_meanemisso3meancastneto3_conus.eps', dpi = 300)
+    # # # # plot bias at each CASTNet site
+    i = 0
+    bias_all = []
+    for ilat, ilon in zip(lat_castnet, lon_castnet): 
+        # loop through CASTNet sites and find nearest GMI grid cell
+        lat_gmi_near = geo_idx(ilat, gmi_lat)
+        lon_gmi_near = geo_idx(ilon, gmi_lon)
+        # O3 at GMI grid cell 
+        gmi_near_castnet = o3[:, lat_gmi_near, lon_gmi_near] * 1e9
+        castnet_atsite = o3_castnet[i]
+        bias_atsite = np.nanmean(gmi_near_castnet)  - np.nanmean(castnet_atsite)
+        bias_all.append(bias_atsite)
+        i = i + 1
+    print('Max bias of %.3f ppbv at %s' %(np.max(bias_all),
+          sites_castnet[np.where(np.array(bias_all) == np.max(bias_all))[0][0]]))
+    print('Min bias of %.3f ppbv at %s' %(np.min(bias_all),
+          sites_castnet[np.where(np.array(bias_all) == np.min(bias_all))[0][0]]))    
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 1), (0, 0))
+    vmin = -12; vmax = 12
+    cmap = plt.get_cmap('RdBu_r', 12)
+    clevs = np.linspace(vmin, vmax, 13, endpoint = True)
+    sc = m.scatter(x_castnet, y_castnet, c = np.array(bias_all), s = 20, 
+              cmap = cmap, vmin = vmin, vmax = vmax,
+              zorder = 30, linewidth = 1., edgecolor = 'k')    
+    fill_oceans(ax, m)    
+    # add countries, states, etc here so they sit atop the gridlines
+    m.drawstates(color = 'k', linewidth = 0.5, zorder = 10)
+    m.drawcountries(color = 'k', linewidth = 1.0, zorder = 10)
+    m.drawcoastlines(color = 'k', linewidth = 1.0, zorder = 10)  
+    outline_region(ax, m, pollutants_constants.NORTHEAST_STATES)    
+    cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
+    cb = fig.colorbar(sc, cax=cax, orientation='horizontal', extend = 'both')
+    cb.set_ticks(np.linspace(vmin, vmax, 7, endpoint = True))
+    cb.set_label(label = 'O$_{\mathregular{3, GMI}}$ - ' +
+                 'O$_{\mathregular{3, CASTNet}}$', 
+                 size = 16)
+    cb.ax.tick_params(labelsize = 12)
+    plt.subplots_adjust(bottom = 0.25)
+    print('mean nationwide bias (GMI - CASTNet) = %.4f ppbv' 
+          %np.mean(bias_all))
+    # find O3 bias in region 
+    where_region = np.in1d(sites_castnet, region_castnet)
+    where_region = np.where(where_region == True)[0]
+    bias_region = np.array(bias_all)[where_region]
+    print('mean bias in region (GMI - CASTNet) = %.4f ppbv'
+          %np.mean(bias_region))
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/'
+                'map_meanemisso3meancastneto3_bias_conus.eps', dpi = 300)
+    return
 # # # # # # # # # # # # #  
 def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region, 
     mr2_o3_region, mr2_t2m_region, region):
@@ -1995,30 +2113,29 @@ def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region,
              color = 'darkgrey', zorder = 1)
     # total least squares
     ax1.plot(castnet_t2m_region, fit_func(beta, castnet_t2m_region), 
-             '#a6cee3', lw = 2, label = 'Total Least Squares', 
-             zorder = 2)    
+             '#a6cee3', lw = 2, zorder = 2)    
     castnet_t2m_region = np.sort(castnet_t2m_region)
     # least squares
     ax1.plot(castnet_t2m_region, lsq_res_castnet[1] + lsq_res_castnet[0] * 
-             castnet_t2m_region, '-', color = '#1f78b4', lw = 2., 
-             label = 'Least Squares', zorder = 5)
+             castnet_t2m_region, '-', color = '#1f78b4', lw = 2., zorder = 5)
     # Theil-Sen
     ax1.plot(castnet_t2m_region, res_castnet[1] + res_castnet[0] * 
-             castnet_t2m_region, '--',  color = '#fb9a99', lw = 2., 
-             label = 'Theil-Sen', zorder = 4)
+             castnet_t2m_region, '--',  color = '#fb9a99', lw = 2., zorder = 6)
     # second-order
     ax1.plot(castnet_t2m_region, (castnet_t2m_region**2 * b[2]) + 
-             (castnet_t2m_region * b[1]) + b[0], '-', zorder = 2,
-             color = '#33a02c', lw = 2., label = 'Second order')    
+             (castnet_t2m_region * b[1]) + b[0], '-', zorder = 3,
+             color = '#33a02c', lw = 2.)
     xlim = ax1.get_xlim()
     ylim = ax1.get_ylim()
     for t in ax1.get_xticklabels():
         t.set_fontsize(12)
     for t in ax1.get_yticklabels():
         t.set_fontsize(12)    
-    ax1.set_title('CASTNet', fontsize = 16)
+    ax1.set_title('(a) CASTNet', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
     ax1.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    ax1.get_yaxis().set_label_coords(-0.15, 0.53)
     ax1.set_xlabel('T$_{}$ [K]', fontsize = 16, x = 1.1)
+    ax1.tick_params(right = True, left = True)   
     print('CASTNet Total Least Squares slope = %.3f ppbv K^-1' %beta[0])
     print('CASTNet Least Squares slope = %.3f ppbv K^-1' %lsq_res_castnet.slope)
     print('CASTNet Theil-Sen slope = %.3f ppbv K^-1' %res_castnet[0])
@@ -2029,20 +2146,19 @@ def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region,
              color = 'darkgrey', zorder = 1)
     # total least squares
     ax2.plot(mr2_t2m_region, fit_func(beta_gmi, mr2_t2m_region), 
-             '#a6cee3', lw = 2, label = 'Total Least Squares        ', 
+             '#a6cee3', lw = 2, label = 'TLS', 
              zorder = 2)    
     mr2_t2m_region = np.sort(mr2_t2m_region)
     # least squares
     ax2.plot(mr2_t2m_region, lsq_res_mr2[1] + lsq_res_mr2[0] * mr2_t2m_region, 
-             '-', color = '#1f78b4', lw = 2., label = 'Least Squares', 
-             zorder = 3)
+             '-', color = '#1f78b4', lw = 2., label = 'OLS', zorder = 5)
     # Theil-Sen
     ax2.plot(mr2_t2m_region, res_mr2[1] + res_mr2[0] * mr2_t2m_region, '--',  
-             color = '#fb9a99', lw = 2., label = 'Theil-Sen', zorder = 4)
+             color = '#fb9a99', lw = 2., label = 'Theil-Sen', zorder = 6)
     # second-order
     ax2.plot(mr2_t2m_region, (mr2_t2m_region**2 * so_res_mr2[0]) + 
              (mr2_t2m_region * so_res_mr2[1]) + so_res_mr2[2], '-', 
-             color = '#33a02c', lw = 2., label = 'Second order', zorder = 2)
+             color = '#33a02c', lw = 2., label = 'Second order', zorder = 3)
     # set x/y limits of second subplot to be consistent with first 
     ax2.set_xlim(xlim)
     ax2.set_ylim(ylim)
@@ -2050,10 +2166,10 @@ def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region,
         t.set_fontsize(12)
     ax2.set_yticklabels([''])
     ax2.yaxis.tick_right()
-    ax2.set_title('GMI', fontsize = 16)
-    plt.subplots_adjust(bottom = 0.32)
-    ax2.legend(loc = 3, ncol = 2, frameon = False, fontsize = 16, 
-               bbox_to_anchor = (-0.95, -0.6))
+    ax2.set_title('(b) GMI', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
+    plt.subplots_adjust(bottom = 0.28)
+    ax2.legend(loc = 3, ncol = 4, frameon = False, fontsize = 16, 
+               bbox_to_anchor = (-1.2, -0.48))
     print('GMI Total Least Squares slope = %.3f ppbv K^-1' %beta_gmi[0])    
     print('GMI Least Squares slope = %.3f ppbv K^-1' %lsq_res_mr2.slope)
     print('GMI Theil-Sen slope = %.3f ppbv K^-1' %res_mr2[0])
@@ -2116,13 +2232,15 @@ def timeseries_castneto3allgmio3(transport, chemistry, emissions, obs, region,
     ax.plot(transport[yearpos*92:(yearpos+1)*92], '-', 
             color = pollutants_constants.COLOR_TRANSPORT, label = 'Transport')
     ax.set_xlim([0, 91])
+    ax.set_ylim([30, 65])
     # axis labels
     ax.set_xticks([0, 14, 30, 44, 61, 75])
-    ax.set_xticklabels(['1 June', '', '1 July', '', '1 Aug %d' %year, ''], 
+    ax.set_xticklabels(['1 June %d' %year, '', '1 July', '', '1 Aug', ''], 
                        ha = 'center', fontsize = 12)
     ax.set_ylabel('Ozone [ppbv]', fontsize = 16)
     for tl in ax.get_yticklabels():
         tl.set_fontsize(12)
+    ax.tick_params(right = True, left = True, top = True)
     # reorder and place legend
     handles, labels = ax.get_legend_handles_labels()
     handles = [handles[0], handles[3], handles[2], handles[1]]
@@ -2254,7 +2372,7 @@ def scatterhist_castneto3allgmio3(transport, chemistry, emissions, obs, t2m,
     axScatter.plot(np.unique(t2m), np.poly1d(np.polyfit(t2m, emissions, 
         1))(np.unique(t2m)), zorder = 10, 
         color = pollutants_constants.COLOR_EMISSIONS, lw = 2.5)    
-    axScatter.set_xlabel('T$_{\mathregular{2\:m}}$ [K]', fontsize = 16)
+    axScatter.set_xlabel('T [K]', fontsize = 16)
     axScatter.set_ylabel('Ozone [ppbv]', fontsize = 16)
     for tl in axScatter.get_xticklabels():
         tl.set_fontsize(12)
@@ -2263,7 +2381,12 @@ def scatterhist_castneto3allgmio3(transport, chemistry, emissions, obs, t2m,
     axScatter.get_xaxis().set_label_coords(0.5, -0.07)        
     axScatter.get_yaxis().set_label_coords(-0.09, 0.5) 
     axScatter.text(0.04, 0.92, '(a)',
-                 transform = axScatter.transAxes, fontsize = 20)         
+                 transform = axScatter.transAxes, fontsize = 20)  
+    # manually set xticks and remove final tick to avoid clutter 
+    axScatter.set_xlim([290, 308])
+    axScatter.set_xticks([290, 292, 294, 296, 298, 300, 302, 304, 306, 308])
+    plt.setp(axScatter.get_xticklabels()[0], visible=False)
+    plt.setp(axScatter.get_xticklabels()[-1], visible=False)
     # histograms
     nbins = 18
     n, x, _  = axHistx.hist(t2m, bins = nbins, histtype = u'step', 
@@ -2275,7 +2398,7 @@ def scatterhist_castneto3allgmio3(transport, chemistry, emissions, obs, t2m,
     #             transform = axHistx.transAxes, fontsize = 20)   
     axHistx.text(0.04, 0.92, '(b)',
                  transform = axHistx.transAxes, fontsize = 20)    
-    axHistx.get_yaxis().set_label_coords(-0.09, 0.5)        
+    axHistx.get_yaxis().set_label_coords(-0.11, 0.5)        
     # observations
     n, x, _  = axHisty.hist(obs, bins = nbins, histtype = u'step', 
                             orientation = 'horizontal', density = True, lw = 0.)
@@ -2653,50 +2776,6 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     import sys
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
-    # # # #
-    def o3_givent2mpercentile(o3, t2m_overpass, ptile, gtlt):
-        """for a given tempeature percentile function identifies the days which 
-        exceed or are less than that threshold and the average O3 on those days 
-        in each CTM grid cell. 
-    
-        Parameters
-        ----------  
-        o3 : numpy.ndarray
-            GMI CTM surface-level ozone at overpass time, units of volume mixing 
-            ratio, [time, lat, lon]
-        t2m_overpass : numpy.ndarray
-            MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
-            resolution of the CTM, units of K, [time, lat, lon]
-        ptile : int
-            The percentile of interest
-        gtlt : string
-            Either 'less' or 'greater.' If 'less' ('greater') function finds days 
-            with 2-meter temperatures less than (greater than) percentile threshold 
-            
-        Returns
-        ----------     
-        o3_p : numpy.ndarray
-            The mean O3 concentrations in each GMI CTM grid cell averaged over days
-            which are less than/greater than 2-meter temperature thresholds, 
-            units of ppbv, [lat, lon]
-        """
-        import numpy as np
-        o3 = o3 * 1e9
-        # find 90th percentile at each grid cell
-        p = np.percentile(t2m_overpass, ptile, axis = 0)
-        o3_p = np.empty(shape = (p.shape))
-        for i in np.arange(0, len(gmi_lat), 1):
-            for j in np.arange(0, len(gmi_lon), 1):
-                # find days which exceed 90th percentile at each grid cell 
-                if gtlt == 'less':
-                    pdays = np.where(t2m_overpass[:, i, j] < p[i, j])[0]
-                if gtlt == 'greater':
-                    pdays = np.where(t2m_overpass[:, i, j] > p[i, j])[0]            
-                # find mean O3 on hot days
-                o3_pdays = o3[pdays, i, j]
-                o3_p[i, j] = o3_pdays.mean()
-        return o3_p
-    # # # #
     # find mean O3 in each simulation on days where 2-meter temperatures exceed
     # the 90th percentile
     dat_o3_p90 = o3_givent2mpercentile(dat_o3, t2m_overpass, 90, 'greater')
@@ -3197,23 +3276,23 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, year,
     castnet_o3_ty = castnet_o3[(yearpos*92):((yearpos+1)*92)]
     # initialize figure, axes
     fig = plt.figure(figsize = (8, 6))
-    ax1 = plt.subplot2grid((3, 4), (0, 0), colspan = 3)
-    ax2 = plt.subplot2grid((3, 4), (1, 0), colspan = 3)
-    ax3 = plt.subplot2grid((3, 4), (2, 0), colspan = 3)
+    ax1 = plt.subplot2grid((3, 5), (0, 0), colspan = 3)
+    ax2 = plt.subplot2grid((3, 5), (1, 0), colspan = 3)
+    ax3 = plt.subplot2grid((3, 5), (2, 0), colspan = 3)
     # MERRA-2 2-meter temperature plot
-    ax1.set_title('(a)', fontsize = 16, x = 0.03, y = 1.03)
+    ax1.set_title('(a)', fontsize = 16, x = 0.07, y = 1.03)
     ax1.plot(castnet_t2m_ty, lw = 2., color = '#ff7f00')
     ax1.set_xlim([0, len(castnet_t2m_ty) - 1])
     ax1.set_xticks([0, 30, 61])
     ax1.set_xticklabels([''])
     for t in ax1.get_yticklabels():
         t.set_fontsize(12)        
-    ax1.get_yaxis().set_label_coords(-0.11, 0.5)
+    ax1.get_yaxis().set_label_coords(-0.15, 0.5)
     ax1.set_ylabel('T [K]', fontsize = 16)
     ax1.xaxis.set_ticks_position('both')
     ax1.yaxis.set_ticks_position('both')
     # CASTNet O3
-    ax2.set_title('(b)', fontsize = 16, x = 0.03, y = 1.03)
+    ax2.set_title('(b)', fontsize = 16, x = 0.07, y = 1.03)
     ax2.plot(castnet_o3_ty, lw = 2., color = '#999999')
     ax2.set_xlim([0, len(castnet_o3_ty) - 1])
     ax2.set_xticks([0, 30, 61])
@@ -3221,12 +3300,12 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, year,
         t.set_fontsize(12)
     ax2.set_xticklabels([''])
     ax2.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
-    ax2.get_yaxis().set_label_coords(-0.11, 0.5)
+    ax2.get_yaxis().set_label_coords(-0.15, 0.5)
     ax2.xaxis.set_ticks_position('both')
     ax2.yaxis.set_ticks_position('both')
     # scatterplot of CASTNet O3 vs MERRA-2 2-meter temperatures
-    ax2b = plt.subplot2grid((3, 4), (0, 3), rowspan = 2)
-    ax2b.set_title('(d)', fontsize = 16, x = 0.1, y = 1.03)
+    ax2b = plt.subplot2grid((3, 5), (0, 3), rowspan = 2, colspan = 2)
+    ax2b.set_title('(d)', fontsize = 16, x = 0.1, y = 1.02)
     ax2b.plot(castnet_t2m_ty, castnet_o3_ty, 'o', markersize = 4, 
               color = '#999999')
     ax2b.set_xlabel('T [K]', fontsize = 16)
@@ -3235,13 +3314,13 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, year,
     ax2b.yaxis.set_label_position('right')
     ax2b.tick_params(right = True, left = True, top = True, 
                      labelright = True, labelleft = False)
-    ax2b.get_yaxis().set_label_coords(1.45, 0.5)
+    ax2b.get_yaxis().set_label_coords(1.48, 0.5)
     for t in ax2b.get_xticklabels():
         t.set_fontsize(12)
     for t in ax2b.get_yticklabels():
         t.set_fontsize(12)    
     # CEMS NOx plot
-    ax3.set_title('(c)', fontsize = 16, x = 0.03, y = 1.03)
+    ax3.set_title('(c)', fontsize = 16, x = 0.07, y = 1.03)
     ax3.plot(nox, lw = 2., color = '#377eb8')
     ax3.set_xlim([0, len(nox) - 1])
     ax3.set_xticks([0, 30, 61])
@@ -3249,16 +3328,16 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, year,
     for t in ax3.get_yticklabels():
         t.set_fontsize(12)
     ax3.set_ylabel('NO$_{x}$ [tons]', fontsize = 16)
-    ax3.get_yaxis().set_label_coords(-0.11, 0.5)
+    ax3.get_yaxis().set_label_coords(-0.15, 0.5)
     pc = (nox - np.mean(nox))/np.mean(nox) * 100.
     ax3t = ax3.twinx()
     ax3t.plot(pc, lw = 1.0)
     for t in ax3t.get_yticklabels():
         t.set_fontsize(12)    
     ax3t.set_ylabel('Change [%]', rotation = 270, fontsize = 16)   
-    ax3t.get_yaxis().set_label_coords(1.14, 0.48)
+    ax3t.get_yaxis().set_label_coords(1.16, 0.48)
     ax3.xaxis.set_ticks_position('both')
-    ax3.yaxis.set_ticks_position('both')
+#    ax3.yaxis.set_ticks_position('both')
     plt.subplots_adjust(hspace = 0.4)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'timeseries_t2m_castneto3_cemsnox_%d_%s_withscatter.eps' %(year, region), 
@@ -3269,207 +3348,7 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, year,
     print('O3-NOx correlation = %.3f' %(np.corrcoef(castnet_o3_ty, nox)[0, 1])) 
     print('Observed O3-climate penalty = %.3f ppbv K-1' %(np.polyfit(castnet_t2m_ty, castnet_o3_ty, 1)[0])) 
     return 
-# # # # # # # # # # # # #    
-def NO_inventory_atpoint(t2m_overpass, ilat, ilon, year, gmi_lat, gmi_lon): 
-    """given a latitude, longitude coordinate and year, function finds the 
-    closest grid cell in the emission inventory of the GMI CTM and plots the 
-    (1) monthly mean values from the control run and (2) the scaled (daily-
-    varying) values from the emissions-temperature sensitivity simulations. 
-    Here "values" are NO flux per grid box from the fossil fuel sector for 
-    summer months. Also plotted are MERRA2 2-meter temperatures from the grid 
-    cell nearest the given latitude, longitude coordinate. A small inset map 
-    showing the location of the grid cell is also plotted. n.b. if the 
-    inventory/temperature over Baltimore is desired, ilat = 39.2904 and 
-    ilon = 283.387. 
-    
-    Parameters
-    ----------  
-    t2m_overpass : numpy.ndarray
-        MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
-        resolution of the CTM, units of K, [time, lat, lon]
-    ilat : float
-        Latitude of interest
-    ilon : float
-        Longitude (0 - 360˚) of interest
-    year : int
-        Year of interest
-    gmi_lat : numpy.ndarray
-        GMI CTM latitude coordinates, units of degrees north, [lat,]      
-    gmi_lon : numpy.ndarray
-        GMI CTM longitude coordinates, units of degrees east, [lon,]  
-        
-    Returns
-    ----------
-    None      
-    """
-    import numpy as np
-    from netCDF4 import Dataset
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.basemap import Basemap    
-    import sys
-    sys.path.append('/Users/ghkerr/phd/')
-    import pollutants_constants
-    sys.path.append('/Users/ghkerr/phd/GMI/')
-    from geo_idx import geo_idx
-    # load perturbed emissions inventory 
-    month = 'JUN'
-    dataset = Dataset(pollutants_constants.PATH_GMIEMISSIONS + 
-                     'hindcast_IAVanthQFED.daily.1x1.25_%d_%s_NOscaling.nc' 
-                     %(year, month), 'r')
-    species_raw = dataset['species'][:]
-    species = []
-    for row in np.arange(0, np.shape(species_raw)[0]):
-        temp = []
-        for element in species_raw[row]:
-            temp.append(element.decode('UTF-8'))
-        si = ''.join(temp)
-        si = si.rstrip()
-        species.append(si[:])      
-    # fetch perturbed fields and dimensions
-    lat = dataset['latitude_dim'][:]
-    lon = dataset['longitude_dim'][:]
-    NO_ff_prime = dataset['emiss_2d'][:, np.where(np.array(species) == 'NO_ff')[0][0], :, :]
-    # total surface NO
-    NO_total_prime_jun = NO_ff_prime
-    bmore_lat = geo_idx(ilat, lat)
-    bmore_lon = geo_idx(ilon, lon)
-    NO_total_prime_jun = NO_total_prime_jun[:, bmore_lat, bmore_lon]
-    # # # #
-    month = 'JUL'
-    dataset = Dataset(pollutants_constants.PATH_GMIEMISSIONS + 
-                     'hindcast_IAVanthQFED.daily.1x1.25_%d_%s_NOscaling.nc' 
-                     %(year, month), 'r')    
-    NO_ff_prime = dataset['emiss_2d'][:, np.where(np.array(species) == 'NO_ff')[0][0], :, :]
-    NO_total_prime_jul = NO_ff_prime
-    NO_total_prime_jul = NO_total_prime_jul[:, bmore_lat, bmore_lon]
-    # # # # August of summer of interest
-    month = 'AUG'
-    dataset = Dataset(pollutants_constants.PATH_GMIEMISSIONS + 
-                     'hindcast_IAVanthQFED.daily.1x1.25_%d_%s_NOscaling.nc' 
-                     %(year, month), 'r')     
-    NO_ff_prime = dataset['emiss_2d'][:, np.where(np.array(species) == 'NO_ff')[0][0], :, :]
-    NO_total_prime_aug = NO_ff_prime
-    NO_total_prime_aug = NO_total_prime_aug[:, bmore_lat, bmore_lon]
-    del bmore_lat, bmore_lon
-    # find 2-meter temperatures
-    year_where = np.where(np.array([2008, 2009, 2010]) == year)[0][0]
-    bmore_lat = geo_idx(ilat, gmi_lat)
-    bmore_lon = geo_idx(ilon - 360., gmi_lon)
-    t2m_bmore = t2m_overpass[92*year_where:(92*(year_where + 1) + 1), 
-                             bmore_lat, bmore_lon]
-    # initialize figure, axis
-    fig = plt.figure()
-    ax = plt.subplot2grid((1, 3), (0, 0), rowspan = 1, colspan = 3)
-    # twin axis, add temperature 
-    ax2 = ax.twinx()
-    ax2.plot(t2m_bmore, linewidth = 2., color = '#ff7f00', clip_on = True, 
-             zorder = 2)
-    ax.plot(np.concatenate([NO_total_prime_jun, NO_total_prime_jul, NO_total_prime_aug]), 
-            linewidth = 1.5, clip_on = True, label = '$\mathregular{' +
-            r'\partial}$NO $\mathregular{\partial}$T$^{\mathregular{-1}}\neq$0', 
-            color = '#377eb8', linestyle = ':')
-    ax.plot(np.arange(0, 30, 1), np.repeat(np.mean(NO_total_prime_jun), 30), 
-            linewidth = 2., clip_on = True,  color = '#377eb8', zorder = 6)
-    ax.plot(np.arange(31, 62, 1), np.repeat(np.mean(NO_total_prime_jul), 31), 
-            linewidth = 2., clip_on = True, color = '#377eb8', zorder = 6)
-    ax.plot(np.arange(62, 93, 1), np.repeat(np.mean(NO_total_prime_aug), 31), 
-            linewidth = 2., clip_on = True, label = '$\mathregular{' +
-            r'\partial}$NO $\mathregular{\partial}$T$^{\mathregular{-1}}=$0', 
-            color = '#377eb8')
-    ax.set_xlim([0, 91])
-    ax.set_xticks([0, 14, 30, 44, 61, 75])
-    ax.set_xticklabels(['1 June %d' %year, '', '1 July', '', '1 Aug', ''], 
-                       ha = 'center', fontsize = 12)
-    # add legend and title
-    leg = ax.legend(loc = 9, bbox_to_anchor = (0.5, 1.18), fontsize = 16,
-                    ncol = 2)
-    leg.get_frame().set_linewidth(0.0)
-    ax.set_ylabel('NO$_{\mathregular{}}$ [kg s$^{\mathregular{-1}}$'+ 
-                        ' grid cell$^{\mathregular{-1}}$]', color = '#377eb8', 
-                        fontsize = 16)
-    ax2.set_ylabel('T [K]', color = '#ff7f00', fontsize = 16, rotation = 270)
-    ax2.get_yaxis().set_label_coords(1.18, 0.50)
-    for label in ax.get_yticklabels():
-        label.set_fontsize(12)   
-        label.set_color('#377eb8')
-    for label in ax2.get_yticklabels():
-        label.set_fontsize(12)    
-        label.set_color('#ff7f00')
-    left, bottom, width, height = [0.43, 0.16, 0.28, 0.28]
-    axi = fig.add_axes([left, bottom, width, height])        
-    m_small = Basemap(projection = 'ortho', lat_0 = 30, lon_0 = -80,
-                      resolution = 'i', area_thresh = 10000) 
-    m_small.drawmapboundary(fill_color='lightgrey')
-    m_small.fillcontinents(color = '#f9f6d8')
-    m_small.drawcountries(color = 'k', linewidth = 0.5)
-    m_small.drawcoastlines(color = 'k', linewidth = 0.5)    
-    x, y = m_small(ilon - 360, ilat) 
-    m_small.scatter(x, y, 30, color = 'r', marker = '.', edgecolor = 'r', 
-              zorder = 5)
-    plt.subplots_adjust(right = 0.85)
-    plt.savefig('/Users/ghkerr/phd/emissions/figs/' + 
-                'NO_inventory_atpoint.png', dpi = 300)
-    return
-# # # # # # # # # # # # #    
-def find_bias_nationwide_region(gmi_o3, gmi_lat, gmi_lon, o3_castnet, 
-    region_castnet, sites_castnet, lat_castnet, lon_castnet):
-    """function finds O3 averaged over days in JJA 2008-2010 at each GMI 
-    grid cell co-located with a CASTNet stations and calculates the 
-    nationwide average bias (bias = GMI O3 - CASTNet O3) and thereafter 
-    finds the average bias in a given region defined by its CASTNet stations.
-    
-    Parameters
-    ----------  
-    gmi_o3 : numpy.ndarray
-        GMI CTM surface-level ozone at overpass time, units of volume mixing 
-        ratio, [time, lat, lon]        
-    gmi_lat : numpy.ndarray
-        GMI CTM latitude coordinates, units of degrees north, [lat,]      
-    gmi_lon : numpy.ndarray
-        GMI CTM longitude coordinates, units of degrees east, [lon,]    
-    o3_castnet : list
-        Daily 1300 hours local time O3 at each CASTNet site, units of ppbv, 
-        [no. sites,]        
-    region_castnet : list
-        Site IDs for CASTNet sites in region, [no. sites in region,]
-    sites_castnet : list
-        CASTNet site names, [no. sites,]
-    lat_castnet : list
-        Latitudes of CASTNet sites, units of degrees north, [no. sites,]
-    lon_castnet : list
-        Longitudes of CASTNet sites, units of degrees west, [no. sites,]    
-
-    Returns
-    ----------       
-    None    
-    """
-    import numpy as np
-    import sys
-    sys.path.append('/Users/ghkerr/phd/')
-    from geo_idx import geo_idx
-    gmi_o3 = gmi_o3 * 1e9
-    i = 0
-    bias_all = []
-    for ilat, ilon in zip(lat_castnet, lon_castnet): 
-        # loop through CASTNet sites and find nearest GMI grid cell
-        lat_gmi_near = geo_idx(ilat, gmi_lat)
-        lon_gmi_near = geo_idx(ilon, gmi_lon)
-        # O3 at GMI grid cell 
-        gmi_near_castnet = gmi_o3[:, lat_gmi_near, lon_gmi_near]
-        castnet_atsite = o3_castnet[i]
-        bias_atsite = np.nanmean(gmi_near_castnet)  - np.nanmean(castnet_atsite)
-        bias_all.append(bias_atsite)
-        i = i + 1
-    print('mean nationwide bias (GMI - CASTNet) = %.4f ppbv' 
-          %np.mean(bias_all))
-    # find O3 bias in region 
-    where_region = np.in1d(sites_castnet, region_castnet)
-    where_region = np.where(where_region == True)[0]
-    bias_region = np.array(bias_all)[where_region]
-    print('mean bias in region (GMI - CASTNet) = %.4f ppbv'
-          %np.mean(bias_region))
-    return 
-# # # # # # # # # # # # #
+# # # # # # # # # # # # #  
 def map_r2o3t2m_conus(lat_castnet, lon_castnet, r_castnet, gmi_lat, gmi_lon, 
     r, case): 
     """function plots maps of the coefficient of determination ("r-squared")
@@ -3757,7 +3636,7 @@ def map_simulationschematic(gmi_lat, gmi_lon):
                 colors.append('#33a02c')                                  
             if (value >= 3282.3063999999977):
                 sizes.append(50)
-                colors.append('#fb9a99')                           
+                colors.append('#e31a1c')                           
         return sizes, colors
     # # # # 
     # initialize figure, axis
@@ -3770,7 +3649,7 @@ def map_simulationschematic(gmi_lat, gmi_lon):
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
+#    m.fillcontinents(color = '#f9f6d8', lake_color = '#dcf0fa')
     fill_oceans(ax, m)    
     outline_region(ax, m, pollutants_constants.NORTHEAST_STATES)    
     # three bounding boxes: 
@@ -3796,24 +3675,24 @@ def map_simulationschematic(gmi_lat, gmi_lon):
     x2, y2 = m(gmi_lon[bb1l], gmi_lat[bb1t])
     x3, y3 = m(gmi_lon[bb1r], gmi_lat[bb1t])
     x4, y4 = m(gmi_lon[bb1r], gmi_lat[bb1b])
-    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#fdbf6f', 
-                    alpha = 0.5, linewidth = 0)
+    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#ff7f00', 
+                    alpha = 0.6, linewidth = 0)
     plt.gca().add_patch(poly)
     # bounding box #2
     x1, y1 = m(gmi_lon[bb2l], gmi_lat[bb2b])
     x2, y2 = m(gmi_lon[bb2l], gmi_lat[bb2t])
     x3, y3 = m(gmi_lon[bb2r], gmi_lat[bb2t])
     x4, y4 = m(gmi_lon[bb2r], gmi_lat[bb2b])
-    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#fdbf6f', 
-                    alpha = 0.5, linewidth = 0)
+    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#ff7f00', 
+                    alpha = 0.6, linewidth = 0)
     plt.gca().add_patch(poly)
     # bounding box #3 
     x1, y1 = m(gmi_lon[bb3l], gmi_lat[bb3b])
     x2, y2 = m(gmi_lon[bb3l], gmi_lat[bb3t])
     x3, y3 = m(gmi_lon[bb3r], gmi_lat[bb3t])
     x4, y4 = m(gmi_lon[bb3r], gmi_lat[bb3b])
-    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#fdbf6f', 
-                    alpha = 0.5, linewidth = 0)
+    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#ff7f00', 
+                    alpha = 0.6, linewidth = 0)
     plt.gca().add_patch(poly)
     # import emissions information
     facilityinfo = cems_nei.facility_attributes('/Volumes/GAIGEKERR/emissions/CEMS/')
@@ -3842,7 +3721,7 @@ def map_simulationschematic(gmi_lat, gmi_lon):
     xcems, ycems = m(np.concatenate(facilitylon.values), 
              np.concatenate(facilitylat.values))      
     m.scatter(xcems, ycems, s = sizes, color = colors, marker = 'o', 
-              edgecolor = colors, zorder = 10)
+              edgecolor = colors, zorder = 30)
     # legend for a scatter plot using a proxy artists 
     # see http://matplotlib.sourceforge.net/users/legend_guide.html#using-proxy-artist
     circle1 = Line2D(range(1), range(1), color = 'w', marker = 'o', 
@@ -3865,8 +3744,8 @@ def map_simulationschematic(gmi_lat, gmi_lon):
         '$\mathregular{\leq}$$\,$$\mathregular{\Sigma}$ NO$_x$$\,$<$\,$90'+
         '$^{\mathregular{th}}$')
     circle5 = Line2D(range(1), range(1), color = 'w', marker = 'o', 
-        markersize = np.log(50)**1.5, zorder = 50, markerfacecolor = '#fb9a99', 
-        markeredgecolor = '#fb9a99', label = '$\mathregular{\Sigma}$$\,'+
+        markersize = np.log(50)**1.5, zorder = 50, markerfacecolor = '#e31a1c', 
+        markeredgecolor = '#e31a1c', label = '$\mathregular{\Sigma}$$\,'+
         '$NO$_x$$\,$$\mathregular{\geq}$$\,$90$^{\mathregular{th}}$')
     # add legend 
     leg = ax.legend(loc = 9, bbox_to_anchor = (0.5, 1.2),
@@ -4004,6 +3883,563 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet):
                 'boxplot_cemsnox_castneto3_neus.eps', dpi = 300)
     return
 # # # # # # # # # # # # #    
+def compare_regional_averaging(neus, t_castnet, o3_castnet, castnet_t2m_neus, 
+    castnet_o3_neus, sites_castnet, neus_castnet, t2m_overpass, emiss_o3, 
+    emiss_t2m_neus, emiss_o3_neus, emiss_sens, do3dt2m_castnet):
+    """examine two different ways to calculate regional averages. The first
+    method ("regional quantities") uses regionally-averaged primary fields 
+    (i.e. O3, T) to calculate secondary quantities like the O3-climate penalty. 
+    The second method ("regional average") calculates the secondary quantity at
+    every grid cell and thereafter averages the secondary quantity over the 
+    region. This is done for both CASTNet and GMI for the O3-climate penalty,
+    the standard deviation, and the O3 increase on hot days. 
+    
+    Parameters
+    ----------  
+    neus : numpy.ndarray
+        CTM grid where grid cells within NEUS have a value of 1 and grid 
+        cells not in region have a value of NaN, [lat, lon]
+    t_castnet : list
+        Daily 1300 hours local time MERRA-2 2-meter temperatures at each 
+        CASTNet site, units of K, [no. sites,]        
+    o3_castnet : list
+        Daily 1300 hours local time O3 at each CASTNet site, units of ppbv, 
+        [no. sites,]
+    castnet_t2m_neus : numpy.ndarray
+        Daily regionally-averaged 2-meter temperatures co-located with CASTNet 
+        stations, [time,]      
+    castnet_o3_neus : numpy.ndarray
+        Daily regionally-averaged O3 from CASTNet, [time,]         
+    sites_castnet : list
+        CASTNet site names, [no. sites,]
+    neus_castnet : list
+        Site IDs for CASTNet sites in region, [no. sites in region,]    
+    t2m_overpass : numpy.ndarray
+        MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
+        resolution of the CTM, units of K, [time, lat, lon]
+    emiss_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        GHKerr-DailyEmiss, units of volume mixing ratio, [time, lat, lon] 
+    emiss_t2m_neus : numpy.ndarray
+        Daily regionally-averaged T2m from + Emissions simulation, [time,]    
+    emiss_o3_neus : numpy.ndarray
+        Daily regionally-averaged O3 from + Emissions simulation, [time,]          
+    emiss_sens : numpy.ndarray    
+        The O3-climate penalty at each GMI grid cell from the + Emissions 
+        simulation, units of ppbv K^-1, [lat, lon]  
+    do3dt2m_castnet : list
+        The O3-T2m sensitivity (slope of linear regression) at each CASTNet
+        site, [no. CASTNet stations,]     
+        
+        
+    Returns
+    ----------     
+    None     
+    """
+    import numpy as np
+    # rq stands for "regional quantities," i.e. quantity has been calculated 
+    # using primary quantities that have been regionally-averaged. For example, 
+    # the O3-climate penalty calculated with regional quantities means that it 
+    # was calculated with regionally-averaged T and O3. ra stands for "regional
+    # averaged" meaning that the final product has been averaged over the 
+    # region. For the O3-climate penalty example, this would mean that the O3-
+    # climate penalty was calculated at local areas/points/sites within a 
+    # region using local quantities and then the penalty itself was averaged. 
+    # # # # for O3-climate penalty
+    # GMI
+    emiss_m_rq = np.polyfit(emiss_t2m_neus, emiss_o3_neus, 1)[0]
+    emiss_m_ra = np.nanmean(neus*emiss_sens)
+    print('Regional quantity: GMI penalty = %.4f ppbv K-1' %emiss_m_rq)
+    print('Regional average: GMI penalty = %.4f ppbv K-1' %emiss_m_ra)    
+    where_neus = np.in1d(sites_castnet, neus_castnet)
+    where_neus = np.where(where_neus == True)[0]
+    # CASTNet
+    castnet_m_rq = np.polyfit(castnet_t2m_neus, castnet_o3_neus, 1)[0]
+    castnet_m_ra = np.array(do3dt2m_castnet)[where_neus].mean()
+    print('Regional quantity: CASTNet penalty = %.4f ppbv K-1' %castnet_m_rq)
+    print('Regional average: CASTNet penalty = %.4f ppbv K-1' %castnet_m_ra)      
+    # # # # for variability
+    # GMI
+    emiss_std_rq = np.std(emiss_o3_neus)
+    emiss_std_ra = neus*(np.std(emiss_o3, axis = 0) * 1e9)
+    emiss_std_ra = np.nanmean(emiss_std_ra)
+    print('Regional quantity: GMI standard deviation = %.4f ppbv'
+          %emiss_std_rq)
+    print('Regional average: GMI standard deviation = %.4f ppbv'
+          %emiss_std_ra)      
+    # CASTNet 
+    castnet_std_rq = np.std(castnet_o3_neus)
+    castnet_std_ra = np.nanstd(np.array(o3_castnet)[where_neus], axis = 1).mean()
+    print('Regional quantity: CASTNet standard deviation = %.4f ppbv' 
+          %castnet_std_rq)
+    print('Regional average: CASTNet standard deviation = %.4f ppbv' 
+          %castnet_std_ra)       
+    # # # # for hot/cold days 
+    # GMI
+    # find mean O3 in each simulation on days where 2-meter temperatures exceed
+    # the 90th percentile
+    emiss_o3_p90 = o3_givent2mpercentile(emiss_o3, t2m_overpass, 90, 'greater')
+    # find median O3 values in each simulation and convert from volume mixing
+    # ratio to ppbv
+    emiss_o3_med = np.median(emiss_o3, axis = 0) * 1e9
+    delta_emiss_hot = emiss_o3_p90 - emiss_o3_med
+    emiss_o3_p90_rq = emiss_o3_neus[np.where(emiss_t2m_neus >
+        np.percentile(emiss_t2m_neus, 90))[0]]
+    emiss_o3_med_rq = np.median(emiss_o3_neus)
+    emiss_hot_rq = emiss_o3_p90_rq.mean() - emiss_o3_med_rq
+    emiss_hot_ra = np.nanmean(delta_emiss_hot*neus)
+    print('Regional quantity: GMI hot day increase = %.4f ppbv' 
+          %emiss_hot_rq)
+    print('Regional average: GMI hot day increase = %.4f ppbv' 
+          %emiss_hot_ra)    
+    # CASTNet
+    castnet_o3_med = np.median(castnet_o3_neus)
+    castnet_o3_p90 = castnet_o3_neus[np.where(castnet_t2m_neus > 
+                              np.percentile(castnet_t2m_neus, 90))[0]]
+    castnet_hot_ra = []
+    for o3_as, t2m_as in zip(np.array(o3_castnet)[where_neus], 
+                             np.array(t_castnet)[where_neus]):
+        o3_as_p90 = np.nanmean(o3_as[np.where(t2m_as > np.percentile(t2m_as, 90))[0]])
+        o3_as_med = np.nanmedian(o3_as)
+        castnet_hot_ra.append(o3_as_p90 - o3_as_med)
+    castnet_hot_rq = castnet_o3_p90.mean() - castnet_o3_med
+    castnet_hot_ra = np.mean(castnet_hot_ra)
+    print('Regional quantity: CASTNet hot day increase = %.4f ppbv' 
+          %castnet_hot_rq)
+    print('Regional average: CASTNet hot day increase = %.4f ppbv' 
+          %castnet_hot_ra)           
+    return 
+# # # # # # # # # # # # #    
+def NO_inventory_atpoint(t2m_overpass, ilat, ilon, year, gmi_lat, gmi_lon): 
+    """given a latitude, longitude coordinate and year, function finds the 
+    closest grid cell in the emission inventory of the GMI CTM and plots the 
+    (1) monthly mean values from the control run and (2) the scaled (daily-
+    varying) values from the emissions-temperature sensitivity simulations. 
+    Here "values" are NO flux per grid box from the fossil fuel sector for 
+    summer months. Also plotted are MERRA2 2-meter temperatures from the grid 
+    cell nearest the given latitude, longitude coordinate. A small inset map 
+    showing the location of the grid cell is also plotted. n.b. if the 
+    inventory/temperature over Baltimore is desired, ilat = 39.2904 and 
+    ilon = 283.387. 
+    
+    Parameters
+    ----------  
+    t2m_overpass : numpy.ndarray
+        MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
+        resolution of the CTM, units of K, [time, lat, lon]
+    ilat : float
+        Latitude of interest
+    ilon : float
+        Longitude (0 - 360˚) of interest
+    year : int
+        Year of interest
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]  
+        
+    Returns
+    ----------
+    None      
+    """
+    import numpy as np
+    from netCDF4 import Dataset
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap    
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Polygon
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    from geo_idx import geo_idx
+    # load perturbed emissions inventory 
+    month = 'JUN'
+    dataset = Dataset(pollutants_constants.PATH_GMIEMISSIONS + 
+                     'hindcast_IAVanthQFED.daily.1x1.25_%d_%s_NOscaling.nc' 
+                     %(year, month), 'r')
+    species_raw = dataset['species'][:]
+    species = []
+    for row in np.arange(0, np.shape(species_raw)[0]):
+        temp = []
+        for element in species_raw[row]:
+            temp.append(element.decode('UTF-8'))
+        si = ''.join(temp)
+        si = si.rstrip()
+        species.append(si[:])      
+    # fetch perturbed fields and dimensions
+    lat = dataset['latitude_dim'][:]
+    lon = dataset['longitude_dim'][:]
+    NO_ff_prime = dataset['emiss_2d'][:, np.where(np.array(species) == 'NO_ff')[0][0], :, :]
+    # total surface NO
+    NO_total_prime_jun = NO_ff_prime
+    bmore_lat = geo_idx(ilat, lat)
+    bmore_lon = geo_idx(ilon, lon)
+    NO_total_prime_jun = NO_total_prime_jun[:, bmore_lat, bmore_lon]
+    # # # #
+    month = 'JUL'
+    dataset = Dataset(pollutants_constants.PATH_GMIEMISSIONS + 
+                     'hindcast_IAVanthQFED.daily.1x1.25_%d_%s_NOscaling.nc' 
+                     %(year, month), 'r')    
+    NO_ff_prime = dataset['emiss_2d'][:, np.where(np.array(species) == 'NO_ff')[0][0], :, :]
+    NO_total_prime_jul = NO_ff_prime
+    NO_total_prime_jul = NO_total_prime_jul[:, bmore_lat, bmore_lon]
+    # # # # August of summer of interest
+    month = 'AUG'
+    dataset = Dataset(pollutants_constants.PATH_GMIEMISSIONS + 
+                     'hindcast_IAVanthQFED.daily.1x1.25_%d_%s_NOscaling.nc' 
+                     %(year, month), 'r')     
+    NO_ff_prime = dataset['emiss_2d'][:, np.where(np.array(species) == 'NO_ff')[0][0], :, :]
+    NO_total_prime_aug = NO_ff_prime
+    NO_total_prime_aug = NO_total_prime_aug[:, bmore_lat, bmore_lon]
+    del bmore_lat, bmore_lon
+    # find 2-meter temperatures
+    year_where = np.where(np.array([2008, 2009, 2010]) == year)[0][0]
+    bmore_lat = geo_idx(ilat, gmi_lat)
+    bmore_lon = geo_idx(ilon - 360., gmi_lon)
+    t2m_bmore = t2m_overpass[92*year_where:(92*(year_where + 1) + 1), 
+                             bmore_lat, bmore_lon]
+    # initialize figure, axis
+    fig = plt.figure()
+    ax = plt.subplot2grid((1, 3), (0, 0), rowspan = 1, colspan = 3)
+    # twin axis, add temperature 
+    ax2 = ax.twinx()
+    ax2.plot(t2m_bmore, linewidth = 2., color = '#ff7f00', clip_on = True, 
+             zorder = 2)
+    ax.plot(np.concatenate([NO_total_prime_jun, NO_total_prime_jul, NO_total_prime_aug]), 
+            linewidth = 1.5, clip_on = True, label = '$\mathregular{' +
+            r'\partial}$NO $\mathregular{\partial}$T$^{\mathregular{-1}}\neq$0', 
+            color = '#377eb8', linestyle = ':')
+    ax.plot(np.arange(0, 30, 1), np.repeat(np.mean(NO_total_prime_jun), 30), 
+            linewidth = 2., clip_on = True,  color = '#377eb8', zorder = 6)
+    ax.plot(np.arange(30, 61, 1), np.repeat(np.mean(NO_total_prime_jul), 31), 
+            linewidth = 2., clip_on = True, color = '#377eb8', zorder = 6)
+    ax.plot(np.arange(61, 92, 1), np.repeat(np.mean(NO_total_prime_aug), 31), 
+            linewidth = 2., clip_on = True, label = '$\mathregular{' +
+            r'\partial}$NO $\mathregular{\partial}$T$^{\mathregular{-1}}=$0', 
+            color = '#377eb8')
+    ax.set_xlim([0, 91])
+    ax.set_xticks([0, 14, 30, 44, 61, 75])
+    ax.set_xticklabels(['1 June %d' %year, '', '1 July', '', '1 Aug', ''], 
+                       ha = 'center', fontsize = 12)
+    # add legend and title
+    leg = ax.legend(loc = 9, bbox_to_anchor = (0.5, 1.18), fontsize = 16,
+                    ncol = 2)
+    leg.get_frame().set_linewidth(0.0)
+    ax.set_ylabel('NO$_{\mathregular{}}$ [kg s$^{\mathregular{-1}}$'+ 
+                        ' grid cell$^{\mathregular{-1}}$]', color = '#377eb8', 
+                        fontsize = 16)
+    ax2.set_ylabel('T [K]', color = '#ff7f00', fontsize = 16, rotation = 270)
+    ax2.get_yaxis().set_label_coords(1.18, 0.50)
+    for label in ax.get_yticklabels():
+        label.set_fontsize(12)   
+        label.set_color('#377eb8')
+    for label in ax2.get_yticklabels():
+        label.set_fontsize(12)    
+        label.set_color('#ff7f00')
+    # add inset axis
+    left, bottom, width, height = [0.46, 0.16, 0.28, 0.28]
+    axi = fig.add_axes([left, bottom, width, height])        
+    m = Basemap(projection = 'merc', llcrnrlon = -93.5, 
+                llcrnrlat = 24., urcrnrlon = -65.3, 
+                urcrnrlat = 50., resolution = 'h', area_thresh = 1000)
+    m.drawstates(color = 'k', linewidth = 0.5)
+    m.drawcountries(color = 'k', linewidth = 1.0)
+    m.drawcoastlines(color = 'k', linewidth = 1.0)    
+    fill_oceans(axi, m)    
+    # three bounding boxes: 
+    # 1. 47˚N, -80˚E, 28˚N, -92˚E
+    bb1t = geo_idx(47., gmi_lat)
+    bb1r = geo_idx(-80., gmi_lon)
+    bb1b = geo_idx(28., gmi_lat)
+    bb1l = geo_idx(-92., gmi_lon)
+    # 2. 48˚N, -66˚E, 41˚N, -80˚N
+    bb2t = geo_idx(48., gmi_lat)
+    bb2r = geo_idx(-66., gmi_lon)
+    bb2b = geo_idx(41., gmi_lat)
+    bb2l = geo_idx(-80., gmi_lon)
+    # 3. 41˚N, -74˚E, 28˚N, -80˚E
+    bb3t = geo_idx(41., gmi_lat)
+    bb3r = geo_idx(-74., gmi_lon)
+    bb3b = geo_idx(28., gmi_lat)
+    bb3l = geo_idx(-80., gmi_lon)
+    x, y = np.meshgrid(gmi_lon, gmi_lat)
+    x, y = m(x, y)
+    # bounding box #1
+    x1, y1 = m(gmi_lon[bb1l], gmi_lat[bb1b])
+    x2, y2 = m(gmi_lon[bb1l], gmi_lat[bb1t])
+    x3, y3 = m(gmi_lon[bb1r], gmi_lat[bb1t])
+    x4, y4 = m(gmi_lon[bb1r], gmi_lat[bb1b])
+    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#ff7f00', 
+                    alpha = 0.6, linewidth = 0)
+    plt.gca().add_patch(poly)
+    # bounding box #2
+    x1, y1 = m(gmi_lon[bb2l], gmi_lat[bb2b])
+    x2, y2 = m(gmi_lon[bb2l], gmi_lat[bb2t])
+    x3, y3 = m(gmi_lon[bb2r], gmi_lat[bb2t])
+    x4, y4 = m(gmi_lon[bb2r], gmi_lat[bb2b])
+    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#ff7f00', 
+                    alpha = 0.6, linewidth = 0)
+    plt.gca().add_patch(poly)
+    # bounding box #3 
+    x1, y1 = m(gmi_lon[bb3l], gmi_lat[bb3b])
+    x2, y2 = m(gmi_lon[bb3l], gmi_lat[bb3t])
+    x3, y3 = m(gmi_lon[bb3r], gmi_lat[bb3t])
+    x4, y4 = m(gmi_lon[bb3r], gmi_lat[bb3b])
+    poly = Polygon([(x1,y1),(x2,y2),(x3,y3),(x4,y4)], facecolor = '#ff7f00', 
+                    alpha = 0.6, linewidth = 0)
+    plt.gca().add_patch(poly)
+    # add point corresponding to grid cell 
+    x, y = m(ilon - 360, ilat) 
+    m.scatter(x, y, 20, color = 'w', marker = 's', edgecolor = 'w', zorder = 20)
+    plt.subplots_adjust(right = 0.85)
+    plt.savefig('/Users/ghkerr/phd/emissions/figs/' + 
+                'NO_inventory_atpoint.eps', dpi = 300)
+    return
+# # # # # # # # # # # # #      
+def scatter_inventorynonox_noxo3(t2m_overpass, mr2_no, mr2_no2, mr2_o3, 
+    emiss_no, emiss_no2, emiss_o3, neus_states, gmi_lat, gmi_lon):
+    """function opens output from Strode et al. [2015] EmFix and Std 
+    simulations and the emissions inventories from these simulations along with 
+    the emissions inventory from the + Emissions and + Chemistry simulations. 
+    Thereafter we calculate regionally-averaged quantities in the
+    Northeast. These results are compared with results from + Emissions and 
+    + Chemistry simulations through two scatterplots and related regressions. 
+    The first scatterplot is modeled NOx versus NO from the models' emissions
+    inventories and thes second is modeled O3 versus modeled NOx. 
+
+    Parameters
+    ----------  
+    t2m_overpass : numpy.ndarray
+        MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
+        resolution of the CTM, units of K, [time, lat, lon]
+    mr2_no : numpy.ndarray
+        GMI CTM surface-level nitrogen oxide at overpass time from the 
+        + Chemistry simulation, units of volume mixing ratio, [time, lat, lon]
+    mr2_no2 : numpy.ndarray
+        GMI CTM surface-level nitrogen dioxide at overpass time from the 
+        + Chemistry simulation, units of volume mixing ratio, [time, lat, lon]            
+    mr2_o3 : numpy.ndarray    
+        GMI CTM surface-level ozone at overpass time from the + Chemistry 
+        simulation, units of volume mixing ratio, [time, lat, lon]
+    emiss_no : numpy.ndarray
+        GMI CTM surface-level nitrogen oxide at overpass time from the 
+        + Emissions simulation, units of volume mixing ratio, [time, lat, lon]
+    emiss_no2 : numpy.ndarray
+        GMI CTM surface-level nitrogen dioxide at overpass time from the 
+        + Emissions simulation, units of volume mixing ratio, [time, lat, lon]        
+    emiss_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time from the + Emissions 
+        simulation, units of volume mixing ratio, [time, lat, lon]
+    neus_states : list
+        State names (string format) in region      
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]  
+                
+    Returns
+    ----------     
+    std_inventory_daily : numpy.ndarray   
+        Daily Northeast-averaged NO emissions from Strode et al. [2015] 
+        emissions inventory Std simulation for the measuring period 2000 - 
+        2010, units of kg grid cell-1 s-1, [time,]
+    std_o3_neus : numpy.ndarray
+        Daily Northeast-averaged O3 from Strode et al. [2015] 
+        emissions inventory Std simulation for the measuring period 2000 - 
+        2010, units of ppbv, [time,]
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    import commensurability     
+    # load Std
+    (gmi_lat_c, gmi_lon_c, eta_c, times_c, std_co, std_no, std_no2, std_o3, 
+     std_cloudfraction, std_gridboxheight) = \
+    commensurability.open_overpass2('HindcastFFIgac2', [2000, 2001, 2002, 
+        2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010])
+    # load EmFix
+    (gmi_lat_c, gmi_lon_c, eta_c, times_c, emfix_co, emfix_no, emfix_no2, emfix_o3, 
+     std_cloudfraction, std_gridboxheight) = \
+    commensurability.open_overpass2('Hindcast3Igac2', [2000, 2001, 2002, 
+        2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010])
+    gmi_lon_c = np.mod(gmi_lon_c - 180.0, 360.0) - 180.0
+    # emissions inventory from + Emissions simulation
+    emiss_no_inventory, lon_inventory, lat_inventory = \
+     commensurability.open_perturbed_emissions()
+    # emissions inventory from + Chemistry simulation 
+    mr2_no_inventory, lon_inventory, lat_inventory = \
+     commensurability.open_unperturbed_emissions('1x1.25_IAVanthGFED4')
+    lon_inventory = np.mod(lon_inventory[0] - 180.0, 360.0) - 180.0
+    # emissions inventory from Std/EmFix simulations
+    std_no_inventory, lon_inventory_c, lat_inventory_c = \
+     commensurability.open_unperturbed_emissions('2x2.5_IAVanthGFED3gcEF')
+    lon_inventory_c = np.mod(lon_inventory_c[0] - 180.0, 360.0) - 180.0
+    # find grid cells in Northeast for different simulations/inventories
+    m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
+                urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
+                area_thresh = 1000)
+    neus_states = pollutants_constants.NORTHEAST_STATES
+    neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
+    neus_c = find_grid_in_region(m, neus_states, gmi_lat_c, gmi_lon_c) 
+    neus_inventory = find_grid_in_region(m, neus_states, lat_inventory[0], 
+                                         lon_inventory)  
+    neus_inventory_c = find_grid_in_region(m, neus_states, lat_inventory_c[0], 
+                                           lon_inventory_c)       
+     # # # find Northeast-averaged inventories, NOx, O3 
+    # from Strode et al. [2015] simulations
+    std_no_inventory_c_neus = np.array(std_no_inventory) * neus_inventory_c
+    std_no_inventory_c_neus = np.nanmean(std_no_inventory_c_neus, axis = tuple((2, 3)))
+    std_o3_neus = np.nanmean((std_o3 * neus_c), axis = tuple((1, 2))) * 1e9
+    std_nox_neus = np.nanmean(((std_no + std_no2) * neus_c), 
+                              axis = tuple((1, 2))) * 1e9
+    emfix_o3_neus = np.nanmean((emfix_o3 * neus_c), axis = tuple((1, 2))) * 1e9
+    emfix_nox_neus = np.nanmean(((emfix_no + emfix_no2) * neus_c), 
+                              axis = tuple((1, 2))) * 1e9
+    # from + Emissions/+ Chemistry simulations
+    emiss_no_inventory_neus = np.vstack(emiss_no_inventory) * neus_inventory
+    emiss_no_inventory_neus = np.nanmean(emiss_no_inventory_neus, axis = tuple((1, 2)))             
+    mr2_no_inventory_neus = np.vstack(mr2_no_inventory) * neus_inventory
+    mr2_no_inventory_neus = np.nanmean(mr2_no_inventory_neus, axis = tuple((1, 2)))    
+    # since the inventory from MR2 only varies from month-to-month, repeat 
+    # monthly values for every day in month
+    mr2_inventory_daily = []
+    for year in (mr2_no_inventory_neus[0:3], 
+                 mr2_no_inventory_neus[3:6],
+                 mr2_no_inventory_neus[6:]): 
+        mr2_inventory_daily.append(np.repeat(year[0], 30))
+        mr2_inventory_daily.append(np.repeat(year[1], 31))
+        mr2_inventory_daily.append(np.repeat(year[2], 31))
+    mr2_no_inventory_neus = np.hstack(mr2_inventory_daily)
+    emiss_o3_neus = np.nanmean((emiss_o3 * neus), axis = tuple((1, 2))) * 1e9
+    emiss_nox_neus = np.nanmean(((emiss_no + emiss_no2) * neus), 
+                                axis = tuple((1, 2))) * 1e9
+    mr2_o3_neus = np.nanmean((mr2_o3 * neus), axis = tuple((1, 2))) * 1e9
+    mr2_nox_neus = np.nanmean(((mr2_no + mr2_no2) * neus), 
+                              axis = tuple((1, 2))) * 1e9
+    # find regionally-averaged temperatures 
+    t2m_neus = np.nanmean((t2m_overpass * neus), axis = tuple((1, 2)))
+    t2m_hot = np.where(t2m_neus > np.percentile(t2m_neus, 90))[0]
+    t2m_cold = np.where(t2m_neus < np.percentile(t2m_neus, 10))[0]
+    # separate into years and months
+    std_o3_neus = np.reshape(std_o3_neus, (11, 92))
+    std_nox_neus = np.reshape(std_nox_neus, (11, 92))
+    emfix_o3_neus = np.reshape(emfix_o3_neus, (11, 92))
+    emfix_nox_neus = np.reshape(emfix_nox_neus, (11, 92))
+    emiss_o3_neus = np.reshape(emiss_o3_neus, (3, 92))
+    emiss_nox_neus = np.reshape(emiss_nox_neus, (3, 92)) 
+    mr2_o3_neus = np.reshape(mr2_o3_neus, (3, 92))
+    mr2_nox_neus = np.reshape(mr2_nox_neus, (3, 92))
+    # for emissions inventories, n.b. repeat monthly mean values for every day and 
+    # save off 2000 values for EmFix
+    std_inventory_daily, emfix_inventory_daily = [], []  
+    emfix_inventory_mm = []  
+    for year in std_no_inventory_c_neus: 
+        std_inventory_daily.append(np.repeat(year[0], 30))
+        std_inventory_daily.append(np.repeat(year[1], 31))
+        std_inventory_daily.append(np.repeat(year[2], 31))
+        emfix_inventory_daily.append(np.repeat(std_no_inventory_c_neus[0][0], 30))
+        emfix_inventory_daily.append(np.repeat(std_no_inventory_c_neus[0][1], 31))
+        emfix_inventory_daily.append(np.repeat(std_no_inventory_c_neus[0][2], 31))
+        emfix_inventory_mm.append(std_no_inventory_c_neus[0][0])
+        emfix_inventory_mm.append(std_no_inventory_c_neus[0][1])
+        emfix_inventory_mm.append(std_no_inventory_c_neus[0][2])
+    # # # # + Emissions/+ Chemistry simulations on hot and cold days
+    # for inventories    
+    emiss_inventory_neus_hot = emiss_no_inventory_neus[t2m_hot]
+    emiss_inventory_neus_cold = emiss_no_inventory_neus[t2m_cold]
+    delta_emiss_inventory = emiss_inventory_neus_hot - emiss_inventory_neus_cold
+    mr2_inventory_neus_hot = mr2_no_inventory_neus[t2m_hot]
+    mr2_inventory_neus_cold = mr2_no_inventory_neus[t2m_cold]
+    delta_mr2_inventory = mr2_inventory_neus_hot - mr2_inventory_neus_cold
+    # for NOx
+    emiss_nox_hot = np.hstack(emiss_nox_neus)[t2m_hot]
+    emiss_nox_cold = np.hstack(emiss_nox_neus)[t2m_cold]
+    delta_emiss_nox = emiss_nox_hot - emiss_nox_cold
+    mr2_nox_hot = np.hstack(mr2_nox_neus)[t2m_hot]
+    mr2_nox_cold = np.hstack(mr2_nox_neus)[t2m_cold]
+    delta_mr2_nox = mr2_nox_hot - mr2_nox_cold
+    # for O3
+    emiss_o3_hot = np.hstack(emiss_o3_neus)[t2m_hot]
+    emiss_o3_cold = np.hstack(emiss_o3_neus)[t2m_cold]
+    delta_emiss_o3 = emiss_o3_hot - emiss_o3_cold
+    mr2_o3_hot = np.hstack(mr2_o3_neus)[t2m_hot]
+    mr2_o3_cold = np.hstack(mr2_o3_neus)[t2m_cold]
+    delta_mr2_o3 = mr2_o3_hot - mr2_o3_cold
+    # stack arrays
+    mr2_inventory_daily = np.hstack(mr2_inventory_daily)
+    std_inventory_daily = np.hstack(std_inventory_daily)
+    emfix_inventory_daily = np.hstack(emfix_inventory_daily)
+    emiss_no_inventory_neus = np.hstack(emiss_no_inventory_neus)
+    # initialize figure, axes
+    fig = plt.figure()
+    ax1 = plt.subplot2grid((1, 2), (0, 0))
+    ax2 = plt.subplot2grid((1, 2), (0, 1))
+    # daily values (i.e., EmFix - Std and (+ Emissions) - (+ Chemistry))
+    # of modeled NOx versus inventory
+    ax1.plot((emfix_inventory_daily - std_inventory_daily), 
+             (np.hstack(emfix_nox_neus) - np.hstack(std_nox_neus)), 'o', 
+             color = '#666666', markersize = 3, alpha = 1.)
+    ax1.plot((delta_emiss_inventory - delta_mr2_inventory), 
+             (delta_emiss_nox - delta_mr2_nox), 'o', 
+             color = '#d95f02', markersize = 3, alpha = 1.)
+    ax1.set_xlabel('$\mathregular{\Delta}$ NO$_{\mathregular{}}$ '+
+                   '[kg s$^{\mathregular{-1}}$ grid cell$^{\mathregular{-1}}$]', 
+                   fontsize = 16)         
+    ax1.set_ylabel(r'$\mathregular{\Delta}$ NO$_{x}$ [ppbv]', fontsize = 16)
+    for t in ax1.get_xticklabels():
+        t.set_fontsize(12)
+    for t in ax1.get_yticklabels():
+        t.set_fontsize(12)  
+    ax1.set_title('(a)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
+    ax1.tick_params(right = True, left = True, top = True, 
+                     labelright = False, labelleft = True)    
+    # daily values of modeled O3 versus modeled NOx
+    ax2.plot((np.hstack(emfix_nox_neus) - np.hstack(std_nox_neus)), 
+             (np.hstack(emfix_o3_neus) - np.hstack(std_o3_neus)), 'o', 
+             markersize = 3, color = '#666666', alpha = 1., 
+             label = 'Strode et al. (2015)')
+    ax2.plot((delta_emiss_nox - delta_mr2_nox), (delta_emiss_o3 - delta_mr2_o3), 'o', 
+             color = '#d95f02', markersize = 3, alpha = 1., 
+             label = 'this study')
+    ax2.set_xlabel(r'$\mathregular{\Delta}$ NO$_{x}$ [ppbv]', fontsize = 16)
+    ax2.get_xaxis().set_label_coords(0.5, -0.14)    
+    ax2.set_ylabel(r'$\mathregular{\Delta}$ O$_{\mathregular{3}}$ [ppbv]', 
+                   fontsize = 16)
+    for t in ax2.get_xticklabels():
+        t.set_fontsize(12)
+    for t in ax2.get_yticklabels():
+        t.set_fontsize(12)        
+    ax2.set_title('(b)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
+    ax2.tick_params(right = True, left = True, top = True, 
+                     labelright = False, labelleft = True)    
+    plt.subplots_adjust(wspace = 0.5)
+    # add legend 
+    leg = ax2.legend(loc = 8, bbox_to_anchor = (-0.4, -0.52), ncol = 2, 
+                    fontsize = 16, numpoints = 1)
+    leg.get_frame().set_linewidth(0.0)
+    plt.subplots_adjust(bottom = 0.3)    
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'scatter_inventorynonox_noxo3.eps', dpi = 300)
+    # calculate regression between fields 
+    print('m(Strode Emiss, Strode NOx) = %.4f ppbv s grid cell kg-1' %
+          np.polyfit((emfix_inventory_daily - std_inventory_daily), 
+          (np.hstack(emfix_nox_neus) - np.hstack(std_nox_neus)), 1)[0])
+    print('m(Emiss, NOx) = %.4f ppbv s grid cell kg-1' %
+          np.polyfit((delta_emiss_inventory - delta_mr2_inventory), 
+          (delta_emiss_nox - delta_mr2_nox), 1)[0])
+    print('m(Strode NOx, Strode O3) = %.4f ppbv ppbv-1' %
+          np.polyfit((np.hstack(emfix_nox_neus) - np.hstack(std_nox_neus)), 
+          (np.hstack(emfix_o3_neus) - np.hstack(std_o3_neus)), 1)[0])
+    print('m(NOx, O3) = %.4f ppbv ppbv-1' %
+          np.polyfit((delta_emiss_nox - delta_mr2_nox), 
+          (delta_emiss_o3 - delta_mr2_o3), 1)[0])
+    return std_inventory_daily, np.hstack(std_o3_neus)
+# # # # # # # # # # # # #    
 #import numpy as np
 #import pandas as pd
 #import matplotlib.pyplot as plt
@@ -4079,9 +4515,9 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet):
 #r, do3dt2m = aqs_mda8_r_do3dt2m(ozone_nomean_mda8, merra_lat, merra_lon)
 # # # # # # # # # # # # #
 # visualizations
-## focus region, CTM resolution, and mean CASTNet/CTM + Chemistry O3
+# focus region, CTM resolution, and mean CASTNet/CTM + Chemistry O3
 #map_meanmr2o3meancastneto3_conus(emiss_o3, o3_castnet, gmi_lat, gmi_lon,
-#    lat_castnet, lon_castnet)
+#    lat_castnet, lon_castnet, neus_castnet, sites_castnet)
 # modeled dO3-dT2m and correlation coefficients
 #map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, dat_sens, dat_r, lat_castnet, 
 #    lon_castnet, r_castnet, do3dt2m_castnet, 'Diurnal-AvgT')
@@ -4104,7 +4540,7 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet):
 ## from different regressions
 #scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_neus, castnet_t2m_neus, 
 #    emiss_o3_neus, emiss_t2m_neus, 'neus')
-## timeseries of regionally-averaged O3 from observations and simulations
+# timeseries of regionally-averaged O3 from observations and simulations
 #timeseries_castneto3allgmio3(dat_o3_neus, mr2_o3_neus, emiss_o3_neus, 
 #    castnet_o3_neus, 'neus', 2010, [2008, 2009, 2010])
 # scatterplots and KDES of 2-meter temperature and O3 from different 
@@ -4126,9 +4562,6 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet):
 ## at single grid cell
 #NO_inventory_atpoint(mr2_t2m_overpass, 39.2904, 283.387799, 2010, gmi_lat, 
 #    gmi_lon)
-## calculate nationwide/regional CTM bias
-#find_bias_nationwide_region(emiss_o3, gmi_lat, gmi_lon, o3_castnet, 
-#    neus_castnet, sites_castnet, lat_castnet, lon_castnet)
 ## plot coefficient of determination between O3 and T2m
 #map_r2o3t2m_conus(lat_castnet, lon_castnet, r_castnet, gmi_lat, gmi_lon, 
 #    emiss_r, 'GHKerr-DailyEmiss')
@@ -4147,3 +4580,12 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet):
 #    gmi_lon)
 ## plot boxplots of CEMS NOx and CASTNet O3
 #boxplot_cemsnox_castneto3_neus(neus_castnet)
+## compare different methods of regional averaging
+#compare_regional_averaging(neus, t_castnet, o3_castnet, castnet_t2m_neus, 
+#    castnet_o3_neus, sites_castnet, neus_castnet, emiss_t2m_overpass, 
+#    emiss_o3, emiss_t2m_neus, emiss_o3_neus, emiss_sens, do3dt2m_castnet)    
+## plot Strode et al. (2015) simulations to compare with + Emissions/
+## + Chemistry simulations
+#strode_inventory, strode_o3 = scatter_inventorynonox_noxo3(mr2_t2m_overpass, 
+#    mr2_no, mr2_no2, mr2_o3, emiss_no, emiss_no2, emiss_o3, neus_states, 
+#    gmi_lat, gmi_lon)
