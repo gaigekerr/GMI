@@ -17,6 +17,7 @@ REVISION HISTORY
     27072018 -- function 'inst1_2d_asm_Nx_combine' added 
     10102018 -- function 'inst1_2d_asm_Nx_combine' edited to extract 
                 sea level pressure from daily netCDF files
+    05122018 -- function 'inst1_2d_asm_Nx_combine_dailymaxt2m' added
 """
 # # # # # # # # # # # # #
 def yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, case, year):
@@ -590,19 +591,102 @@ def inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon):
     outfile.close()
     return 
 # # # # # # # # # # # # #    
+def inst1_2d_asm_Nx_combine_dailymaxt2m(year, month):
+    """create monthly file of daily maximum hourly MERRA-2 2-meter temperatures
+
+    Parameters
+    ----------
+    year : int
+        Year of interest
+    months : int
+        Month (1 = January, 2 = February, ...) of interest
+        
+    Returns
+    -------
+    None    
+    """
+    import numpy as np
+    from netCDF4 import Dataset
+    import glob
+    # Path to MERRA-2 data holdings
+    PATH_MERRA = '/mnt/scratch1/gaige/data/MERRA-2/global/%s/' %(year) 
+    # File names with wildcard character for date
+    mfstring = 'MERRA2_300.inst1_2d_asm_Nx.%s%.2d*.SUB.nc*' %(year,month)
+    infiles = []
+    for file in glob.glob(PATH_MERRA + mfstring):
+        infiles.append(file)
+    # Sort input files by date (YYYYMMDD format)
+    infiles.sort()
+    t2m_month = []
+    # Loop through files, find daily maximum temperature 
+    for infilen in infiles:
+        infile = Dataset(infilen,'r')
+        # Extract dimensional information on first iteration
+        if infilen == infiles[0]:
+            lat = infile.variables['lat'][:]
+            lng = infile.variables['lon'][:]
+        t2m = infile.variables['T2M'][:]
+        t2m_max = np.max(t2m,axis=0)
+        t2m_month.append(t2m_max)
+    t2m_month = np.stack(t2m_month)
+    # Create output file; naming convention is the same as input file, 
+    # with trailing values corresponding to: lower latitude, left longitude, 
+    # upper latitude, right longitude
+    outfile = Dataset(PATH_MERRA+'MERRA2_300.inst1_2d_asm_Nx.%s%.2d.SUB.nc'
+                      %(year,month),'w')
+    # define set of dimensions
+    lat_dim = outfile.createDimension('lat', len(lat))
+    lon_dim = outfile.createDimension('lon', len(lng))
+    time_dim = outfile.createDimension('time', None)
+    # create coordinate variables for variables
+    t2m_dataset = outfile.createVariable('T2M', np.float32,
+        ('time', 'lat', 'lon'))
+    lat_dim = outfile.createVariable('lat', np.float32, ('lat'))
+    lon_dim = outfile.createVariable('lon', np.float32, ('lon'))
+    # Sdd data and define their attributes
+    # Latitude
+    lat_dim[:] = lat[:]
+    lat_dim.standard_name = 'latitude'
+    lat_dim.units = 'degrees_north'
+    # Longitude
+    lon_dim[:] = lng[:]
+    lon_dim.standard_name = 'longitude'
+    lon_dim.units = 'degree_east'
+    # 2-meter_air_temperature
+    t2m_dataset[:] = t2m_month
+    t2m_dataset.standard_name = '2-meter_air_temperature'
+    t2m_dataset.long_name = '2-meter_air_temperature'
+    t2m_dataset.units = 'K'
+    # attributes
+    outfile.title = 'MERRA2 inst1_2d_asm_Nx: 2d,3-Hourly,Instantaneous,'+\
+        'Single-Level,Assimilation,Single-Level Diagnostics for %.2d/%d'%(
+                month,year)
+    outfile.author = 'NASA Global Modeling and Assimilation Office,'+\
+        'adapted by Gaige Hunter Kerr'
+    outfile.comment = 'Contents represent daily maximum 2-meter temperatures'+\
+        'at each grid cell'
+    outfile.close()
+    return 
+# # # # # # # # # # # # #
+import numpy as np
 # define function inputs 
 ulat = 50.
-llat = 25.
+llat = 23.
 llon = 230.
 rlon = 300.
 presslevel = 15
-# for HindcastMR2-DiurnalAvgT
-yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, 
-    'HindcastMR2-DiurnalAvgT', 2008)
-# for tavg1_2d_aer_Nx
-tavg1_2d_aer_Nx_combine(ulat, llat, llon, rlon)
-# for inst6_3d_ana_Np
-year = 2008
-inst6_3d_ana_Np_combine(year, ulat, llat, llon, rlon)
-# for inst1_2d_asm_Nx
-inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon)
+## for HindcastMR2-DiurnalAvgT
+#yearly_idaily_combine(ulat, llat, llon, rlon, presslevel, 
+#    'HindcastMR2-DiurnalAvgT', 2008)
+## for tavg1_2d_aer_Nx
+#tavg1_2d_aer_Nx_combine(ulat, llat, llon, rlon)
+## for inst6_3d_ana_Np
+#year = 2008
+#inst6_3d_ana_Np_combine(year, ulat, llat, llon, rlon)
+## for inst1_2d_asm_Nx
+#inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon)
+
+for year in np.arange(2005,2011,1):
+    for month in np.arange(1,13,1):
+        print('Finding daily maximum T2m for %.2d/%d...'%(month,year))
+        inst1_2d_asm_Nx_combine_dailymaxt2m(year, month)
