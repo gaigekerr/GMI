@@ -66,6 +66,8 @@ REVISION HISTORY
     26112018 -- maximum and minimum biases and which CASTNet they occur at 
                 recorded in function 'map_meanmr2o3meancastneto3_conus' 
     28112018 -- function 'scatter_inventorynonox_noxo3' added
+    11122018 -- function 'timeseries_t2m_castneto3_cemsnox' edited and scatter-
+                plot removed and model timeseries added
 """
 # # # # # # # # # # # # #
 # change font
@@ -2354,7 +2356,7 @@ def scatterhist_castneto3allgmio3(transport, chemistry, emissions, obs, t2m,
                       color = pollutants_constants.COLOR_TRANSPORT, zorder = 9)
     axScatter.scatter(t2m, chemistry, label = '+$\:$Chemistry', s = 20, 
                       color = pollutants_constants.COLOR_CHEMISTRY, zorder = 6)
-    axScatter.scatter(t2m, emissions, label = '+$\:$Emissions', s = 20, 
+    axScatter.scatter(t2m, emissions, label = '+$\:$AEmissions', s = 20, 
                       color = pollutants_constants.COLOR_EMISSIONS, zorder = 3)
     # add in lines of best fit 
     obs_m = np.poly1d(np.polyfit(castnet_t2m, obs, 1))[1]
@@ -2772,10 +2774,41 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     import matplotlib.pyplot as plt
     from mpl_toolkits.basemap import Basemap
     from matplotlib.colors import Normalize
-    from matplotlib.colorbar import ColorbarBase    
-    import sys
-    sys.path.append('/Users/ghkerr/phd/')
-    import pollutants_constants
+    from matplotlib.colors import LinearSegmentedColormap    
+    from matplotlib.colorbar import ColorbarBase   
+    # from https://stackoverflow.com/questions/3279560/reverse-colormap-in-matplotlib
+    def reverse_colourmap(cmap, name = 'my_cmap_r'):
+        """
+        In: 
+        cmap, name 
+        Out:
+        my_cmap_r
+    
+        Explanation:
+        t[0] goes from 0 to 1
+        row i:   x  y0  y1 -> t[0] t[1] t[2]
+                       /
+                      /
+        row i+1: x  y0  y1 -> t[n] t[1] t[2]
+    
+        so the inverse should do the same:
+        row i+1: x  y1  y0 -> 1-t[0] t[2] t[1]
+                       /
+                      /
+        row i:   x  y1  y0 -> 1-t[n] t[2] t[1]
+        """        
+        reverse = []
+        k = []   
+        for key in cmap._segmentdata:    
+            k.append(key)
+            channel = cmap._segmentdata[key]
+            data = []
+            for t in channel:                    
+                data.append((1-t[0],t[2],t[1]))            
+            reverse.append(sorted(data))    
+        LinearL = dict(zip(k,reverse))
+        my_cmap_r = mpl.colors.LinearSegmentedColormap(name, LinearL, N=10) 
+        return my_cmap_r    
     # find mean O3 in each simulation on days where 2-meter temperatures exceed
     # the 90th percentile
     dat_o3_p90 = o3_givent2mpercentile(dat_o3, t2m_overpass, 90, 'greater')
@@ -2813,11 +2846,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    # add value for correlation contour 
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)    
     fill_oceans(ax1, m)    
-    outline_region(ax1, m, pollutants_constants.NORTHEAST_STATES)    
     # contributions from + Chemistry simulation
     ax2 = plt.subplot2grid((3, 1), (1, 0))
     ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
@@ -2826,10 +2855,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)        
     fill_oceans(ax2, m)    
-    outline_region(ax2, m, pollutants_constants.NORTHEAST_STATES)    
     # colorbar for first two plots 
     plt.subplots_adjust(right = 0.7)
     cbar_ax = fig.add_axes([0.75, 0.43, 0.05, 0.4])
@@ -2846,21 +2872,28 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
                   x = 0.03, y = 1.03)
     vmin = 0.; vmax = 100.
-    cmap = plt.get_cmap('gist_earth_r', 10)
+    # only use half of RdBu colormap since there aren't many places exceeding
+    # 100% by evaluating an existing colormap from 0.5 (midpoint) to 1 
+    # (upper end)
+    cmap = plt.get_cmap('RdBu', 10)
+    colors = cmap(np.linspace(0.5, 1, cmap.N // 2))
+    # create a new colormap from those colors
+    cmap = LinearSegmentedColormap.from_list('Upper Half', colors, 10)
+    cmap = reverse_colourmap(cmap)
     norm = Normalize(vmin = vmin, vmax = vmax)
     clevs = np.linspace(vmin, vmax, 11, endpoint = True)
     m.contourf(x, y, (delta_dat_hot/delta_mr2_hot) * 100., clevs, cmap = cmap,
                extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)    
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
-    outline_region(ax3, m, pollutants_constants.NORTHEAST_STATES)    
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
+    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
               linestyles = ('-',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
-    cb.set_ticks(np.linspace(vmin, vmax, 5))
+    cb.set_ticks(np.linspace(vmin, vmax, 6))
     cb.set_label(label = '[%]', size = 16)
     cb.ax.tick_params(labelsize = 12)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
@@ -2880,11 +2913,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    # add value for correlation contour 
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)    
     fill_oceans(ax1, m)    
-    outline_region(ax1, m, pollutants_constants.NORTHEAST_STATES)    
     # contributions from + Chemistry simulation
     ax2 = plt.subplot2grid((3, 1), (1, 0))
     ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
@@ -2893,10 +2922,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)        
     fill_oceans(ax2, m)    
-    outline_region(ax2, m, pollutants_constants.NORTHEAST_STATES)    
     # colorbar for first two plots 
     plt.subplots_adjust(right = 0.7)
     cbar_ax = fig.add_axes([0.75, 0.43, 0.05, 0.4])
@@ -2912,21 +2938,25 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
                   x = 0.03, y = 1.03)
     vmin = 0.; vmax = 100.
-    cmap = plt.get_cmap('gist_earth_r', 10)
+    cmap = plt.get_cmap('RdBu', 10)
+    colors = cmap(np.linspace(0.5, 1, cmap.N // 2))
+    # create a new colormap from those colors
+    cmap = LinearSegmentedColormap.from_list('Upper Half', colors, 10)
+    cmap = reverse_colourmap(cmap)
     norm = Normalize(vmin = vmin, vmax = vmax)
     clevs = np.linspace(vmin, vmax, 11, endpoint = True)
     m.contourf(x, y, (delta_dat_cold/delta_mr2_cold) * 100., clevs, 
                cmap = cmap, extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)    
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
-    outline_region(ax3, m, pollutants_constants.NORTHEAST_STATES)    
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
+    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
               linestyles = ('-',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
-    cb.set_ticks(np.linspace(vmin, vmax, 5))
+    cb.set_ticks(np.linspace(vmin, vmax, 6))
     cb.set_label(label = '[%]', size = 16)
     cb.ax.tick_params(labelsize = 12)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
@@ -2969,18 +2999,49 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     from mpl_toolkits.basemap import Basemap
     from matplotlib.colors import Normalize
     from matplotlib.colorbar import ColorbarBase    
-    import sys
-    sys.path.append('/Users/ghkerr/phd/')
-    import pollutants_constants
+    from matplotlib.colors import LinearSegmentedColormap    
+    # from https://stackoverflow.com/questions/3279560/reverse-colormap-in-matplotlib
+    def reverse_colourmap(cmap, name = 'my_cmap_r'):
+        """
+        In: 
+        cmap, name 
+        Out:
+        my_cmap_r
+    
+        Explanation:
+        t[0] goes from 0 to 1
+        row i:   x  y0  y1 -> t[0] t[1] t[2]
+                       /
+                      /
+        row i+1: x  y0  y1 -> t[n] t[1] t[2]
+    
+        so the inverse should do the same:
+        row i+1: x  y1  y0 -> 1-t[0] t[2] t[1]
+                       /
+                      /
+        row i:   x  y1  y0 -> 1-t[n] t[2] t[1]
+        """        
+        reverse = []
+        k = []   
+        for key in cmap._segmentdata:    
+            k.append(key)
+            channel = cmap._segmentdata[key]
+            data = []
+            for t in channel:                    
+                data.append((1-t[0],t[2],t[1]))            
+            reverse.append(sorted(data))    
+        LinearL = dict(zip(k,reverse))
+        my_cmap_r = mpl.colors.LinearSegmentedColormap(name, LinearL, N=10) 
+        return my_cmap_r 
     m = Basemap(projection = 'merc', llcrnrlon = -126., llcrnrlat = 24., 
                 urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'h', 
                 area_thresh = 1000)
     x, y = np.meshgrid(gmi_lon, gmi_lat)
     x, y = m(x, y)    
     vmin = 0.0; vmax = 2.
-    cmap = plt.get_cmap('PuBu', 10)
+    cmap = plt.get_cmap('PuBu', 8)
     norm = Normalize(vmin = vmin, vmax = vmax)
-    clevs = np.linspace(vmin, vmax, 11, endpoint = True)
+    clevs = np.linspace(vmin, vmax, 9, endpoint = True)
     # contributions from Transport simulation
     fig = plt.figure(figsize = (4, 7))    
     ax1 = plt.subplot2grid((3, 1), (0, 0))
@@ -2988,51 +3049,48 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
                   y = 1.03)
     m.contourf(x, y, dat_sens, clevs, cmap = cmap, norm = norm, 
                extend = 'both')
-    # add value for correlation contour 
-    CS = m.contour(x, y, emiss_r, levels = [0.3], colors=('orange',),
-                   linestyles = ('-',), linewidths = (1,), zorder = 1)
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax1, m)    
-    outline_region(ax1, m, pollutants_constants.NORTHEAST_STATES)    
     # + Chemistry simulation
     ax2 = plt.subplot2grid((3, 1), (1, 0))
     ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
                   y = 1.03)
     m.contourf(x, y, mr2_sens, clevs, cmap = cmap, norm = norm, 
                extend = 'both')
-    CS = m.contour(x, y, emiss_r, levels = [0.3], colors=('orange',),
-                   linestyles = ('-',), linewidths = (1,), zorder = 1)
     m.drawstates(color = 'k', linewidth = 0.5)
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax2, m)    
-    outline_region(ax2, m, pollutants_constants.NORTHEAST_STATES)    
     plt.subplots_adjust(right = 0.7)
     cbar_ax = fig.add_axes([0.75, 0.43, 0.05, 0.4])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
     cb.set_ticks(np.linspace(vmin, vmax, 5))
-    cb.set_label(label = 'O$_{\mathregular{3}}$(T$_{\mathregular{P}' +
-                 '_{\mathregular{10}}})$ $-$ O$_{\mathregular{3}}$' +
-                 '(T$_{\mathregular{P}_{\mathregular{50}}})$ [ppbv]', size = 16)
+    cb.set_label(label = '$\mathregular{\partial}$O$_{\mathregular{3}}$ ' + 
+                 '$\mathregular{\partial}$T$^{\mathregular{-1}}$ ' +
+                 '[ppbv K$^{\mathregular{-1}}$]', size = 16)    
     cb.ax.tick_params(labelsize = 12)    
     # ratio from simulations
     ax3 = plt.subplot2grid((3, 1), (2, 0))
     ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
                   x = 0.03, y = 1.03)
     vmin = 0.; vmax = 100.
-    cmap = plt.get_cmap('gist_earth_r', 10)
+    cmap = plt.get_cmap('RdBu', 10)
+    colors = cmap(np.linspace(0.5, 1, cmap.N // 2))
+    # create a new colormap from those colors
+    cmap = LinearSegmentedColormap.from_list('Upper Half', colors, 10)
+    cmap = reverse_colourmap(cmap)
     norm = Normalize(vmin = vmin, vmax = vmax)
     clevs = np.linspace(vmin, vmax, 11, endpoint = True)
     m.contourf(x, y, (dat_sens/mr2_sens) * 100., clevs, cmap = cmap, 
                extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)    
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
-    outline_region(ax3, m, pollutants_constants.NORTHEAST_STATES)    
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
+    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
               linestyles = ('-',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
@@ -3043,189 +3101,9 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 'map_allgmio3_do3dt.eps', 
                 dpi = 300)         
     return        
-# # # # # # # # # # # # #
-def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
-    neus): 
-    """plot maps of the 10th and 90th percentiles from the Transport and 
-    + Chemistry simulations and the ratio between them. Outline regions where 
-    the O3-T correlation (from + Emissions simulation) falls below r = 0.3.
-
-    Parameters
-    ----------       
-    dat_o3 : numpy.ndarray
-        GMI CTM surface-level ozone at overpass time, for model case 
-        HindcastMR2-DiurnalAvgT, units of volume mixing ratio, [time, lat, lon] 
-    mr2_o3 : numpy.ndarray
-        GMI CTM surface-level ozone at overpass time, for model case 
-        HindcastMR2, units of volume mixing ratio, [time, lat, lon] 
-    emiss_o3 : numpy.ndarray
-        GMI CTM surface-level ozone at overpass time, for model case 
-        GHKerr-DailyEmiss, units of volume mixing ratio, [time, lat, lon]         
-    emiss_r : numpy.ndarray
-        The Pearson product-moment correlation coefficient calculated between 
-        MERRA-2 2-meter temperatures and ozone at each GMI grid cell from the 
-        + Emissions simulation, [lat, lon]
-    gmi_lat : numpy.ndarray
-        GMI CTM latitude coordinates, units of degrees north, [lat,]      
-    gmi_lon : numpy.ndarray
-        GMI CTM longitude coordinates, units of degrees east, [lon,]  
-    neus : numpy.ndarray
-        CTM grid where grid cells within NEUS have a value of 1 and grid 
-        cells not in region have a value of NaN, [lat, lon]             
-        
-    Returns
-    ----------      
-    None                
-    """
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.basemap import Basemap
-    from matplotlib.colors import Normalize
-    from matplotlib.colorbar import ColorbarBase    
-    import sys
-    sys.path.append('/Users/ghkerr/phd/')
-    import pollutants_constants
-    # extreme O3 events in each simulation 
-    dat_p90 = np.percentile(dat_o3, 90, axis = 0) * 1e9
-    mr2_p90 = np.percentile(mr2_o3, 90, axis = 0) * 1e9
-    dat_p10 = np.percentile(dat_o3, 10, axis = 0) * 1e9
-    mr2_p10 = np.percentile(mr2_o3, 10, axis = 0) * 1e9    
-    m = Basemap(projection = 'merc', llcrnrlon = -126., llcrnrlat = 24., 
-                urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'h', 
-                area_thresh = 1000)
-    x, y = np.meshgrid(gmi_lon, gmi_lat)
-    x, y = m(x, y)    
-    # # # # for extreme high events
-    vmin = 50.; vmax = 70.
-    cmap = plt.get_cmap('PuBu', 10)
-    norm = Normalize(vmin = vmin, vmax = vmax)
-    clevs = np.linspace(vmin, vmax, 11, endpoint = True)
-    # contributions from Transport simulation
-    fig = plt.figure(figsize = (4, 7))    
-    ax1 = plt.subplot2grid((3, 1), (0, 0))
-    ax1.set_title('(a) Transport', ha = 'left', fontsize = 16, x = 0.03, 
-                  y = 1.03)
-    m.contourf(x, y, dat_p90, clevs, cmap = cmap, norm = norm, extend = 'both')
-    m.contour(x, y, emiss_r, levels = [0.3], colors=('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)
-    m.drawstates(color = 'k', linewidth = 0.5)
-    m.drawcountries(color = 'k', linewidth = 1.0)
-    m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    fill_oceans(ax1, m)    
-    outline_region(ax1, m, pollutants_constants.NORTHEAST_STATES)   
-    # + Chemistry simulation
-    ax2 = plt.subplot2grid((3, 1), (1, 0))
-    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
-                  y = 1.03)
-    m.contourf(x, y, mr2_p90, clevs, cmap = cmap, norm = norm, 
-               extend = 'both')
-    m.contour(x, y, emiss_r, levels = [0.3], colors=('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)
-    m.drawstates(color = 'k', linewidth = 0.5)
-    m.drawcountries(color = 'k', linewidth = 1.0)
-    m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    fill_oceans(ax2, m)    
-    outline_region(ax2, m, pollutants_constants.NORTHEAST_STATES)    
-    plt.subplots_adjust(right = 0.7)
-    cbar_ax = fig.add_axes([0.75, 0.43, 0.05, 0.4])
-    cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
-                      orientation = 'vertical')
-    cb.set_ticks(np.linspace(vmin, vmax, 6))
-    cb.set_label(label = 'O$_{\mathregular{3, P}_{\mathregular{90}}}$ [ppbv]', 
-                 size = 16)
-    cb.ax.tick_params(labelsize = 12)    
-    # ratio from simulations
-    ax3 = plt.subplot2grid((3, 1), (2, 0))
-    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
-                  x = 0.03, y = 1.03)
-    vmin = 96.; vmax = 102.
-    cmap = plt.get_cmap('gist_earth_r', 7)
-    norm = Normalize(vmin = vmin, vmax = vmax)
-    clevs = np.linspace(vmin, vmax, 8, endpoint = True)
-    m.contourf(x, y, (dat_p90/mr2_p90) * 100., clevs, cmap = cmap, 
-               extend = 'both')
-    m.drawcountries(color = 'k', linewidth = 1.0)
-    m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    fill_oceans(ax3, m)    
-    outline_region(ax3, m, pollutants_constants.NORTHEAST_STATES)    
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)     
-    cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
-    cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
-                      orientation = 'vertical')
-    cb.set_ticks(np.linspace(vmin, vmax, 7))
-    cb.set_label(label = '[%]', size = 16)
-    cb.ax.tick_params(labelsize = 12)    
-    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'map_allgmio3_p90.eps', dpi = 300)
-    plt.show()
-    # # # # for extreme low events
-    vmin = 30.; vmax = 50.
-    cmap = plt.get_cmap('PuBu', 10)
-    norm = Normalize(vmin = vmin, vmax = vmax)
-    clevs = np.linspace(vmin, vmax, 11, endpoint = True)
-    # contributions from Transport simulation
-    fig = plt.figure(figsize = (4, 7))    
-    ax1 = plt.subplot2grid((3, 1), (0, 0))
-    ax1.set_title('(a) Transport', ha = 'left', fontsize = 16, x = 0.03, 
-                  y = 1.03)
-    m.contourf(x, y, dat_p10, clevs, cmap = cmap, norm = norm, extend = 'both')
-    m.contour(x, y, emiss_r, levels = [0.3], colors=('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)
-    m.drawstates(color = 'k', linewidth = 0.5)
-    m.drawcountries(color = 'k', linewidth = 1.0)
-    m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    fill_oceans(ax1, m)    
-    outline_region(ax1, m, pollutants_constants.NORTHEAST_STATES)   
-    # + Chemistry simulation
-    ax2 = plt.subplot2grid((3, 1), (1, 0))
-    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
-                  y = 1.03)
-    m.contourf(x, y, mr2_p10, clevs, cmap = cmap, norm = norm, 
-               extend = 'both')
-    m.contour(x, y, emiss_r, levels = [0.3], colors=('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)
-    m.drawstates(color = 'k', linewidth = 0.5)
-    m.drawcountries(color = 'k', linewidth = 1.0)
-    m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    fill_oceans(ax2, m)    
-    outline_region(ax2, m, pollutants_constants.NORTHEAST_STATES)    
-    plt.subplots_adjust(right = 0.7)
-    cbar_ax = fig.add_axes([0.75, 0.43, 0.05, 0.4])
-    cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
-                      orientation = 'vertical')
-    cb.set_ticks(np.linspace(vmin, vmax, 6))
-    cb.set_label(label = 'O$_{\mathregular{3, P}_{\mathregular{90}}}$ [ppbv]', 
-                 size = 16)
-    cb.ax.tick_params(labelsize = 12)    
-    # ratio from simulations
-    ax3 = plt.subplot2grid((3, 1), (2, 0))
-    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
-                  x = 0.03, y = 1.03)
-    vmin = 100.; vmax = 108.
-    cmap = plt.get_cmap('gist_earth_r', 8)
-    norm = Normalize(vmin = vmin, vmax = vmax)
-    clevs = np.linspace(vmin, vmax, 9, endpoint = True)
-    m.contourf(x, y, (dat_p10/mr2_p10) * 100., clevs, cmap = cmap, 
-               extend = 'both')
-    m.drawcountries(color = 'k', linewidth = 1.0)
-    m.drawcoastlines(color = 'k', linewidth = 1.0)    
-    fill_oceans(ax3, m)    
-    outline_region(ax3, m, pollutants_constants.NORTHEAST_STATES)    
-    m.contour(x, y, emiss_r, levels = [0.3], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)     
-    cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
-    cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
-                      orientation = 'vertical')
-    cb.set_ticks(np.linspace(vmin, vmax, 5))
-    cb.set_label(label = '[%]', size = 16)
-    cb.ax.tick_params(labelsize = 12)    
-    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'map_allgmio3_p10.eps', dpi = 300)
-    return
-# # # # # # # # # # # # #    
-def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, year, 
-    years, region):
+# # # # # # # # # # # # #  
+def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, dat_o3_neus, 
+    mr2_o3_neus, emiss_o3_neus, year, years, region):
     """for a given summer (JJA) function plots regionally-averaged 2-meter
     temperatures from MERRA-2, regionally-averaged O3 from CASTNet, and 
     regionally-summed NOx emissions from CEMS and determines the correlation 
@@ -3275,10 +3153,10 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, year,
     castnet_t2m_ty = castnet_t2m[(yearpos*92):((yearpos+1)*92)]
     castnet_o3_ty = castnet_o3[(yearpos*92):((yearpos+1)*92)]
     # initialize figure, axes
-    fig = plt.figure(figsize = (8, 6))
-    ax1 = plt.subplot2grid((3, 5), (0, 0), colspan = 3)
-    ax2 = plt.subplot2grid((3, 5), (1, 0), colspan = 3)
-    ax3 = plt.subplot2grid((3, 5), (2, 0), colspan = 3)
+    fig = plt.figure(figsize = (7, 5.5))
+    ax1 = plt.subplot2grid((3, 4), (0, 0), colspan = 4)
+    ax2 = plt.subplot2grid((3, 4), (2, 0), colspan = 4)
+    ax3 = plt.subplot2grid((3, 4), (1, 0), colspan = 4)
     # MERRA-2 2-meter temperature plot
     ax1.set_title('(a)', fontsize = 16, x = 0.07, y = 1.03)
     ax1.plot(castnet_t2m_ty, lw = 2., color = '#ff7f00')
@@ -3287,60 +3165,58 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, year,
     ax1.set_xticklabels([''])
     for t in ax1.get_yticklabels():
         t.set_fontsize(12)        
-    ax1.get_yaxis().set_label_coords(-0.15, 0.5)
+    ax1.get_yaxis().set_label_coords(-0.1, 0.5)
     ax1.set_ylabel('T [K]', fontsize = 16)
     ax1.xaxis.set_ticks_position('both')
     ax1.yaxis.set_ticks_position('both')
-    # CASTNet O3
-    ax2.set_title('(b)', fontsize = 16, x = 0.07, y = 1.03)
-    ax2.plot(castnet_o3_ty, lw = 2., color = '#999999')
+    # CASTNet/GMI O3
+    ax2.set_title('(c)', fontsize = 16, x = 0.07, y = 1.03)
+    ax2.plot(castnet_o3_ty, lw = 2., color = '#999999', label = 'CASTNet')
+    ax2.plot(emiss_o3_neus[yearpos*92:(yearpos+1)*92], '-', 
+            color = pollutants_constants.COLOR_EMISSIONS, 
+            label = '+$\:$AEmissions')
+    ax2.plot(mr2_o3_neus[yearpos*92:(yearpos+1)*92],
+            '-', color = pollutants_constants.COLOR_CHEMISTRY, 
+            label = '+$\:$Chemistry')
+    ax2.plot(dat_o3_neus[yearpos*92:(yearpos+1)*92], '-', 
+            color = pollutants_constants.COLOR_TRANSPORT, label = 'Transport')
     ax2.set_xlim([0, len(castnet_o3_ty) - 1])
-    ax2.set_xticks([0, 30, 61])
+    ax2.set_xticks([0, 30, 61])    
+    ax2.set_xticklabels(['1 June %d' %year, '1 July', '1 Aug'], fontsize = 12)
+    ax2.set_yticks([30, 45, 60])
     for t in ax2.get_yticklabels():
         t.set_fontsize(12)
-    ax2.set_xticklabels([''])
     ax2.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
-    ax2.get_yaxis().set_label_coords(-0.15, 0.5)
+    ax2.get_yaxis().set_label_coords(-0.1, 0.5)
     ax2.xaxis.set_ticks_position('both')
-    ax2.yaxis.set_ticks_position('both')
-    # scatterplot of CASTNet O3 vs MERRA-2 2-meter temperatures
-    ax2b = plt.subplot2grid((3, 5), (0, 3), rowspan = 2, colspan = 2)
-    ax2b.set_title('(d)', fontsize = 16, x = 0.1, y = 1.02)
-    ax2b.plot(castnet_t2m_ty, castnet_o3_ty, 'o', markersize = 4, 
-              color = '#999999')
-    ax2b.set_xlabel('T [K]', fontsize = 16)
-    ax2b.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16, 
-                    rotation = 270)
-    ax2b.yaxis.set_label_position('right')
-    ax2b.tick_params(right = True, left = True, top = True, 
-                     labelright = True, labelleft = False)
-    ax2b.get_yaxis().set_label_coords(1.48, 0.5)
-    for t in ax2b.get_xticklabels():
-        t.set_fontsize(12)
-    for t in ax2b.get_yticklabels():
-        t.set_fontsize(12)    
+    ax2.yaxis.set_ticks_position('both')   
     # CEMS NOx plot
-    ax3.set_title('(c)', fontsize = 16, x = 0.07, y = 1.03)
+    ax3.set_title('(b)', fontsize = 16, x = 0.07, y = 1.03)
     ax3.plot(nox, lw = 2., color = '#377eb8')
     ax3.set_xlim([0, len(nox) - 1])
     ax3.set_xticks([0, 30, 61])
-    ax3.set_xticklabels(['1 June %d' %year, '1 July', '1 Aug'], fontsize = 12)
+    ax3.set_xticklabels([''])    
+    ax3.set_ylabel('NO$_{x}$ [tons]', fontsize = 16)
     for t in ax3.get_yticklabels():
         t.set_fontsize(12)
-    ax3.set_ylabel('NO$_{x}$ [tons]', fontsize = 16)
-    ax3.get_yaxis().set_label_coords(-0.15, 0.5)
+    ax3.get_yaxis().set_label_coords(-0.1, 0.5)
     pc = (nox - np.mean(nox))/np.mean(nox) * 100.
     ax3t = ax3.twinx()
     ax3t.plot(pc, lw = 1.0)
     for t in ax3t.get_yticklabels():
         t.set_fontsize(12)    
     ax3t.set_ylabel('Change [%]', rotation = 270, fontsize = 16)   
-    ax3t.get_yaxis().set_label_coords(1.16, 0.48)
+    ax3t.get_yaxis().set_label_coords(1.12, 0.48)
     ax3.xaxis.set_ticks_position('both')
-#    ax3.yaxis.set_ticks_position('both')
-    plt.subplots_adjust(hspace = 0.4)
+    plt.subplots_adjust(bottom=0.2, hspace=0.5)
+    # reorder and place legend
+    handles, labels = ax2.get_legend_handles_labels()
+    handles = [handles[0], handles[3], handles[2], handles[1]]
+    labels = [labels[0], labels[3], labels[2], labels[1]]
+    ax2.legend(handles,labels, bbox_to_anchor = (0.5, -.8), loc = 'center', 
+              ncol = 2, frameon = False, fontsize = 16)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'timeseries_t2m_castneto3_cemsnox_%d_%s_withscatter.eps' %(year, region), 
+                'timeseries_t2m_castneto3_cemsnox_%d_%s.eps' %(year, region), 
                 dpi = 300)    
     print('For year %d...' %year)
     print('T2m-O3 correlation = %.3f' %(np.corrcoef(castnet_t2m_ty, castnet_o3_ty)[0, 1]))
@@ -3463,7 +3339,7 @@ def timeseries_mr2o3dato3t2m_atpoint(t2m_overpass, o3, dat_o3, gmi_lat,
     import pollutants_constants
     # indices of grid cell in South
     slon_idx_south = 33
-    slat_idx_south = 8
+    slat_idx_south = 8 + 2
     print('(%.3f, %.3f) is chosen coordinate point in South...' 
           %(gmi_lat[slat_idx_south], gmi_lon[slon_idx_south]))   
     # select values at point
@@ -3559,14 +3435,15 @@ def timeseries_mr2o3dato3t2m_atpoint(t2m_overpass, o3, dat_o3, gmi_lat,
         t.set_fontsize(12)    
         t.set_color('#ff7f00')
     # add inset map showing location of cells
-    left, bottom, width, height = [0.58, 0.38, 0.25, 0.25]
+    left, bottom, width, height = [0.6, 0.4, 0.2, 0.22]
     axi = fig.add_axes([left, bottom, width, height])        
-    m_small = Basemap(projection = 'ortho', lat_0 = 30, lon_0 = -80,
-                      resolution = 'c', area_thresh = 10000) 
-    m_small.drawmapboundary(fill_color ='lightgrey')
-    m_small.fillcontinents(color = '#f9f6d8')
-    m_small.drawcountries(color = 'k', linewidth = 0.5)
-    m_small.drawcoastlines(color = 'k', linewidth = 0.5)    
+    m_small = Basemap(projection = 'merc', llcrnrlon = -93.5, 
+                      llcrnrlat = 24., urcrnrlon = -65.3, 
+                      urcrnrlat = 50., resolution = 'h', area_thresh = 1000)
+    m_small.drawstates(color = 'k', linewidth = 0.5)
+    m_small.drawcountries(color = 'k', linewidth = 1.0)
+    m_small.drawcoastlines(color = 'k', linewidth = 1.0)   
+    fill_oceans(axi, m_small)   
     x, y = m_small(gmi_lon[slon_idx_south], gmi_lat[slat_idx_south])
     m_small.scatter(x, y, 30, color = 'r', marker = '.', edgecolor = 'r', 
               zorder = 20)
@@ -3577,7 +3454,6 @@ def timeseries_mr2o3dato3t2m_atpoint(t2m_overpass, o3, dat_o3, gmi_lat,
     leg = ax1.legend(loc = 9, bbox_to_anchor = (0.5, 1.35), fontsize = 16,
                     ncol = 2)
     leg.get_frame().set_linewidth(0.0)
-    
     plt.subplots_adjust(right = 0.88)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
                 'timeseries_mr2o3dato3t_atpoint_2010.eps', dpi = 300)
@@ -4501,6 +4377,181 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
                 'boxplot_cemsnox_castneto3_neus.eps', dpi = 300)
     return
 # # # # # # # # # # # # #    
+def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
+    neus): 
+    """plot maps of the  difference between the 10th and 90th percentiles from 
+    the Transport and + Chemistry simulations and median O3 concentrations from
+    the + Emissions simulation. A third map shows the ratio between these 
+    event enhancements. Regions where the O3-T correlation (from + Emissions 
+    simulation) falls below r = 0.5 are outlined. 
+
+    Parameters
+    ----------       
+    dat_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        HindcastMR2-DiurnalAvgT, units of volume mixing ratio, [time, lat, lon] 
+    mr2_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        HindcastMR2, units of volume mixing ratio, [time, lat, lon] 
+    emiss_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        GHKerr-DailyEmiss, units of volume mixing ratio, [time, lat, lon]         
+    emiss_r : numpy.ndarray
+        The Pearson product-moment correlation coefficient calculated between 
+        MERRA-2 2-meter temperatures and ozone at each GMI grid cell from the 
+        + Emissions simulation, [lat, lon]
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]  
+    neus : numpy.ndarray
+        CTM grid where grid cells within NEUS have a value of 1 and grid 
+        cells not in region have a value of NaN, [lat, lon]             
+        
+    Returns
+    ----------      
+    None                
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap
+    from matplotlib.colors import Normalize
+    from matplotlib.colorbar import ColorbarBase    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # extreme O3 events in each simulation 
+    dat_p90 = np.percentile(dat_o3, 90, axis = 0) * 1e9
+    mr2_p90 = np.percentile(mr2_o3, 90, axis = 0) * 1e9
+    dat_p10 = np.percentile(dat_o3, 10, axis = 0) * 1e9
+    mr2_p10 = np.percentile(mr2_o3, 10, axis = 0) * 1e9    
+    med_o3 = np.percentile(emiss_o3, 50, axis = 0)  * 1e9
+    m = Basemap(projection = 'merc', llcrnrlon = -126., llcrnrlat = 24., 
+                urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'h', 
+                area_thresh = 1000)
+    x, y = np.meshgrid(gmi_lon, gmi_lat)
+    x, y = m(x, y)    
+    # # # # for extreme high events
+    vmin = 5.; vmax = 15.
+    cmap = plt.get_cmap('PuBu', 10)
+    norm = Normalize(vmin = vmin, vmax = vmax)
+    clevs = np.linspace(vmin, vmax, 11, endpoint = True)
+    # contributions from Transport simulation
+    fig = plt.figure(figsize = (4, 7))    
+    ax1 = plt.subplot2grid((3, 1), (0, 0))
+    ax1.set_title('(a) Transport', ha = 'left', fontsize = 16, x = 0.03, 
+                  y = 1.03)
+    m.contourf(x, y, dat_p90 - med_o3, clevs, cmap = cmap, norm = norm, 
+               extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)
+    m.drawcountries(color = 'k', linewidth = 1.0)
+    m.drawcoastlines(color = 'k', linewidth = 1.0)    
+    fill_oceans(ax1, m)    
+    # + Chemistry simulation
+    ax2 = plt.subplot2grid((3, 1), (1, 0))
+    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
+                  y = 1.03)
+    m.contourf(x, y, mr2_p90 - med_o3, clevs, cmap = cmap, norm = norm, 
+               extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)
+    m.drawcountries(color = 'k', linewidth = 1.0)
+    m.drawcoastlines(color = 'k', linewidth = 1.0)    
+    fill_oceans(ax2, m)    
+    plt.subplots_adjust(right = 0.7)
+    cbar_ax = fig.add_axes([0.75, 0.43, 0.05, 0.4])
+    cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
+                      orientation = 'vertical')
+    cb.set_ticks(np.linspace(vmin, vmax, 6))
+    cb.set_label(label = 'O$_{\mathregular{3, P}_{\mathregular{90}}}$ - '+
+                 'O$_{\mathregular{3, P}_{\mathregular{50}}}$ [ppbv]', 
+                 size = 16)
+    cb.ax.tick_params(labelsize = 12)    
+    # ratio from simulations
+    ax3 = plt.subplot2grid((3, 1), (2, 0))
+    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
+                  x = 0.03, y = 1.03)
+    vmin = 75.; vmax = 125.
+    cmap = plt.get_cmap('RdBu_r', 10)
+    norm = Normalize(vmin = vmin, vmax = vmax)
+    clevs = np.linspace(vmin, vmax, 11, endpoint = True)
+    m.contourf(x, y, ((dat_p90 - med_o3)/(mr2_p90 - med_o3)) * 100., clevs, 
+               cmap = cmap, extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)
+    m.drawcountries(color = 'k', linewidth = 1.0)
+    m.drawcoastlines(color = 'k', linewidth = 1.0)    
+    fill_oceans(ax3, m)    
+    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
+              linestyles = ('-',), linewidths = (1,), zorder = 1)     
+    cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
+    cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
+                      orientation = 'vertical')
+    cb.set_ticks(np.linspace(vmin, vmax, 6))
+    cb.set_label(label = '[%]', size = 16)
+    cb.ax.tick_params(labelsize = 12)    
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_allgmio3_p90.eps', dpi = 300)
+    plt.show()
+    # # # # for extreme low events
+    vmin = -15.; vmax = -5.
+    cmap = plt.get_cmap('PuBu_r', 10)
+    norm = Normalize(vmin = vmin, vmax = vmax)
+    clevs = np.linspace(vmin, vmax, 11, endpoint = True)
+    # contributions from Transport simulation
+    fig = plt.figure(figsize = (4, 7))    
+    ax1 = plt.subplot2grid((3, 1), (0, 0))
+    ax1.set_title('(a) Transport', ha = 'left', fontsize = 16, x = 0.03, 
+                  y = 1.03)
+    m.contourf(x, y, (dat_p10 - med_o3), clevs, cmap = cmap, norm = norm, 
+               extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)
+    m.drawcountries(color = 'k', linewidth = 1.0)
+    m.drawcoastlines(color = 'k', linewidth = 1.0)    
+    fill_oceans(ax1, m)    
+    # + Chemistry simulation
+    ax2 = plt.subplot2grid((3, 1), (1, 0))
+    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
+                  y = 1.03)
+    m.contourf(x, y, (mr2_p10 - med_o3), clevs, cmap = cmap, norm = norm, 
+               extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)
+    m.drawcountries(color = 'k', linewidth = 1.0)
+    m.drawcoastlines(color = 'k', linewidth = 1.0)    
+    fill_oceans(ax2, m)    
+    plt.subplots_adjust(right = 0.7)
+    cbar_ax = fig.add_axes([0.75, 0.43, 0.05, 0.4])
+    cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
+                      orientation = 'vertical')
+    cb.set_ticks(np.linspace(vmin, vmax, 6))
+    cb.set_label(label = 'O$_{\mathregular{3, P}_{\mathregular{10}}}$ - '+
+                 'O$_{\mathregular{3, P}_{\mathregular{50}}}$ [ppbv]', 
+                 size = 16)
+    cb.ax.tick_params(labelsize = 12)    
+    # ratio from simulations
+    ax3 = plt.subplot2grid((3, 1), (2, 0))
+    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
+                  x = 0.03, y = 1.03)
+    vmin = 75.; vmax = 125.
+    cmap = plt.get_cmap('RdBu_r', 10)
+    norm = Normalize(vmin = vmin, vmax = vmax)
+    clevs = np.linspace(vmin, vmax, 11, endpoint = True)
+    m.contourf(x, y, ((dat_p10 - med_o3)/(mr2_p10 - med_o3)) * 100., clevs, 
+               cmap = cmap, extend = 'both')
+    m.drawstates(color = 'k', linewidth = 0.5)
+    m.drawcountries(color = 'k', linewidth = 1.0)
+    m.drawcoastlines(color = 'k', linewidth = 1.0)    
+    fill_oceans(ax3, m)    
+    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
+              linestyles = ('-',), linewidths = (1,), zorder = 1)     
+    cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
+    cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
+                      orientation = 'vertical')
+    cb.set_ticks(np.linspace(vmin, vmax, 6))
+    cb.set_label(label = '[%]', size = 16)
+    cb.ax.tick_params(labelsize = 12)    
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_allgmio3_p10.eps', dpi = 300)
+    return
+# # # # # # # # # # # # #  
 #import numpy as np
 #import pandas as pd
 #import matplotlib.pyplot as plt
@@ -4601,7 +4652,7 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
 ## from different regressions
 #scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_neus, castnet_t2m_neus, 
 #    emiss_o3_neus, emiss_t2m_neus, 'neus')
-# timeseries of regionally-averaged O3 from observations and simulations
+## timeseries of regionally-averaged O3 from observations and simulations
 #timeseries_castneto3allgmio3(dat_o3_neus, mr2_o3_neus, emiss_o3_neus, 
 #    castnet_o3_neus, 'neus', 2010, [2008, 2009, 2010])
 # scatterplots and KDES of 2-meter temperature and O3 from different 
@@ -4617,8 +4668,8 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
 #map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, mr2_t2m_overpass, 
 #    gmi_lat, gmi_lon, neus)
 ## timeseries of 2-meter temperatures, CASTNet O3, CEMS NOx
-#timeseries_t2m_castneto3_cemsnox(castnet_o3_neus, castnet_t2m_neus, 2010, 
-#    years, 'neus')
+#timeseries_t2m_castneto3_cemsnox(castnet_o3_neus, castnet_t2m_neus, 
+#    dat_o3_neus, mr2_o3_neus, emiss_o3_neus, 2010, years, 'neus')
 ## plot emissions inventory from + Chemistry and + Emissions simulations
 ## at single grid cell
 #NO_inventory_atpoint(mr2_t2m_overpass, 39.2904, 283.387799, 2010, gmi_lat, 
@@ -4626,15 +4677,15 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
 ## plot coefficient of determination between O3 and T2m
 #map_r2o3t2m_conus(lat_castnet, lon_castnet, r_castnet, gmi_lat, gmi_lon, 
 #    emiss_r, 'GHKerr-DailyEmiss')
-# maps of the 90th percentile of O3
+## maps of the 90th percentile of O3
 #map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 #    neus)
 ## maps of the O3-climate penalty 
 #map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat, 
 #    gmi_lon)
-## time series of O3 and T2m at a grid point with negative O3-T2m correlation 
-## and sensitivity
-#timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, o3, dat_o3, gmi_lat, 
+# time series of O3 and T2m at a grid point with negative O3-T2m correlation 
+# and sensitivity
+#timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, mr2_o3, dat_o3, gmi_lat, 
 #    gmi_lon)
 # plot timeseries of O3, T at grid cells with high and low O3-T correlations
 #timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, mr2_o3, dat_o3, gmi_lat, 
