@@ -1316,9 +1316,9 @@ def map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, do3dt2m, r, lat_castnet,
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
     cb.set_ticks(np.linspace(vmin, vmax, 6))
-    cb.set_label(label = '$\mathregular{\partial}$O$_{\mathregular{3}}$ ' + 
-                 '$\mathregular{\partial}$T ' +
-                 '$^{\mathregular{-1}}$ [ppbv K$^{\mathregular{-1}}$]', 
+    cb.set_label(label = '$\mathregular{d}$O$_{\mathregular{3}}$/' + 
+                 '$\mathregular{d}$T' +
+                 '[ppbv K$^{\mathregular{-1}}$]', 
                  size = 16, y = 0.2)
     cb.ax.tick_params(labelsize = 12)
     plt.subplots_adjust(bottom = 0.2)         
@@ -1982,8 +1982,9 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
     cb.set_ticks(np.linspace(vmin, vmax, 6))
-    cb.set_label(label = 'O$_{\mathregular{3, GMI\:|\:CASTNet}}$', 
-                 size = 16)
+    cb.set_label(label = '$\mathregular{\mu}_{\mathregular{O}_3}$', size=16)
+#    cb.set_label(label = 'O$_{\mathregular{3, GMI\:|\:CASTNet}}$', 
+#                 size = 16)
     cb.ax.tick_params(labelsize = 12)
     plt.subplots_adjust(bottom = 0.25)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'
@@ -2022,8 +2023,8 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
     cb = fig.colorbar(sc, cax=cax, orientation='horizontal', extend = 'both')
     cb.set_ticks(np.linspace(vmin, vmax, 7, endpoint = True))
-    cb.set_label(label = 'O$_{\mathregular{3, GMI}}$ - ' +
-                 'O$_{\mathregular{3, CASTNet}}$', 
+    cb.set_label(label = '$\mathregular{\mu}_{\mathregular{O}_3\mathregular{, CTM}} - '+
+                 '\mathregular{\mu}_{\mathregular{O}_3\mathregular{, CASTNet}}$',
                  size = 16)
     cb.ax.tick_params(labelsize = 12)
     plt.subplots_adjust(bottom = 0.25)
@@ -2168,7 +2169,7 @@ def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region,
         t.set_fontsize(12)
     ax2.set_yticklabels([''])
     ax2.yaxis.tick_right()
-    ax2.set_title('(b) GMI', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
+    ax2.set_title('(b) CTM', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
     plt.subplots_adjust(bottom = 0.28)
     ax2.legend(loc = 3, ncol = 4, frameon = False, fontsize = 16, 
                bbox_to_anchor = (-1.2, -0.48))
@@ -2879,7 +2880,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     colors = cmap(np.linspace(0.5, 1, cmap.N // 2))
     # create a new colormap from those colors
     cmap = LinearSegmentedColormap.from_list('Upper Half', colors, 10)
-    cmap = reverse_colourmap(cmap)
+    #cmap = reverse_colourmap(cmap)
     norm = Normalize(vmin = vmin, vmax = vmax)
     clevs = np.linspace(vmin, vmax, 11, endpoint = True)
     m.contourf(x, y, (delta_dat_hot/delta_mr2_hot) * 100., clevs, cmap = cmap,
@@ -2889,7 +2890,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
     m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)     
+              linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
@@ -2942,7 +2943,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     colors = cmap(np.linspace(0.5, 1, cmap.N // 2))
     # create a new colormap from those colors
     cmap = LinearSegmentedColormap.from_list('Upper Half', colors, 10)
-    cmap = reverse_colourmap(cmap)
+    #cmap = reverse_colourmap(cmap)
     norm = Normalize(vmin = vmin, vmax = vmax)
     clevs = np.linspace(vmin, vmax, 11, endpoint = True)
     m.contourf(x, y, (delta_dat_cold/delta_mr2_cold) * 100., clevs, 
@@ -2952,7 +2953,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
     m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)     
+              linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
@@ -3068,8 +3069,8 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
     cb.set_ticks(np.linspace(vmin, vmax, 5))
-    cb.set_label(label = '$\mathregular{\partial}$O$_{\mathregular{3}}$ ' + 
-                 '$\mathregular{\partial}$T$^{\mathregular{-1}}$ ' +
+    cb.set_label(label = '$\mathregular{d}$O$_{\mathregular{3}}$/' + 
+                 '$\mathregular{d}$T ' +
                  '[ppbv K$^{\mathregular{-1}}$]', size = 16)    
     cb.ax.tick_params(labelsize = 12)    
     # ratio from simulations
@@ -3081,7 +3082,7 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     colors = cmap(np.linspace(0.5, 1, cmap.N // 2))
     # create a new colormap from those colors
     cmap = LinearSegmentedColormap.from_list('Upper Half', colors, 10)
-    cmap = reverse_colourmap(cmap)
+    #cmap = reverse_colourmap(cmap)
     norm = Normalize(vmin = vmin, vmax = vmax)
     clevs = np.linspace(vmin, vmax, 11, endpoint = True)
     m.contourf(x, y, (dat_sens/mr2_sens) * 100., clevs, cmap = cmap, 
@@ -3091,7 +3092,7 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
     m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)     
+              linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
@@ -4137,7 +4138,7 @@ def scatter_inventorynonox_noxo3(t2m_overpass, mr2_no, mr2_no2, mr2_o3,
     ax1.plot((delta_emiss_inventory - delta_mr2_inventory), 
              (delta_emiss_nox - delta_mr2_nox), 'o', 
              color = '#d95f02', markersize = 3, alpha = 1.)
-    ax1.set_xlabel('$\mathregular{\Delta}$ NO$_{\mathregular{}}$ '+
+    ax1.set_xlabel('$\mathregular{\Delta}$ Emiss$_{\mathregular{NO}}$ '+
                    '[kg s$^{\mathregular{-1}}$ grid cell$^{\mathregular{-1}}$]', 
                    fontsize = 16)         
     ax1.set_ylabel(r'$\mathregular{\Delta}$ NO$_{x}$ [ppbv]', fontsize = 16)
@@ -4314,7 +4315,7 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
     ax2.set_xticklabels(['', '2000', '', '2002', '', '2004', '', '2006', '', 
                          '2008', '', '2010', '', '2012', ''], fontsize = 12)
     # y-axis    
-    ax1.set_ylabel('NO$_{x}$ [tons day$^{\mathregular{-1}}$]', fontsize=16, 
+    ax1.set_ylabel('Emiss$_{\mathregular{NO}_{x}}$ [tons day$^{\mathregular{-1}}$]', fontsize=16, 
                    color='#d95f02')
     ax1.get_yaxis().set_label_coords(-0.15, 0.53)    
     ax2.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize=16, color='#d95f02')
@@ -4336,7 +4337,7 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
         t.set_fontsize(12) 
         t.set_color('#666666')          
     ax1b.set_ylim([2.5, 5.0])
-    ax1b.set_ylabel('NO [kg s$^{\mathregular{-1}}$ grid cell$'+
+    ax1b.set_ylabel('Emiss$_{\mathregular{NO}}$ [kg s$^{\mathregular{-1}}$ grid cell$'+
                     '^{\mathregular{-1}}$]', color = '#666666', fontsize = 16, 
                     rotation = 270)
     ax1b.get_yaxis().set_label_coords(1.21, 0.50)
@@ -4481,7 +4482,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
     m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)     
+              linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
@@ -4541,7 +4542,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
     m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
-              linestyles = ('-',), linewidths = (1,), zorder = 1)     
+              linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
                       orientation = 'vertical')
@@ -4555,7 +4556,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 #import numpy as np
 #import pandas as pd
 #import matplotlib.pyplot as plt
-#from mpl_toolkits.basemap import Basemap    
+#from mpl_toolkits.basemap import Basemap
 #import sys
 #sys.path.append('/Users/ghkerr/phd/')
 #import pollutants_constants
@@ -4691,8 +4692,8 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 #timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, mr2_o3, dat_o3, gmi_lat, 
 #    gmi_lon)
 ## plot boxplots of CEMS NOx and CASTNet O3
-#boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily, 
-#    std_o3_neus)
+#boxplot_cemsnox_castneto3_neus(neus_castnet, strode_inventory, 
+#    strode_o3)
 ## compare different methods of regional averaging
 #compare_regional_averaging(neus, t_castnet, o3_castnet, castnet_t2m_neus, 
 #    castnet_o3_neus, sites_castnet, neus_castnet, emiss_t2m_overpass, 
