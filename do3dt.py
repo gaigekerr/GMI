@@ -68,6 +68,12 @@ REVISION HISTORY
     28112018 -- function 'scatter_inventorynonox_noxo3' added
     11122018 -- function 'timeseries_t2m_castneto3_cemsnox' edited and scatter-
                 plot removed and model timeseries added
+    20022019 -- function 'timeseries_map_hourlyvsoverpass_neus' added; 
+                function 'timeseries_map_hourlyvsoverpass_neus' edited to 
+                output mean O3 and bias plots as a two-panel figure
+    21022019 -- function 'scatter_inventorynoo3' added to replace, in effect, 
+                'scatter_inventorynonox_noxo3' (simplified version)
+    22022018 -- function 'timeseries_transportchemistryo3_atpoints' added
 """
 # # # # # # # # # # # # #
 # change font
@@ -795,6 +801,12 @@ def calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, o3,
     ps_atoverpass_interp : numpy.ndarray
         MERRA-2 sea level pressure at overpass2 time interpolated to the 
         resolution of the CTM, units of Pa, [time, lat, lon]
+    p : numpy.ndarray
+        The p-values for the correlation coefficient calculated between 
+        MERRA-2 2-meter temperatures and ozone at each GMI grid cell; the 
+        p-values roughly indicates the probability of an uncorrelated system 
+        producing datasets that have a Pearson correlation at least as extreme 
+        as the one computed from these datasets, [lat, lon]        
     """
     import numpy as np
     import scipy.interpolate
@@ -802,6 +814,7 @@ def calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, o3,
     import pytz
     import timezonefinder
     import scipy.odr    
+    import scipy.stats
     # # # #
     def fit_func(p, t):
         """first order linear regression for calculating total least squares
@@ -886,11 +899,15 @@ def calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, o3,
     print('calculating correlation coefficients...')
     r = np.empty(shape = t2m_atoverpass_interp.shape[1:])
     r[:] = np.nan
+    p = np.empty(shape = t2m_atoverpass_interp.shape[1:])
+    p[:] = np.nan    
     for i, ilat in enumerate(gmi_lat):
         for j, jlon in enumerate(gmi_lon):
             r[i, j] = np.corrcoef(t2m_atoverpass_interp[:, i, j], 
                                        o3[:, i, j], 1)[0, 1]
-    return do3dt2m, tls, r, t2m_atoverpass_interp, ps_atoverpass_interp
+            p[i, j] = np.corrcoef(t2m_atoverpass_interp[:, i, j], 
+                                       o3[:, i, j], 1)[0, 1]
+    return do3dt2m, tls, r, t2m_atoverpass_interp, ps_atoverpass_interp, p
 # # # # # # # # # # # # #
 def calculate_castnet_r_do3dt2m_regionmean(t_castnet, o3_castnet, 
     sites_castnet, region_castnet):
@@ -1263,12 +1280,12 @@ def map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, do3dt2m, r, lat_castnet,
         resolution = 'h', area_thresh = 1000)
     x, y = np.meshgrid(gmi_lon, gmi_lat)
     x, y = m(x, y)    
-    fig = plt.figure(figsize = (10, 5))
+    fig = plt.figure(figsize=(5, 7.5))
     # O3-T2m correlation map
     m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
                 llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
                 urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
-    ax = plt.subplot2grid((1, 2), (0, 0))
+    ax = plt.subplot2grid((2, 1), (0, 0))
     ax.set_title('(a)', fontsize = 16, x = 0.1, y = 1.03)
     vmin = 0; vmax = 0.75
     cmap = plt.get_cmap('PuBu', 10)
@@ -1285,14 +1302,14 @@ def map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, do3dt2m, r, lat_castnet,
               edgecolor = 'orange')    
     fill_oceans(ax, m)    
     outline_region(ax, m, pollutants_constants.NORTHEAST_STATES)    
-    cax = fig.add_axes([0.125, 0.25, 0.352, 0.05])
-    cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
+    caxt = fig.add_axes([0.21, 0.56, 0.6, 0.03]) 
+    cb = ColorbarBase(caxt, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
     cb.set_label(label = r'$r$(T, O$_{\mathregular{3}}$)', size = 16, y = 0.25)    
     cb.ax.tick_params(labelsize = 12)
     cb.set_ticks(np.linspace(vmin, vmax, 6))    
     # O3-T2m sensitivity map         
-    ax2 = plt.subplot2grid((1, 2), (0, 1))
+    ax2 = plt.subplot2grid((2, 1), (1, 0))
     ax2.set_title('(b)', fontsize = 16, x = 0.1, y = 1.03)
     # set up colormap
     vmin = 0.0; vmax = 2.0
@@ -1312,8 +1329,8 @@ def map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, do3dt2m, r, lat_castnet,
     fill_oceans(ax2, m)    
     outline_region(ax2, m, pollutants_constants.NORTHEAST_STATES)
     # add colorbar
-    cax = fig.add_axes([0.5477, 0.25, 0.352, 0.05])
-    cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
+    caxb = fig.add_axes([0.21, 0.13, 0.6, 0.03])
+    cb = ColorbarBase(caxb, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
     cb.set_ticks(np.linspace(vmin, vmax, 6))
     cb.set_label(label = '$\mathregular{d}$O$_{\mathregular{3}}$/' + 
@@ -1321,7 +1338,7 @@ def map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, do3dt2m, r, lat_castnet,
                  '[ppbv K$^{\mathregular{-1}}$]', 
                  size = 16, y = 0.2)
     cb.ax.tick_params(labelsize = 12)
-    plt.subplots_adjust(bottom = 0.2)         
+    plt.subplots_adjust(bottom = 0.18, hspace=0.6)                 
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
                 'map_ro3dt2m_do3dt2m_conus_gmi_%s.eps' %case, dpi = 350)    
     return
@@ -1927,7 +1944,6 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     sites_castnet : list
         CASTNet site names, [no. sites,]        
         
-        
     Returns
     ----------     
     None 
@@ -1948,8 +1964,9 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     m = Basemap(projection = 'merc', llcrnrlon = -126., llcrnrlat = 24., 
             urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'h', 
             area_thresh = 1000)
-    fig = plt.figure()
-    ax = plt.subplot2grid((1, 1), (0, 0))
+    fig = plt.figure(figsize=(5, 7.5))
+    ax = plt.subplot2grid((2, 1), (0, 0))
+    ax.set_title('(a)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')    
     x, y = np.meshgrid(gmi_lon, gmi_lat)
     x, y = m(x, y)
     vmin = 26; vmax = 56
@@ -1978,17 +1995,12 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     m.drawcountries(color = 'k', linewidth = 1.0, zorder = 10)
     m.drawcoastlines(color = 'k', linewidth = 1.0, zorder = 10)  
     outline_region(ax, m, pollutants_constants.NORTHEAST_STATES)    
-    cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
-    cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
+    caxt = fig.add_axes([0.21, 0.56, 0.6, 0.03])    
+    cb = ColorbarBase(caxt, cmap = cmap, norm = norm, 
                       orientation = 'horizontal', extend = 'both')
     cb.set_ticks(np.linspace(vmin, vmax, 6))
-    cb.set_label(label = '$\mathregular{\mu}_{\mathregular{O}_3}$', size=16)
-#    cb.set_label(label = 'O$_{\mathregular{3, GMI\:|\:CASTNet}}$', 
-#                 size = 16)
+    cb.set_label(label = '$\mathregular{O}_3}$ [ppbv]', size=16)
     cb.ax.tick_params(labelsize = 12)
-    plt.subplots_adjust(bottom = 0.25)
-    plt.savefig('/Users/ghkerr/phd/GMI/figs/'
-                'map_meanemisso3meancastneto3_conus.eps', dpi = 300)
     # # # # plot bias at each CASTNet site
     i = 0
     bias_all = []
@@ -2006,28 +2018,26 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
           sites_castnet[np.where(np.array(bias_all) == np.max(bias_all))[0][0]]))
     print('Min bias of %.3f ppbv at %s' %(np.min(bias_all),
           sites_castnet[np.where(np.array(bias_all) == np.min(bias_all))[0][0]]))    
-    fig = plt.figure()
-    ax = plt.subplot2grid((1, 1), (0, 0))
+    ax2 = plt.subplot2grid((2, 1), (1, 0))
+    ax2.set_title('(b)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
     vmin = -12; vmax = 12
     cmap = plt.get_cmap('RdBu_r', 12)
     clevs = np.linspace(vmin, vmax, 13, endpoint = True)
     sc = m.scatter(x_castnet, y_castnet, c = np.array(bias_all), s = 20, 
               cmap = cmap, vmin = vmin, vmax = vmax,
               zorder = 30, linewidth = 1., edgecolor = 'k')    
-    fill_oceans(ax, m)    
+    fill_oceans(ax2, m)    
     # add countries, states, etc here so they sit atop the gridlines
     m.drawstates(color = 'k', linewidth = 0.5, zorder = 10)
     m.drawcountries(color = 'k', linewidth = 1.0, zorder = 10)
     m.drawcoastlines(color = 'k', linewidth = 1.0, zorder = 10)  
-    outline_region(ax, m, pollutants_constants.NORTHEAST_STATES)    
-    cax = fig.add_axes([0.15, 0.16, 0.73, 0.05])
+    outline_region(ax2, m, pollutants_constants.NORTHEAST_STATES)    
+    cax = fig.add_axes([0.21, 0.13, 0.6, 0.03])
     cb = fig.colorbar(sc, cax=cax, orientation='horizontal', extend = 'both')
     cb.set_ticks(np.linspace(vmin, vmax, 7, endpoint = True))
-    cb.set_label(label = '$\mathregular{\mu}_{\mathregular{O}_3\mathregular{, CTM}} - '+
-                 '\mathregular{\mu}_{\mathregular{O}_3\mathregular{, CASTNet}}$',
-                 size = 16)
+    cb.set_label(label = 'Bias [ppbv]', size = 16)
     cb.ax.tick_params(labelsize = 12)
-    plt.subplots_adjust(bottom = 0.25)
+    plt.subplots_adjust(bottom = 0.18, hspace=0.6)
     print('mean nationwide bias (GMI - CASTNet) = %.4f ppbv' 
           %np.mean(bias_all))
     # find O3 bias in region 
@@ -2037,7 +2047,7 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     print('mean bias in region (GMI - CASTNet) = %.4f ppbv'
           %np.mean(bias_region))
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'
-                'map_meanemisso3meancastneto3_bias_conus.eps', dpi = 300)
+                'map_meanemisso3meancastneto3_withbias_conus.eps', dpi = 300)
     return
 # # # # # # # # # # # # #  
 def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region, 
@@ -2114,9 +2124,9 @@ def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region,
     # first subplot, CASTNet O3
     ax1.plot(castnet_t2m_region, castnet_o3_region, 'o', markersize = 3, 
              color = 'darkgrey', zorder = 1)
-    # total least squares
-    ax1.plot(castnet_t2m_region, fit_func(beta, castnet_t2m_region), 
-             '#a6cee3', lw = 2, zorder = 2)    
+#    # total least squares
+#    ax1.plot(castnet_t2m_region, fit_func(beta, castnet_t2m_region), 
+#             '#a6cee3', lw = 2, zorder = 2)    
     castnet_t2m_region = np.sort(castnet_t2m_region)
     # least squares
     ax1.plot(castnet_t2m_region, lsq_res_castnet[1] + lsq_res_castnet[0] * 
@@ -2147,10 +2157,10 @@ def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region,
     # second subplot, GMI O3
     ax2.plot(mr2_t2m_region, mr2_o3_region, 'o', markersize = 3, 
              color = 'darkgrey', zorder = 1)
-    # total least squares
-    ax2.plot(mr2_t2m_region, fit_func(beta_gmi, mr2_t2m_region), 
-             '#a6cee3', lw = 2, label = 'TLS', 
-             zorder = 2)    
+#    # total least squares
+#    ax2.plot(mr2_t2m_region, fit_func(beta_gmi, mr2_t2m_region), 
+#             '#a6cee3', lw = 2, label = 'TLS', 
+#             zorder = 2)    
     mr2_t2m_region = np.sort(mr2_t2m_region)
     # least squares
     ax2.plot(mr2_t2m_region, lsq_res_mr2[1] + lsq_res_mr2[0] * mr2_t2m_region, 
@@ -2172,15 +2182,17 @@ def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region,
     ax2.set_title('(b) CTM', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
     plt.subplots_adjust(bottom = 0.28)
     ax2.legend(loc = 3, ncol = 4, frameon = False, fontsize = 16, 
-               bbox_to_anchor = (-1.2, -0.48))
+               bbox_to_anchor = (-0.9, -0.48))
+    # uncomment and replace if TLS is included
+#               bbox_to_anchor = (-1.2, -0.48))    
     print('GMI Total Least Squares slope = %.3f ppbv K^-1' %beta_gmi[0])    
     print('GMI Least Squares slope = %.3f ppbv K^-1' %lsq_res_mr2.slope)
     print('GMI Theil-Sen slope = %.3f ppbv K^-1' %res_mr2[0])
     print('GMI second-order slope, b1, b2, b3 = %.5f, %.5f, %.5f'
           %(so_res_mr2[2], so_res_mr2[1], so_res_mr2[0]))
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'
-                'scatter_castnett2mo3_gmit2mo3_slopes_%s.eps' %region, 
-                dpi = 300)    
+                'scatter_castnett2mo3_gmit2mo3_slopeswithoutTLS_%s.eps' 
+                %region, dpi = 300)    
     return 
 # # # # # # # # # # # # #    
 def timeseries_castneto3allgmio3(transport, chemistry, emissions, obs, region,
@@ -3039,7 +3051,7 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
                 area_thresh = 1000)
     x, y = np.meshgrid(gmi_lon, gmi_lat)
     x, y = m(x, y)    
-    vmin = 0.0; vmax = 2.
+    vmin = 0.0; vmax = 2.0
     cmap = plt.get_cmap('PuBu', 8)
     norm = Normalize(vmin = vmin, vmax = vmax)
     clevs = np.linspace(vmin, vmax, 9, endpoint = True)
@@ -3682,7 +3694,6 @@ def compare_regional_averaging(neus, t_castnet, o3_castnet, castnet_t2m_neus,
         The O3-T2m sensitivity (slope of linear regression) at each CASTNet
         site, [no. CASTNet stations,]     
         
-        
     Returns
     ----------     
     None     
@@ -4315,7 +4326,7 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
     ax2.set_xticklabels(['', '2000', '', '2002', '', '2004', '', '2006', '', 
                          '2008', '', '2010', '', '2012', ''], fontsize = 12)
     # y-axis    
-    ax1.set_ylabel('Emiss$_{\mathregular{NO}_{x}}$ [tons day$^{\mathregular{-1}}$]', fontsize=16, 
+    ax1.set_ylabel('Emissions [tons day$^{\mathregular{-1}}$]', fontsize=16, 
                    color='#d95f02')
     ax1.get_yaxis().set_label_coords(-0.15, 0.53)    
     ax2.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize=16, color='#d95f02')
@@ -4337,7 +4348,7 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
         t.set_fontsize(12) 
         t.set_color('#666666')          
     ax1b.set_ylim([2.5, 5.0])
-    ax1b.set_ylabel('Emiss$_{\mathregular{NO}}$ [kg s$^{\mathregular{-1}}$ grid cell$'+
+    ax1b.set_ylabel('Emissions [kg s$^{\mathregular{-1}}$ grid cell$'+
                     '^{\mathregular{-1}}$]', color = '#666666', fontsize = 16, 
                     rotation = 270)
     ax1b.get_yaxis().set_label_coords(1.21, 0.50)
@@ -4365,7 +4376,7 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
     axleg.plot([3], [0], 'o', lw=2., markersize=6, color='#666666')
     axleg.plot([2.5, 3.5], [0, 0], '-', lw=2., markersize=6, color='#666666')
     axleg.set_xticks([0, 3])
-    axleg.set_xticklabels(['this study', 'Strode et al. (2015)'], fontsize = 16)
+    axleg.set_xticklabels(['observations', 'Strode et al. (2015)'], fontsize = 16)
     axleg.tick_params(axis='x', colors='w', labelcolor='k')
     axleg.set_yticks([])
     axleg.set_yticklabels([])
@@ -4552,7 +4563,631 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
                 'map_allgmio3_p10.eps', dpi = 300)
     return
+# # # # # # # # # # # # #
+def timeseries_map_hourlyvsoverpass_neus(o3, castnet_o3_neus, emiss_o3_neus,
+    gmi_lat, gmi_lon, year, years):
+    """for the desired summer, function plots a timeseries of regionally-
+    averaged O3 in the Northeast from (1) CASTNet observations, (2) daily 
+    average over 1300-1400 hours (local time) from hourly output at GMI sites,
+    and (3) the Northeastern-averaged from output at overpass2 time from 
+    gridded GMI. The bottom subplot shows the location of GMI sites with hourly 
+    output and the mean difference between hourly output and co-located 
+    overpass2 output. 
+
+    Parameters
+    ----------       
+    o3 : numpy.ndarray
+        GMI CTM daily O3 concentrations for model case GHKerr-DailyEmiss, units 
+        of ppbv, [lat, lon, time,]
+    castnet_o3_neus : numpy.ndarray
+        Daily regionally-averaged O3 from CASTNet, units of ppbv, [time,]         
+    emiss_o3_neus : numpy.ndarray
+        Daily regionally-averaged O3 from GHKerr-DailyEmiss simulation, units 
+        of ppbv, [time,]             
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]          
+    year : int
+        Year of interest
+    years : list
+        Years in measuring period
+        
+    Returns
+    ----------      
+    None             
+    """
+    import numpy as np
+    from matplotlib.colors import Normalize
+    from matplotlib.colorbar import ColorbarBase
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap
+    import sys
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    from geo_idx import geo_idx 
+    import commensurability
+    years = [2008, 2009, 2010]            
+    sampling_months = [6, 7, 8]
+    sampling_hours = [15, 16, 17, 18, 19, 20]
+    llcrnrlon = -83.
+    llcrnrlat = 37.0
+    urcrnrlon = -66.3
+    urcrnrlat = 48.
+    m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
+        llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, urcrnrlat = urcrnrlat, 
+        resolution = 'h', area_thresh = 1000)
+    castnet_sites_neus = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
+                        'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
+                        'CDR', 'VPI', 'MKG', 'KEF']
+    timezone = 'GMT+4'
+    # CASTNet sites, n.b. MR2 CASTNet data (with no regional average) needs 
+    # to be loaded
+    mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
+    commensurability.commensurate_castnet_gmi(castnet_sites_neus, 'HindcastMR2', 
+        years, sampling_months, sampling_hours, timezone)
+    # drop GMI hourly output that's missing
+    mask = np.all(np.isnan(mr2_o3), axis=tuple((0,2)))
+    mr2_o3 = mr2_o3[:,~mask]
+    # # # # open daily mean CASTNet O3 and GMI trace gases
+    meandaily = commensurability.commensurate_castnet_gmi_ra(castnet_sites_neus, 
+        years, sampling_months, sampling_hours, timezone)
+    castnet_lats, castnet_lons, gmi_lats, gmi_lons = \
+        commensurability.commensurate_castnet_gmi_locations(castnet_sites_neus, 
+        sampling_months, sampling_hours, timezone)
+    whereyear = np.where(np.array(years)==year)[0][0]
+    meano3_overpass,meano3_hourly = [],[]
+    # Initialize figure, axes 
+    fig = plt.figure()
+    axt = plt.subplot2grid((2,1),(0,0))
+    axt.set_title('(a)', fontsize = 16, x = -0.07, y = 1.03)
+    axt.plot(castnet_o3_neus[whereyear*92:(whereyear+1)*92], '-k', lw=2, 
+                             label='CASTNet')
+    axt.plot(emiss_o3_neus[whereyear*92:(whereyear+1)*92], '-', color='#d95f02',
+                         lw=2, label='Overpass')
+    axt.plot(meandaily['EGU_T O3'][whereyear], '-', color='#1b9e77', lw=2, 
+             label='Hourly')
+    axt.set_xlim([0, 91])
+    axt.set_ylim([30, 72])
+    # axis labels
+    axt.set_xticks([0, 14, 30, 44, 61, 75])
+    axt.set_xticklabels(['1 June %d' %year, '', '1 July', '', '1 Aug', ''], 
+                       ha = 'center', fontsize = 12)
+    axt.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    plt.legend(loc=1, frameon = False, fontsize = 16, ncol=3,
+               bbox_to_anchor = (1.15, 1.4))
+    # Map subplot
+    axb = plt.subplot2grid((2,1),(1,0))
+    axb.set_ylabel('(b)', fontsize = 16, rotation=0)
+    axb.yaxis.set_label_coords(-0.22,0.75)
+    vmin = -5; vmax = 5
+    cmap = plt.get_cmap('bwr', 12)
+    clevs = np.linspace(vmin, vmax, 11, endpoint = True)
+    x_gmi, y_gmi = m(gmi_lons, gmi_lats)
+    # find overpass2 concentrations at each hourly profile site 
+    i = 0
+    for ilat, ilon in zip(gmi_lats, gmi_lons):
+        gilat = geo_idx(ilat,gmi_lat)
+        gilon = geo_idx(ilon,gmi_lon)
+        io3 = o3[:,gilat,gilon]
+        meano3_overpass.append(np.mean(io3))
+        meano3_hourly.append(np.mean(mr2_o3[:,i]))
+        i = i + 1
+    diff = np.array(meano3_overpass) - np.array(meano3_hourly)
+    sc = m.scatter(x_gmi, y_gmi, c = diff, s = 20, cmap = cmap, vmin = vmin, 
+                   vmax = vmax, zorder = 30, linewidth = 1., edgecolor = 'k')    
+    fill_oceans(axb, m)    
+    # add countries, states, etc here so they sit atop the gridlines
+    m.drawstates(color = 'k', linewidth = 0.5, zorder = 10)
+    m.drawcountries(color = 'k', linewidth = 1.0, zorder = 10)
+    m.drawcoastlines(color = 'k', linewidth = 1.0, zorder = 10)
+    cax = fig.add_axes([0.30, 0.15, 0.43, 0.05])
+    cb = fig.colorbar(sc, cax=cax, orientation='horizontal', extend = 'both')
+    cb.set_ticks(np.linspace(vmin, vmax, 5, endpoint = True))
+    cb.set_label(label = '$\mathregular{O}_\mathregular{3,\:Overpass}$ '+
+        '$-$ ${\mathregular{O}_\mathregular{3,\:Hourly}}$ [ppbv]', size = 16)
+    cb.ax.tick_params(labelsize = 12)
+    plt.subplots_adjust(hspace=0.33, bottom=0.22)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
+                'timeseries_map_hourlyvsoverpass_neus.eps', dpi=300)
+    return    
 # # # # # # # # # # # # #  
+def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
+    """function finds the difference between NO in the GMI emissions inventory
+    and simulated O3 in the Northeastern U.S. for (1) Std and EmFix simulations 
+    from Strode et al. (2015) and (2) the + Chemistry and + Emissions 
+    simulations in current work. These daily differences are plotted as 
+    scatterpoints and the lines of best fit are calculated. 
+    
+    Parameters
+    ----------  
+    mr2_o3 : numpy.ndarray    
+        GMI CTM surface-level ozone at overpass time from the + Chemistry 
+        simulation, units of volume mixing ratio, [time, lat, lon]
+    emiss_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time from the + Emissions 
+        simulation, units of volume mixing ratio, [time, lat, lon]
+    neus_states : list
+        State names (string format) in region      
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,] 
+
+    Returns
+    ----------          
+    None
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.basemap import Basemap    
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    import commensurability     
+    # load Std
+    (gmi_lat_c, gmi_lon_c, eta_c, times_c, std_co, std_no, std_no2, std_o3, 
+     std_cloudfraction, std_gridboxheight) = \
+    commensurability.open_overpass2('HindcastFFIgac2', [2000, 2001, 2002, 
+        2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010])
+    # load EmFix
+    (gmi_lat_c, gmi_lon_c, eta_c, times_c, emfix_co, emfix_no, emfix_no2, emfix_o3, 
+     std_cloudfraction, std_gridboxheight) = \
+    commensurability.open_overpass2('Hindcast3Igac2', [2000, 2001, 2002, 
+        2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010])
+    gmi_lon_c = np.mod(gmi_lon_c - 180.0, 360.0) - 180.0
+    # emissions inventory from + Emissions simulation
+    emiss_no_inventory, lon_inventory, lat_inventory = \
+     commensurability.open_perturbed_emissions()
+    # emissions inventory from + Chemistry simulation 
+    mr2_no_inventory, lon_inventory, lat_inventory = \
+     commensurability.open_unperturbed_emissions('1x1.25_IAVanthGFED4')
+    lon_inventory = np.mod(lon_inventory[0] - 180.0, 360.0) - 180.0
+    # emissions inventory from Std/EmFix simulations
+    std_no_inventory, lon_inventory_c, lat_inventory_c = \
+     commensurability.open_unperturbed_emissions('2x2.5_IAVanthGFED3gcEF')
+    lon_inventory_c = np.mod(lon_inventory_c[0] - 180.0, 360.0) - 180.0
+    # find grid cells in Northeast for different simulations/inventories
+    m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
+                urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
+                area_thresh = 1000)
+    neus_states = pollutants_constants.NORTHEAST_STATES
+    neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
+    neus_c = find_grid_in_region(m, neus_states, gmi_lat_c, gmi_lon_c) 
+    neus_inventory = find_grid_in_region(m, neus_states, lat_inventory[0], 
+                                         lon_inventory)  
+    neus_inventory_c = find_grid_in_region(m, neus_states, lat_inventory_c[0], 
+                                           lon_inventory_c)       
+     # # # find Northeast-averaged inventories, NOx, O3 
+    # from Strode et al. [2015] simulations
+    std_no_inventory_c_neus = np.array(std_no_inventory) * neus_inventory_c
+    std_no_inventory_c_neus = np.nanmean(std_no_inventory_c_neus, axis = tuple((2, 3)))
+    std_o3_neus = np.nanmean((std_o3 * neus_c), axis = tuple((1, 2))) * 1e9
+    emfix_o3_neus = np.nanmean((emfix_o3 * neus_c), axis = tuple((1, 2))) * 1e9
+    # from + Emissions/+ Chemistry simulations
+    emiss_no_inventory_neus = np.vstack(emiss_no_inventory) * neus_inventory
+    emiss_no_inventory_neus = np.nanmean(emiss_no_inventory_neus, axis = tuple((1, 2)))             
+    mr2_no_inventory_neus = np.vstack(mr2_no_inventory) * neus_inventory
+    mr2_no_inventory_neus = np.nanmean(mr2_no_inventory_neus, axis = tuple((1, 2)))    
+    # since the inventory from MR2 only varies from month-to-month, repeat 
+    # monthly values for every day in month
+    mr2_inventory_daily = []
+    for year in (mr2_no_inventory_neus[0:3], 
+                 mr2_no_inventory_neus[3:6],
+                 mr2_no_inventory_neus[6:]): 
+        mr2_inventory_daily.append(np.repeat(year[0], 30))
+        mr2_inventory_daily.append(np.repeat(year[1], 31))
+        mr2_inventory_daily.append(np.repeat(year[2], 31))
+    mr2_no_inventory_neus = np.hstack(mr2_inventory_daily)
+    emiss_o3_neus = np.nanmean((emiss_o3 * neus), axis = tuple((1, 2))) * 1e9
+    mr2_o3_neus = np.nanmean((mr2_o3 * neus), axis = tuple((1, 2))) * 1e9
+    # separate into years and months
+    std_o3_neus = np.reshape(std_o3_neus, (11, 92))
+    emfix_o3_neus = np.reshape(emfix_o3_neus, (11, 92))
+    emiss_o3_neus = np.reshape(emiss_o3_neus, (3, 92))
+    mr2_o3_neus = np.reshape(mr2_o3_neus, (3, 92))
+    # for emissions inventories, n.b. repeat monthly mean values for every day and 
+    # save off 2000 values for EmFix
+    std_inventory_daily, emfix_inventory_daily = [], []  
+    emfix_inventory_mm = []  
+    for year in std_no_inventory_c_neus: 
+        std_inventory_daily.append(np.repeat(year[0], 30))
+        std_inventory_daily.append(np.repeat(year[1], 31))
+        std_inventory_daily.append(np.repeat(year[2], 31))
+        emfix_inventory_daily.append(np.repeat(std_no_inventory_c_neus[0][0], 30))
+        emfix_inventory_daily.append(np.repeat(std_no_inventory_c_neus[0][1], 31))
+        emfix_inventory_daily.append(np.repeat(std_no_inventory_c_neus[0][2], 31))
+        emfix_inventory_mm.append(std_no_inventory_c_neus[0][0])
+        emfix_inventory_mm.append(std_no_inventory_c_neus[0][1])
+        emfix_inventory_mm.append(std_no_inventory_c_neus[0][2])    
+    # stack arrays
+    mr2_inventory_daily = np.hstack(mr2_inventory_daily)
+    std_inventory_daily = np.hstack(std_inventory_daily)
+    emfix_inventory_daily = np.hstack(emfix_inventory_daily)
+    emiss_no_inventory_neus = np.hstack(emiss_no_inventory_neus)
+    kerr_delta_o3 = np.hstack(emiss_o3_neus - mr2_o3_neus)
+    kerr_delta_no = emiss_no_inventory_neus - mr2_no_inventory_neus
+    strode_delta_o3 = np.hstack(emfix_o3_neus - std_o3_neus)
+    strode_delta_no = emfix_inventory_daily - std_inventory_daily
+    # Plotting
+    fig = plt.figure()
+    ax1 = plt.subplot2grid((1,1),(0,0))
+    ax1.plot(kerr_delta_no,kerr_delta_o3, 'o', 
+             color = '#d95f02', markersize = 3, alpha = 1.)
+    ax1.plot(strode_delta_no, strode_delta_o3,  'o', 
+             color = '#666666', markersize = 3, alpha = 1.)
+    # Plot lines of best fit 
+    kerrx = np.arange(kerr_delta_no.min()-0.2, kerr_delta_no.max()+0.2, 0.01)
+    strodex = np.arange(strode_delta_no[92:].min()-0.25, 
+                        strode_delta_no[92:].max(), 0.01) 
+    kerrm, kerrb = np.polyfit(kerr_delta_no, kerr_delta_o3, 1)
+    strodem, strodeb = np.polyfit(strode_delta_no[92:], 
+                                  strode_delta_o3[92:], 1)         
+    ax1.plot(kerrx, kerrb + kerrm * kerrx, '--', lw=2., color='#d95f02', 
+             zorder =10)
+    ax1.plot(strodex, strodeb + strodem * strodex, '--', lw=2., 
+             color='#666666')
+    # Indicate slope of best fit lines (i.e., the sensitivity of O3 to changes
+    # in NOx emissions) 
+    ax1.text(0.05, 0.73, 'This study:\n' + r'$\frac{\mathregular{\Delta\:O}_'
+             r'{\mathregular{3}}}{\mathregular{\Delta\:NO}_{x}}$ = %.2f '%kerrm+
+             r'$\frac{\mathregular{ppbv}}{\mathregular{kg\:s}^{\mathregular{-1}}'+
+             r'\mathregular{\:grid\:cell}^{\mathregular{-1}}}$', 
+             transform=ax1.transAxes, color = '#d95f02', fontsize=16)
+    ax1.text(0.45, 0.06, 'Strode et al. (2015):\n' + r'$\frac{\mathregular'+
+             r'{\Delta\:O}_{\mathregular{3}}}{\mathregular{\Delta\:NO}'+
+             r'_{x}}$ = %.2f $\frac{\mathregular{ppbv}}'%strodem +
+             r'{\mathregular{kg\:s}^{\mathregular{-1}}\mathregular{\:grid'+
+             r'\:cell}^{\mathregular{-1}}}$', 
+             transform=ax1.transAxes, color = '#666666', fontsize=16)
+    ax1.set_xlabel('$\mathregular{\Delta}$ Emissions '+
+                   '[kg s$^{\mathregular{-1}}$ grid cell$^{\mathregular{-1}}$]', 
+                   fontsize = 16)  
+    ax1.set_ylabel('$\mathregular{\Delta}$ O$_\mathregular{3}$ [ppbv]',
+                   fontsize = 16)         
+    for t in ax1.get_xticklabels():
+        t.set_fontsize(12)
+    for t in ax1.get_yticklabels():
+        t.set_fontsize(12)  
+    # Calculate the slope from Strode et al. (2015) simulations for only 
+    # the first two summers (to illustrate that the sensitivity changed over
+    # the years)
+    yrstr = 3
+    strode_delta_o3_f2 = (np.hstack(emfix_o3_neus)[92:yrstr*92]-
+                          np.hstack(std_o3_neus)[92:yrstr*92])
+    strode_delta_no_f2 = (emfix_inventory_daily[92:yrstr*92]-
+                          std_inventory_daily[92:yrstr*92])
+    m, b = np.polyfit(strode_delta_no_f2, strode_delta_o3_f2, 1)
+    print('DO3/DEmissions for first %d years of Strode et al. ' %yrstr+
+          '= %.3f ppbv/kg s-1 grid cell-1'%m)
+    plt.subplots_adjust(bottom=0.15)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'scatter_inventorynoo3.eps', dpi = 300)
+    return 
+# # # # # # # # # # # # #    
+def timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
+    year, years):
+    """same as function 'timeseries_map_hourlyvsoverpass_neus' but with no 
+    map showing the bias at individual GMI sites with hourly output. 
+    
+    castnet_o3_neus : numpy.ndarray
+        Daily regionally-averaged O3 from CASTNet, units of ppbv, [time,]         
+    emiss_o3_neus : numpy.ndarray
+        Daily regionally-averaged O3 from GHKerr-DailyEmiss simulation, units 
+        of ppbv, [time,]             
+    year : int
+        Year of interest
+    years : list
+        Years in measuring period
+        
+    Returns
+    ----------      
+    None             
+    """
+    import numpy as np
+    from matplotlib.lines import Line2D
+    import matplotlib.pyplot as plt
+    import sys
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    import commensurability
+    years = [2008, 2009, 2010]            
+    sampling_months = [6, 7, 8]
+    sampling_hours = [15, 16, 17, 18, 19, 20]
+    castnet_sites_neus = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
+                        'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
+                        'CDR', 'VPI', 'MKG', 'KEF']
+    timezone = 'GMT+4'
+    # CASTNet sites, n.b. MR2 CASTNet data (with no regional average) needs 
+    # to be loaded
+    mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
+    commensurability.commensurate_castnet_gmi(castnet_sites_neus, 'HindcastMR2', 
+        years, sampling_months, sampling_hours, timezone)
+    # drop GMI hourly output that's missing
+    mask = np.all(np.isnan(mr2_o3), axis=tuple((0,2)))
+    mr2_o3 = mr2_o3[:,~mask]
+    # # # # open daily mean CASTNet O3 and GMI trace gases
+    meandaily = commensurability.commensurate_castnet_gmi_ra(castnet_sites_neus, 
+        years, sampling_months, sampling_hours, timezone)
+    castnet_lats, castnet_lons, gmi_lats, gmi_lons = \
+        commensurability.commensurate_castnet_gmi_locations(castnet_sites_neus, 
+        sampling_months, sampling_hours, timezone)
+    whereyear = np.where(np.array(years)==year)[0][0]
+    # Initialize figure, axes 
+    fig = plt.figure(figsize=(6,3))
+    axt = plt.subplot2grid((1,1),(0,0))
+    #axt.set_title('(a)', fontsize = 16, x = -0.07, y = 1.03)
+    # Overpass approach
+    axt.plot(castnet_o3_neus[whereyear*92:(whereyear+1)*92], '-', 
+             color='#d95f02', lw=2)
+    axt.plot(emiss_o3_neus[whereyear*92:(whereyear+1)*92], '--', 
+             color='#d95f02', lw=0.75)
+    # Hourly approach
+    axt.plot(np.nanmean(mr2_castnet[whereyear], axis=0), '-', color='#1b9e77',
+                         lw=2, zorder = 10)
+    axt.plot(meandaily['EGU_T O3'][whereyear], '--', color='#1b9e77', lw=0.75, 
+             zorder = 10)
+    axt.set_xlim([0, 91])
+    axt.set_ylim([30, 70])
+    axt.set_yticks([30, 40, 50, 60, 70])
+    axt.set_yticklabels(['30', '40', '50', '60', '70'], fontsize=12)
+    # axis labels
+    axt.set_xticks([0, 14, 30, 44, 61, 75])
+    axt.set_xticklabels(['1 June %d' %year, '', '1 July', '', '1 Aug', ''], 
+                       ha = 'center', fontsize = 12)
+    axt.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    axt.tick_params(right = True, left = True, top = True, bottom = True,
+                    labelbottom = True, labeltop = False)
+    # create legend
+    colors = ['black', 'black', '#1b9e77', '#d95f02']
+    sizes = [2, 0.75, 2, 2]
+    linestyles = ['-', '--', '-', '-']
+    labels = ['CASTNet', 'CTM', 'Hourly', 'Overpass']
+    lines = []
+    for c, s, l in zip(colors, sizes, linestyles):
+        lines.append(Line2D([0], [0], color=c, linewidth=s, linestyle=l))
+    plt.legend(lines, labels, loc = 9, frameon = False, fontsize = 16, 
+               ncol = 2, bbox_to_anchor = (0.5, 1.48))
+    plt.subplots_adjust(top=0.7)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
+                'timeseries_map_hourlyvsoverpass_neus_nomap.eps', dpi=300)
+    return 
+# # # # # # # # # # # # #    
+def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat, 
+    gmi_lon):
+    """same as function 'timeseries_mr2o3dato3t2m_atpoint' but shows the 
+    O3 from the Transport and + Chemistry simulations and co-located 
+    temperatures at four grid cells (Montana, Ohio, California, Mississippi)
+    
+    Parameters
+    ----------  
+    t2m_atoverpass : numpy.ndarry
+        The MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
+        resolution of the CTM, units of K, [time, lat, lon]    
+    o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time from MR2/+ Chemistry 
+        simulation, units of volume mixing ratio, [time, lat, lon]        
+    dat_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time from Diurnal-AvgT/
+        Transport simulation, units of volume mixing ratio, [time, lat, lon]      
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]  
+        
+    Returns
+    ----------     
+    None         
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    # indices of grid cell in South
+    slon_idx_south = 33
+    slat_idx_south = 8 + 2
+    print('(%.3f, %.3f) is chosen coordinate point in South...' 
+          %(gmi_lat[slat_idx_south], gmi_lon[slon_idx_south]))   
+    # select values at point
+    o3_atpoint = o3[184:, slat_idx_south, slat_idx_south] * 1e9
+    dato3_atpoint = dat_o3[184:, slat_idx_south, slat_idx_south] * 1e9
+    t2m_atpoint = t2m_overpass[184:, slat_idx_south, slat_idx_south]
+    # calculate correlation coefficients/sensitivity
+    print('r(Transport O3, + Chemistry O3) = %.3f' 
+          %(np.corrcoef(o3_atpoint, dato3_atpoint)[0, 1]))
+    print('r(+ Chemistry O3, T2m) = %.3f' 
+          %(np.corrcoef(o3_atpoint, t2m_atpoint)[0, 1]))
+    print('d(+ Chemistry O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_atpoint, o3_atpoint, 1)[0]))
+    print('d(Transport O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_atpoint, dato3_atpoint, 1)[0]))
+    print('Mean/Std Transport O3 = %.3f, %.3f' 
+          %(np.mean(dato3_atpoint), np.std(dato3_atpoint)))
+    print('Mean + Chemistry O3 = %.3f, %.3f' 
+          %(np.mean(o3_atpoint), np.std(o3_atpoint)))
+    slon_idx_north = 39
+    slat_idx_north = 18
+    print('(%.3f, %.3f) is chosen coordinate point in North...' 
+          %(gmi_lat[slat_idx_north], gmi_lon[slon_idx_north]))   
+    # select values at point
+    o3_atpoint_north = o3[184:, slat_idx_north, slon_idx_north] * 1e9
+    dato3_atpoint_north = dat_o3[184:, slat_idx_north, slon_idx_north] * 1e9
+    t2m_atpoint_north = t2m_overpass[184:, slat_idx_north, slon_idx_north]
+    # calculate correlation coefficients/sensitivity
+    print('r(Transport O3, + Chemistry O3) = %.3f' 
+          %(np.corrcoef(o3_atpoint_north, dato3_atpoint_north)[0, 1]))
+    print('r(+ Chemistry O3, T2m) = %.3f' 
+          %(np.corrcoef(o3_atpoint_north, t2m_atpoint_north)[0, 1]))
+    print('d(+ Chemistry O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_atpoint_north, o3_atpoint_north, 1)[0]))
+    print('d(Transport O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_atpoint_north, dato3_atpoint_north, 1)[0]))
+    print('Mean/Std Transport O3 = %.3f, %.3f' 
+          %(np.mean(dato3_atpoint_north), np.std(dato3_atpoint_north)))
+    print('Mean + Chemistry O3 = %.3f, %.3f' 
+          %(np.mean(o3_atpoint_north), np.std(o3_atpoint_north)))
+    # indices of grid cell in Montana
+    slon_idx_mt = 20
+    slat_idx_mt = 22
+    print('(%.3f, %.3f) is chosen coordinate point in Montana...' 
+          %(gmi_lat[slat_idx_mt], gmi_lon[slon_idx_mt]))   
+    # select values at point
+    o3_mt = o3[184:, slat_idx_mt, slat_idx_mt] * 1e9
+    dato3_mt = dat_o3[184:, slat_idx_mt, slat_idx_mt] * 1e9
+    t2m_mt = t2m_overpass[184:, slat_idx_mt, slat_idx_mt]
+    # calculate correlation coefficients/sensitivity
+    print('r(Transport O3, + Chemistry O3) = %.3f' 
+          %(np.corrcoef(o3_mt, dato3_mt)[0, 1]))
+    print('r(+ Chemistry O3, T2m) = %.3f' 
+          %(np.corrcoef(o3_mt, t2m_mt)[0, 1]))
+    print('d(+ Chemistry O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_mt, o3_mt, 1)[0]))
+    print('d(Transport O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_mt, dato3_mt, 1)[0]))
+    print('Mean/Std Transport O3 = %.3f, %.3f' 
+          %(np.mean(dato3_mt), np.std(dato3_mt)))
+    print('Mean + Chemistry O3 = %.3f, %.3f' 
+          %(np.mean(o3_mt), np.std(o3_mt)))
+    # indices of grid cell in California
+    slon_idx_ca = 7
+    slat_idx_ca = 14
+    print('(%.3f, %.3f) is chosen coordinate point in California...' 
+          %(gmi_lat[slat_idx_ca], gmi_lon[slon_idx_ca]))   
+    # select values at point
+    o3_ca = o3[184:, slat_idx_ca, slat_idx_ca] * 1e9
+    dato3_ca = dat_o3[184:, slat_idx_ca, slat_idx_ca] * 1e9
+    t2m_ca = t2m_overpass[184:, slat_idx_ca, slat_idx_ca]
+    # calculate correlation coefficients/sensitivity
+    print('r(Transport O3, + Chemistry O3) = %.3f' 
+          %(np.corrcoef(o3_ca, dato3_ca)[0, 1]))
+    print('r(+ Chemistry O3, T2m) = %.3f' 
+          %(np.corrcoef(o3_ca, t2m_ca)[0, 1]))
+    print('d(+ Chemistry O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_ca, o3_ca, 1)[0]))
+    print('d(Transport O3)/d(T2m) = %.3f' 
+          %(np.polyfit(t2m_ca, dato3_ca, 1)[0]))
+    print('Mean/Std Transport O3 = %.3f, %.3f' 
+          %(np.mean(dato3_ca), np.std(dato3_ca)))
+    print('Mean + Chemistry O3 = %.3f, %.3f' 
+          %(np.mean(o3_ca), np.std(o3_ca)))
+    # Plotting
+    fig = plt.figure(figsize=(10,4))
+    axlt = plt.subplot2grid((2, 2), (0, 0))
+    axlb = plt.subplot2grid((2, 2), (1, 0))
+    axrt = plt.subplot2grid((2, 2), (0, 1))
+    axrb = plt.subplot2grid((2, 2), (1, 1))
+    # Montana
+    axlt.set_title('(a) Montana', fontsize = 16, x = 0.2, y = 1.03)
+    lns1 = axlt.plot(o3_mt, lw = 2., 
+                   c = pollutants_constants.COLOR_CHEMISTRY, 
+                   label = 'Transport', zorder = 10)
+    lns2 = axlt.plot(dato3_mt, lw = 2., 
+                   c = pollutants_constants.COLOR_TRANSPORT,
+                   label = '+ Chemistry', zorder = 5)
+    for t in axlt.get_yticklabels():
+        t.set_fontsize(12)   
+    axlt.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    axltb = axlt.twinx()
+    lns3 = axltb.plot(t2m_mt, lw = 2., color = '#ff7f00',
+             label = 'T', zorder = 1)
+    axltb.set_xticks([0, 14, 29, 45, 61, 76])
+    axltb.set_xticklabels([])
+    axltb.set_yticklabels([])
+    # California
+    axlb.set_title('(c) California', fontsize = 16, x = 0.2, y = 1.03)
+    lns1 = axlb.plot(o3_ca, lw = 2., c = pollutants_constants.COLOR_CHEMISTRY, 
+                     zorder = 10)
+    lns2 = axlb.plot(dato3_ca, lw = 2., 
+                     c = pollutants_constants.COLOR_TRANSPORT,
+                     zorder = 5)
+    for t in axlb.get_yticklabels():
+        t.set_fontsize(12)   
+    for t in axlb.get_xticklabels():
+        t.set_fontsize(12)       
+    axlb.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
+    axlbb = axlb.twinx()
+    lns3 = axlbb.plot(t2m_ca, lw = 2., color = '#ff7f00',
+             label = 'T', zorder = 1)
+    axlbb.set_xticks([0, 14, 29, 45, 61, 76])
+    axlbb.set_xticklabels(['1 June 2010', '', '1 July', '', '1 August', ''])
+    axlbb.set_yticklabels([])
+    # Ohio
+    axrt.set_title('(b) Ohio', fontsize = 16, x = 0.98, ha = 'right', y = 1.03)
+    lns1 = axrt.plot(o3_atpoint_north, lw = 2., 
+                   c = pollutants_constants.COLOR_CHEMISTRY, 
+                   label = 'Transport', zorder = 10)
+    lns2 = axrt.plot(dato3_atpoint_north, lw = 2., 
+                   c = pollutants_constants.COLOR_TRANSPORT,
+                   label = '+ Chemistry', zorder = 5)
+    axrt.set_yticklabels([])
+    axrtb = axrt.twinx()
+    lns3 = axrtb.plot(t2m_atpoint_north, lw = 2., color = '#ff7f00',
+             label = 'T', zorder = 1)
+    axrtb.set_xticks([0, 14, 29, 45, 61, 76])
+    axrtb.set_xticklabels([])
+    axrt.tick_params(right = False, left = True, top = True, bottom = False,
+                    labelbottom = False, labeltop = True)
+    axrtb.set_ylabel('T [K]', rotation = 270, fontsize = 16, color = '#ff7f00')
+    axrtb.get_yaxis().set_label_coords(1.2, 0.53)
+    for t in axrtb.get_yticklabels():
+        t.set_fontsize(12)    
+        t.set_color('#ff7f00')
+    # Mississippi
+    axrb.set_title('(d) Mississippi', fontsize = 16, x = 0.98, ha = 'right', 
+                   y = 1.03)
+    lns1 = axrb.plot(o3_atpoint, lw = 2., 
+                   c = pollutants_constants.COLOR_CHEMISTRY, zorder = 10)
+    lns2 = axrb.plot(dato3_atpoint, lw = 2., 
+                   c = pollutants_constants.COLOR_TRANSPORT, zorder = 5)
+    axrb.set_yticklabels([])
+    axrbb = axrb.twinx()
+    lns3 = axrbb.plot(t2m_atpoint, lw = 2., color = '#ff7f00', zorder = 1)
+    axrbb.set_xticks([0, 14, 29, 45, 61, 76])
+    axrbb.set_xticklabels(['1 June 2010', '', '1 July', '', '1 August', ''], 
+                         fontsize = 16)
+    axrbb.set_ylabel('T [K]', rotation = 270, fontsize = 16, color = '#ff7f00')
+    axrbb.get_yaxis().set_label_coords(1.2, 0.53)
+    for t in axrb.get_xticklabels():
+        t.set_fontsize(12)
+    for t in axrbb.get_yticklabels():
+        t.set_fontsize(12)    
+        t.set_color('#ff7f00')
+    # ensure that all axes have the same aspect/scale
+    for ax in [axlt, axlb, axrt, axrb]:
+        ax.set_ylim([20, 80])    
+    for ax in [axltb, axlbb, axrtb, axrbb]:
+        ax.set_xlim([0, 91]) 
+        ax.set_ylim([285, 315])               
+    # Adjust subplots so that a map can be fit in the middle
+    plt.subplots_adjust(hspace = 0.3, wspace = 0.4) # or wspace = 0.6   
+    # add inset map showing location of cells
+    left, bottom, width, height = [0.412-0.02, 0.36, 0.2+0.04, 0.26]
+    axi = fig.add_axes([left, bottom, width, height])        
+    m_small = Basemap(projection = 'merc', llcrnrlon = -126., 
+                      llcrnrlat = 24., urcrnrlon = -66.3, 
+                      urcrnrlat = 50., resolution = 'h', area_thresh = 1000)
+    m_small.drawstates(color = 'k', linewidth = 0.5)
+    m_small.drawcountries(color = 'k', linewidth = 1.0)
+    m_small.drawcoastlines(color = 'k', linewidth = 1.0)   
+    fill_oceans(axi, m_small)   
+    x, y = m_small(gmi_lon[slon_idx_south], gmi_lat[slat_idx_south])
+    m_small.scatter(x, y, 40, color = 'r', marker = '.', edgecolor = 'r', 
+              zorder = 20)
+    x, y = m_small(gmi_lon[slon_idx_north], gmi_lat[slat_idx_north])
+    m_small.scatter(x, y, 40, color = 'r', marker = '.', edgecolor = 'r', 
+              zorder = 20)
+    x, y = m_small(gmi_lon[slon_idx_mt], gmi_lat[slat_idx_mt])
+    m_small.scatter(x, y, 40, color = 'r', marker = '.', edgecolor = 'r', 
+              zorder = 20)
+    x, y = m_small(gmi_lon[slon_idx_ca], gmi_lat[slat_idx_ca])
+    m_small.scatter(x, y, 40, color = 'r', marker = '.', edgecolor = 'r', 
+              zorder = 20)
+    leg = axlt.legend(loc = 9, bbox_to_anchor = (1.25, 1.43), fontsize = 16,
+                    ncol = 2)
+    leg.get_frame().set_linewidth(0.0)
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
+                'timeseries_transportchemistryo3_atpoints.eps', dpi = 300)
+# # # # # # # # # # # # #    
 #import numpy as np
 #import pandas as pd
 #import matplotlib.pyplot as plt
@@ -4588,15 +5223,15 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 # sites_castnet) = castnet_r_do3d2t(castnet, t2m, merra_lat, merra_lon, 
 # times_all)
 ## from Transport simulation
-#dat_sens, dat_tls, dat_r, dat_t2m_overpass, dat_ps_overpass = \
+#dat_sens, dat_tls, dat_r, dat_t2m_overpass, dat_ps_overpass, dat_p = \
 #calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, dat_o3, 
 #    ps)
 ## from + Chemistry simulation 
-#mr2_sens, mr2_tls, mr2_r, mr2_t2m_overpass, mr2_ps_overpass = \
+#mr2_sens, mr2_tls, mr2_r, mr2_t2m_overpass, mr2_ps_overpass, mr2_p = \
 #calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, mr2_o3, 
 #    ps)
 ## from + Emissions simulation
-#emiss_sens, emiss_tls, emiss_r, emiss_t2m_overpass, emiss_ps_overpass = \
+#emiss_sens, emiss_tls, emiss_r, emiss_t2m_overpass, emiss_ps_overpass, emiss_p = \
 #calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, emiss_o3, 
 #    ps)
 ## # # # calculate regionally-averaged fields
@@ -4626,8 +5261,8 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 #ozone_mean_mda8, ozone_nomean_mda8, ozone_mda8 = find_conus_aqsmda8(sc)
 ## correlation coefficients, O3-T2m sensitivity at AQS sites
 #r, do3dt2m = aqs_mda8_r_do3dt2m(ozone_nomean_mda8, merra_lat, merra_lon)
-# # # # # # # # # # # # #
-# visualizations
+## # # # # # # # # # # # #
+## visualizations
 # focus region, CTM resolution, and mean CASTNet/CTM + Chemistry O3
 #map_meanmr2o3meancastneto3_conus(emiss_o3, o3_castnet, gmi_lat, gmi_lon,
 #    lat_castnet, lon_castnet, neus_castnet, sites_castnet)
@@ -4684,13 +5319,16 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 ## maps of the O3-climate penalty 
 #map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat, 
 #    gmi_lon)
-# time series of O3 and T2m at a grid point with negative O3-T2m correlation 
-# and sensitivity
-#timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, mr2_o3, dat_o3, gmi_lat, 
-#    gmi_lon)
 # plot timeseries of O3, T at grid cells with high and low O3-T correlations
-#timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, mr2_o3, dat_o3, gmi_lat, 
+#timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, dat_o3, mr2_o3, gmi_lat, 
 #    gmi_lon)
+#timeseries_transportchemistryo3_atpoints(emiss_t2m_overpass, mr2_o3, dat_o3, 
+#    gmi_lat, gmi_lon)    
+## plot Strode et al. (2015) simulations to compare with + Emissions/
+## + Chemistry simulations
+#strode_inventory, strode_o3 = scatter_inventorynonox_noxo3(mr2_t2m_overpass, 
+#    mr2_no, mr2_no2, mr2_o3, emiss_no, emiss_no2, emiss_o3, neus_states, 
+#    gmi_lat, gmi_lon)
 ## plot boxplots of CEMS NOx and CASTNet O3
 #boxplot_cemsnox_castneto3_neus(neus_castnet, strode_inventory, 
 #    strode_o3)
@@ -4698,8 +5336,9 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 #compare_regional_averaging(neus, t_castnet, o3_castnet, castnet_t2m_neus, 
 #    castnet_o3_neus, sites_castnet, neus_castnet, emiss_t2m_overpass, 
 #    emiss_o3, emiss_t2m_neus, emiss_o3_neus, emiss_sens, do3dt2m_castnet)    
-## plot Strode et al. (2015) simulations to compare with + Emissions/
-## + Chemistry simulations
-#strode_inventory, strode_o3 = scatter_inventorynonox_noxo3(mr2_t2m_overpass, 
-#    mr2_no, mr2_no2, mr2_o3, emiss_no, emiss_no2, emiss_o3, neus_states, 
-#    gmi_lat, gmi_lon)
+## plot comparison of hourly GMI output with overpass2 output
+#timeseries_map_hourlyvsoverpass_neus(emiss_o3*1e9, castnet_o3_neus, 
+#    emiss_o3_neus, gmi_lat, gmi_lon, 2010, years)   
+#timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
+#    2010, years)
+#scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon)s
