@@ -74,6 +74,7 @@ REVISION HISTORY
     21022019 -- function 'scatter_inventorynoo3' added to replace, in effect, 
                 'scatter_inventorynonox_noxo3' (simplified version)
     22022018 -- function 'timeseries_transportchemistryo3_atpoints' added
+    25022018 -- function 'scatter_inventorynoo3' changed to focus on O3 vs. NOx
 """
 # # # # # # # # # # # # #
 # change font
@@ -1671,7 +1672,7 @@ def map_std_90ptile(t2m_overpass, o3, dat_o3, gmi_lat, gmi_lon):
                       orientation = 'horizontal', extend = 'both')
     cb.set_label(label = '$\mathregular{\sigma}_{\mathregular{O_' +
                  '{\mathregular{3, Transport}}}}:\mathregular{\sigma}_' +
-                 '{\mathregular{O_{\mathregular{3, +\:Chemistry}}}}$', 
+                 '{\mathregular{O_{\mathregular{3, +Chemistry}}}}$', 
                  size = 16)
     cb.set_ticks(np.linspace(vmin, vmax, 8))
     cb.ax.tick_params(labelsize = 12)
@@ -2240,10 +2241,10 @@ def timeseries_castneto3allgmio3(transport, chemistry, emissions, obs, region,
              zorder = 1, lw = 2, label = 'CASTNet')
     ax.plot(emissions[yearpos*92:(yearpos+1)*92], '-', 
             color = pollutants_constants.COLOR_EMISSIONS, 
-            label = '+$\:$Emissions')
+            label = '$+$AEmissions')
     ax.plot(chemistry[yearpos*92:(yearpos+1)*92],
             '-', color = pollutants_constants.COLOR_CHEMISTRY, 
-            label = '+$\:$Chemistry')
+            label = '$+$Chemistry')
     ax.plot(transport[yearpos*92:(yearpos+1)*92], '-', 
             color = pollutants_constants.COLOR_TRANSPORT, label = 'Transport')
     ax.set_xlim([0, 91])
@@ -2260,7 +2261,7 @@ def timeseries_castneto3allgmio3(transport, chemistry, emissions, obs, region,
     handles, labels = ax.get_legend_handles_labels()
     handles = [handles[0], handles[3], handles[2], handles[1]]
     labels = [labels[0], labels[3], labels[2], labels[1]]
-    ax.legend(handles,labels, bbox_to_anchor = (0.5, -0.18), loc = 'center', 
+    ax.legend(handles,labels, bbox_to_anchor = (0.49, -0.18), loc = 'center', 
               ncol = 4, frameon = False, fontsize = 16)
     plt.subplots_adjust(bottom = 0.2)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'
@@ -2367,9 +2368,9 @@ def scatterhist_castneto3allgmio3(transport, chemistry, emissions, obs, t2m,
                       color = 'darkgrey', zorder = 2)    
     axScatter.scatter(t2m, transport, label = 'Transport', s = 20, 
                       color = pollutants_constants.COLOR_TRANSPORT, zorder = 9)
-    axScatter.scatter(t2m, chemistry, label = '+$\:$Chemistry', s = 20, 
+    axScatter.scatter(t2m, chemistry, label = '$\mathregular{+}$Chemistry', s = 20, 
                       color = pollutants_constants.COLOR_CHEMISTRY, zorder = 6)
-    axScatter.scatter(t2m, emissions, label = '+$\:$AEmissions', s = 20, 
+    axScatter.scatter(t2m, emissions, label = '$\mathregular{+}$AEmissions', s = 20, 
                       color = pollutants_constants.COLOR_EMISSIONS, zorder = 3)
     # add in lines of best fit 
     obs_m = np.poly1d(np.polyfit(castnet_t2m, obs, 1))[1]
@@ -2862,7 +2863,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     fill_oceans(ax1, m)    
     # contributions from + Chemistry simulation
     ax2 = plt.subplot2grid((3, 1), (1, 0))
-    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
+    ax2.set_title('(b) $\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
                   y = 1.03)
     m.contourf(x, y, delta_mr2_hot, clevs, cmap = cmap, extend = 'both')
     m.drawstates(color = 'k', linewidth = 0.5)
@@ -2882,7 +2883,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     cb.ax.tick_params(labelsize = 12)
     # ratio of simulations
     ax3 = plt.subplot2grid((3, 1), (2, 0))
-    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
+    ax3.set_title('(c) Transport/$\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, 
                   x = 0.03, y = 1.03)
     vmin = 0.; vmax = 100.
     # only use half of RdBu colormap since there aren't many places exceeding
@@ -2929,7 +2930,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     fill_oceans(ax1, m)    
     # contributions from + Chemistry simulation
     ax2 = plt.subplot2grid((3, 1), (1, 0))
-    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
+    ax2.set_title('(b) $\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
                   y = 1.03)
     m.contourf(x, y, delta_mr2_cold, clevs, cmap = cmap, extend = 'both')
     m.drawstates(color = 'k', linewidth = 0.5)
@@ -2948,7 +2949,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     cb.ax.tick_params(labelsize = 12)
     # ratio from simulations
     ax3 = plt.subplot2grid((3, 1), (2, 0))
-    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
+    ax3.set_title('(c) Transport/$\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, 
                   x = 0.03, y = 1.03)
     vmin = 0.; vmax = 100.
     cmap = plt.get_cmap('RdBu', 10)
@@ -3068,7 +3069,7 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     fill_oceans(ax1, m)    
     # + Chemistry simulation
     ax2 = plt.subplot2grid((3, 1), (1, 0))
-    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
+    ax2.set_title('(b) $\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
                   y = 1.03)
     m.contourf(x, y, mr2_sens, clevs, cmap = cmap, norm = norm, 
                extend = 'both')
@@ -3087,7 +3088,7 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     cb.ax.tick_params(labelsize = 12)    
     # ratio from simulations
     ax3 = plt.subplot2grid((3, 1), (2, 0))
-    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
+    ax3.set_title('(c) Transport/$\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, 
                   x = 0.03, y = 1.03)
     vmin = 0.; vmax = 100.
     cmap = plt.get_cmap('RdBu', 10)
@@ -3187,10 +3188,10 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, dat_o3_neus,
     ax2.plot(castnet_o3_ty, lw = 2., color = '#999999', label = 'CASTNet')
     ax2.plot(emiss_o3_neus[yearpos*92:(yearpos+1)*92], '-', 
             color = pollutants_constants.COLOR_EMISSIONS, 
-            label = '+$\:$AEmissions')
+            label = '$\mathregular{+}$AEmissions')
     ax2.plot(mr2_o3_neus[yearpos*92:(yearpos+1)*92],
             '-', color = pollutants_constants.COLOR_CHEMISTRY, 
-            label = '+$\:$Chemistry')
+            label = '$\mathregular{+}$Chemistry')
     ax2.plot(dat_o3_neus[yearpos*92:(yearpos+1)*92], '-', 
             color = pollutants_constants.COLOR_TRANSPORT, label = 'Transport')
     ax2.set_xlim([0, len(castnet_o3_ty) - 1])
@@ -3870,7 +3871,7 @@ def NO_inventory_atpoint(t2m_overpass, ilat, ilon, year, gmi_lat, gmi_lon):
              zorder = 2)
     ax.plot(np.concatenate([NO_total_prime_jun, NO_total_prime_jul, NO_total_prime_aug]), 
             linewidth = 1.5, clip_on = True, label = '$\mathregular{' +
-            r'\partial}$NO $\mathregular{\partial}$T$^{\mathregular{-1}}\neq$0', 
+            r'\partial}$Emissions $\mathregular{\partial}$T$^{\mathregular{-1}}\neq$0', 
             color = '#377eb8', linestyle = ':')
     ax.plot(np.arange(0, 30, 1), np.repeat(np.mean(NO_total_prime_jun), 30), 
             linewidth = 2., clip_on = True,  color = '#377eb8', zorder = 6)
@@ -3878,7 +3879,7 @@ def NO_inventory_atpoint(t2m_overpass, ilat, ilon, year, gmi_lat, gmi_lon):
             linewidth = 2., clip_on = True, color = '#377eb8', zorder = 6)
     ax.plot(np.arange(61, 92, 1), np.repeat(np.mean(NO_total_prime_aug), 31), 
             linewidth = 2., clip_on = True, label = '$\mathregular{' +
-            r'\partial}$NO $\mathregular{\partial}$T$^{\mathregular{-1}}=$0', 
+            r'\partial}$Emissions $\mathregular{\partial}$T$^{\mathregular{-1}}=$0', 
             color = '#377eb8')
     ax.set_xlim([0, 91])
     ax.set_xticks([0, 14, 30, 44, 61, 75])
@@ -3888,7 +3889,7 @@ def NO_inventory_atpoint(t2m_overpass, ilat, ilon, year, gmi_lat, gmi_lon):
     leg = ax.legend(loc = 9, bbox_to_anchor = (0.5, 1.18), fontsize = 16,
                     ncol = 2)
     leg.get_frame().set_linewidth(0.0)
-    ax.set_ylabel('NO$_{\mathregular{}}$ [kg s$^{\mathregular{-1}}$'+ 
+    ax.set_ylabel('Emissions [kg s$^{\mathregular{-1}}$'+ 
                         ' grid cell$^{\mathregular{-1}}$]', color = '#377eb8', 
                         fontsize = 16)
     ax2.set_ylabel('T [K]', color = '#ff7f00', fontsize = 16, rotation = 270)
@@ -4326,7 +4327,8 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
     ax2.set_xticklabels(['', '2000', '', '2002', '', '2004', '', '2006', '', 
                          '2008', '', '2010', '', '2012', ''], fontsize = 12)
     # y-axis    
-    ax1.set_ylabel('Emissions [tons day$^{\mathregular{-1}}$]', fontsize=16, 
+    ax1.set_ylabel('CEMS '+
+                   '[tons day$^{\mathregular{-1}}$]', fontsize=16, 
                    color='#d95f02')
     ax1.get_yaxis().set_label_coords(-0.15, 0.53)    
     ax2.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize=16, color='#d95f02')
@@ -4348,8 +4350,9 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
         t.set_fontsize(12) 
         t.set_color('#666666')          
     ax1b.set_ylim([2.5, 5.0])
-    ax1b.set_ylabel('Emissions [kg s$^{\mathregular{-1}}$ grid cell$'+
-                    '^{\mathregular{-1}}$]', color = '#666666', fontsize = 16, 
+    ax1b.set_ylabel('CTM '+
+                    '[kg s$^{\mathregular{-1}}$ grid cell'+
+                    's$^{\mathregular{-1}}$]', color = '#666666', fontsize = 16, 
                     rotation = 270)
     ax1b.get_yaxis().set_label_coords(1.21, 0.50)
     # add results from Strode et al. (2015) for O3
@@ -4376,7 +4379,8 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
     axleg.plot([3], [0], 'o', lw=2., markersize=6, color='#666666')
     axleg.plot([2.5, 3.5], [0, 0], '-', lw=2., markersize=6, color='#666666')
     axleg.set_xticks([0, 3])
-    axleg.set_xticklabels(['observations', 'Strode et al. (2015)'], fontsize = 16)
+    axleg.set_xticklabels(['Observations', 'Strode et al. (2015)'], 
+                           fontsize = 16)
     axleg.tick_params(axis='x', colors='w', labelcolor='k')
     axleg.set_yticks([])
     axleg.set_yticklabels([])
@@ -4461,7 +4465,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     fill_oceans(ax1, m)    
     # + Chemistry simulation
     ax2 = plt.subplot2grid((3, 1), (1, 0))
-    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
+    ax2.set_title('(b) $\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
                   y = 1.03)
     m.contourf(x, y, mr2_p90 - med_o3, clevs, cmap = cmap, norm = norm, 
                extend = 'both')
@@ -4480,7 +4484,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     cb.ax.tick_params(labelsize = 12)    
     # ratio from simulations
     ax3 = plt.subplot2grid((3, 1), (2, 0))
-    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
+    ax3.set_title('(c) Transport/$\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, 
                   x = 0.03, y = 1.03)
     vmin = 75.; vmax = 125.
     cmap = plt.get_cmap('RdBu_r', 10)
@@ -4521,7 +4525,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     fill_oceans(ax1, m)    
     # + Chemistry simulation
     ax2 = plt.subplot2grid((3, 1), (1, 0))
-    ax2.set_title('(b) +$\:$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
+    ax2.set_title('(b) $\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, x = 0.03, 
                   y = 1.03)
     m.contourf(x, y, (mr2_p10 - med_o3), clevs, cmap = cmap, norm = norm, 
                extend = 'both')
@@ -4540,7 +4544,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     cb.ax.tick_params(labelsize = 12)    
     # ratio from simulations
     ax3 = plt.subplot2grid((3, 1), (2, 0))
-    ax3.set_title('(c) Transport/+$\:$Chemistry', ha = 'left', fontsize = 16, 
+    ax3.set_title('(c) Transport/$\mathregular{+}$Chemistry', ha = 'left', fontsize = 16, 
                   x = 0.03, y = 1.03)
     vmin = 75.; vmax = 125.
     cmap = plt.get_cmap('RdBu_r', 10)
@@ -4691,12 +4695,13 @@ def timeseries_map_hourlyvsoverpass_neus(o3, castnet_o3_neus, emiss_o3_neus,
                 'timeseries_map_hourlyvsoverpass_neus.eps', dpi=300)
     return    
 # # # # # # # # # # # # #  
-def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
-    """function finds the difference between NO in the GMI emissions inventory
-    and simulated O3 in the Northeastern U.S. for (1) Std and EmFix simulations 
-    from Strode et al. (2015) and (2) the + Chemistry and + Emissions 
-    simulations in current work. These daily differences are plotted as 
-    scatterpoints and the lines of best fit are calculated. 
+def scatter_noxo3(mr2_o3, emiss_o3, mr2_no, emiss_no, mr2_no2, emiss_no2, 
+    neus_states, gmi_lat, gmi_lon):
+    """function finds the difference between modeled NOx and O3 in the 
+    Northeastern U.S. for (1) Std and EmFix simulations from Strode et al. 
+    (2015) and (2) the + Chemistry and + Emissions simulations in current work. 
+    These daily differences are plotted as scatterpoints and the lines of best 
+    fit are calculated. 
     
     Parameters
     ----------  
@@ -4706,6 +4711,18 @@ def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
     emiss_o3 : numpy.ndarray
         GMI CTM surface-level ozone at overpass time from the + Emissions 
         simulation, units of volume mixing ratio, [time, lat, lon]
+    mr2_no : numpy.ndarray    
+        GMI CTM surface-level NO at overpass time from the + Chemistry 
+        simulation, units of volume mixing ratio, [time, lat, lon]
+    emiss_no : numpy.ndarray
+        GMI CTM surface-level NO at overpass time from the + Emissions 
+        simulation, units of volume mixing ratio, [time, lat, lon]        
+    mr2_no2 : numpy.ndarray    
+        GMI CTM surface-level NO2 at overpass time from the + Chemistry 
+        simulation, units of volume mixing ratio, [time, lat, lon]
+    emiss_no2 : numpy.ndarray
+        GMI CTM surface-level NO2 at overpass time from the + Emissions 
+        simulation, units of volume mixing ratio, [time, lat, lon]        
     neus_states : list
         State names (string format) in region      
     gmi_lat : numpy.ndarray
@@ -4724,7 +4741,7 @@ def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
     sys.path.append('/Users/ghkerr/phd/')
     import pollutants_constants
     sys.path.append('/Users/ghkerr/phd/GMI/')
-    import commensurability     
+    import commensurability 
     # load Std
     (gmi_lat_c, gmi_lon_c, eta_c, times_c, std_co, std_no, std_no2, std_o3, 
      std_cloudfraction, std_gridboxheight) = \
@@ -4735,7 +4752,7 @@ def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
      std_cloudfraction, std_gridboxheight) = \
     commensurability.open_overpass2('Hindcast3Igac2', [2000, 2001, 2002, 
         2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010])
-    gmi_lon_c = np.mod(gmi_lon_c - 180.0, 360.0) - 180.0
+    gmi_lon_c = np.mod(gmi_lon_c - 180.0, 360.0) - 180.0    
     # emissions inventory from + Emissions simulation
     emiss_no_inventory, lon_inventory, lat_inventory = \
      commensurability.open_perturbed_emissions()
@@ -4758,13 +4775,10 @@ def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
                                          lon_inventory)  
     neus_inventory_c = find_grid_in_region(m, neus_states, lat_inventory_c[0], 
                                            lon_inventory_c)       
-     # # # find Northeast-averaged inventories, NOx, O3 
+    # # # # find Northeast-averaged inventories, NOx, O3 
     # from Strode et al. [2015] simulations
     std_no_inventory_c_neus = np.array(std_no_inventory) * neus_inventory_c
     std_no_inventory_c_neus = np.nanmean(std_no_inventory_c_neus, axis = tuple((2, 3)))
-    std_o3_neus = np.nanmean((std_o3 * neus_c), axis = tuple((1, 2))) * 1e9
-    emfix_o3_neus = np.nanmean((emfix_o3 * neus_c), axis = tuple((1, 2))) * 1e9
-    # from + Emissions/+ Chemistry simulations
     emiss_no_inventory_neus = np.vstack(emiss_no_inventory) * neus_inventory
     emiss_no_inventory_neus = np.nanmean(emiss_no_inventory_neus, axis = tuple((1, 2)))             
     mr2_no_inventory_neus = np.vstack(mr2_no_inventory) * neus_inventory
@@ -4781,11 +4795,6 @@ def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
     mr2_no_inventory_neus = np.hstack(mr2_inventory_daily)
     emiss_o3_neus = np.nanmean((emiss_o3 * neus), axis = tuple((1, 2))) * 1e9
     mr2_o3_neus = np.nanmean((mr2_o3 * neus), axis = tuple((1, 2))) * 1e9
-    # separate into years and months
-    std_o3_neus = np.reshape(std_o3_neus, (11, 92))
-    emfix_o3_neus = np.reshape(emfix_o3_neus, (11, 92))
-    emiss_o3_neus = np.reshape(emiss_o3_neus, (3, 92))
-    mr2_o3_neus = np.reshape(mr2_o3_neus, (3, 92))
     # for emissions inventories, n.b. repeat monthly mean values for every day and 
     # save off 2000 values for EmFix
     std_inventory_daily, emfix_inventory_daily = [], []  
@@ -4804,15 +4813,39 @@ def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
     mr2_inventory_daily = np.hstack(mr2_inventory_daily)
     std_inventory_daily = np.hstack(std_inventory_daily)
     emfix_inventory_daily = np.hstack(emfix_inventory_daily)
-    emiss_no_inventory_neus = np.hstack(emiss_no_inventory_neus)
-    kerr_delta_o3 = np.hstack(emiss_o3_neus - mr2_o3_neus)
-    kerr_delta_no = emiss_no_inventory_neus - mr2_no_inventory_neus
-    strode_delta_o3 = np.hstack(emfix_o3_neus - std_o3_neus)
-    strode_delta_no = emfix_inventory_daily - std_inventory_daily
+    emiss_no_inventory_neus = np.hstack(emiss_no_inventory_neus)    
+    # find grid cells in Northeast for different simulations/inventories
+    m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
+                urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
+                area_thresh = 1000)
+    neus_states = pollutants_constants.NORTHEAST_STATES
+    neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
+    neus_c = find_grid_in_region(m, neus_states, gmi_lat_c, gmi_lon_c) 
+    # # # # find Northeast-averaged NOx, O3 
+    # from Strode et al. [2015] simulations
+    std_nox_c_neus = np.array(std_no + std_no2) * neus_c
+    std_nox_c_neus = np.nanmean(std_nox_c_neus, axis = tuple((1, 2))) * 1e9
+    emfix_nox_c_neus = np.array(emfix_no + emfix_no2) * neus_c
+    emfix_nox_c_neus = np.nanmean(emfix_nox_c_neus, axis = tuple((1, 2))) * 1e9
+    std_o3_neus = np.nanmean((std_o3 * neus_c), axis = tuple((1, 2))) * 1e9
+    emfix_o3_neus = np.nanmean((emfix_o3 * neus_c), axis = tuple((1, 2))) * 1e9
+    # from + Emissions/+ Chemistry simulations
+    emiss_nox_neus = (emiss_no + emiss_no2) * neus
+    emiss_nox_neus = np.nanmean(emiss_nox_neus, axis = tuple((1, 2)))* 1e9           
+    mr2_nox_neus = (mr2_no + mr2_no2) * neus
+    mr2_nox_neus = np.nanmean(mr2_nox_neus, axis = tuple((1, 2))) * 1e9
+    emiss_o3_neus = (emiss_o3) * neus
+    emiss_o3_neus = np.nanmean(emiss_o3_neus, axis = tuple((1, 2)))* 1e9           
+    mr2_o3_neus = (mr2_o3) * neus
+    mr2_o3_neus = np.nanmean(mr2_o3_neus, axis = tuple((1, 2))) * 1e9
+    kerr_delta_no = (emiss_nox_neus - mr2_nox_neus)
+    kerr_delta_o3 = (emiss_o3_neus-mr2_o3_neus)
+    strode_delta_no = (emfix_nox_c_neus - std_nox_c_neus)
+    strode_delta_o3 = (emfix_o3_neus - std_o3_neus)
     # Plotting
     fig = plt.figure()
     ax1 = plt.subplot2grid((1,1),(0,0))
-    ax1.plot(kerr_delta_no,kerr_delta_o3, 'o', 
+    ax1.plot(kerr_delta_no, kerr_delta_o3, 'o', 
              color = '#d95f02', markersize = 3, alpha = 1.)
     ax1.plot(strode_delta_no, strode_delta_o3,  'o', 
              color = '#666666', markersize = 3, alpha = 1.)
@@ -4826,44 +4859,31 @@ def scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon):
     ax1.plot(kerrx, kerrb + kerrm * kerrx, '--', lw=2., color='#d95f02', 
              zorder =10)
     ax1.plot(strodex, strodeb + strodem * strodex, '--', lw=2., 
-             color='#666666')
+             color='#666666')    
     # Indicate slope of best fit lines (i.e., the sensitivity of O3 to changes
     # in NOx emissions) 
     ax1.text(0.05, 0.73, 'This study:\n' + r'$\frac{\mathregular{\Delta\:O}_'
              r'{\mathregular{3}}}{\mathregular{\Delta\:NO}_{x}}$ = %.2f '%kerrm+
-             r'$\frac{\mathregular{ppbv}}{\mathregular{kg\:s}^{\mathregular{-1}}'+
-             r'\mathregular{\:grid\:cell}^{\mathregular{-1}}}$', 
+             r'$\frac{\mathregular{ppbv}}{\mathregular{ppbv}}$', 
              transform=ax1.transAxes, color = '#d95f02', fontsize=16)
-    ax1.text(0.45, 0.06, 'Strode et al. (2015):\n' + r'$\frac{\mathregular'+
+    ax1.text(0.54, 0.06, 'Strode et al. (2015):\n' + r'$\frac{\mathregular'+
              r'{\Delta\:O}_{\mathregular{3}}}{\mathregular{\Delta\:NO}'+
              r'_{x}}$ = %.2f $\frac{\mathregular{ppbv}}'%strodem +
-             r'{\mathregular{kg\:s}^{\mathregular{-1}}\mathregular{\:grid'+
-             r'\:cell}^{\mathregular{-1}}}$', 
+             r'{\mathregular{ppbv}}$',
              transform=ax1.transAxes, color = '#666666', fontsize=16)
-    ax1.set_xlabel('$\mathregular{\Delta}$ Emissions '+
-                   '[kg s$^{\mathregular{-1}}$ grid cell$^{\mathregular{-1}}$]', 
+    ax1.set_xlabel('$\mathregular{\Delta}$ NO$_x$ '+
+                   '[ppbv]', 
                    fontsize = 16)  
     ax1.set_ylabel('$\mathregular{\Delta}$ O$_\mathregular{3}$ [ppbv]',
                    fontsize = 16)         
     for t in ax1.get_xticklabels():
         t.set_fontsize(12)
     for t in ax1.get_yticklabels():
-        t.set_fontsize(12)  
-    # Calculate the slope from Strode et al. (2015) simulations for only 
-    # the first two summers (to illustrate that the sensitivity changed over
-    # the years)
-    yrstr = 3
-    strode_delta_o3_f2 = (np.hstack(emfix_o3_neus)[92:yrstr*92]-
-                          np.hstack(std_o3_neus)[92:yrstr*92])
-    strode_delta_no_f2 = (emfix_inventory_daily[92:yrstr*92]-
-                          std_inventory_daily[92:yrstr*92])
-    m, b = np.polyfit(strode_delta_no_f2, strode_delta_o3_f2, 1)
-    print('DO3/DEmissions for first %d years of Strode et al. ' %yrstr+
-          '= %.3f ppbv/kg s-1 grid cell-1'%m)
-    plt.subplots_adjust(bottom=0.15)
+        t.set_fontsize(12)    
+    plt.subplots_adjust(bottom=0.15)      
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
-                'scatter_inventorynoo3.eps', dpi = 300)
-    return 
+                'scatter_noxo3.eps', dpi = 300)        
+    return std_inventory_daily, std_o3_neus
 # # # # # # # # # # # # #    
 def timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
     year, years):
@@ -4989,9 +5009,9 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
     print('(%.3f, %.3f) is chosen coordinate point in South...' 
           %(gmi_lat[slat_idx_south], gmi_lon[slon_idx_south]))   
     # select values at point
-    o3_atpoint = o3[184:, slat_idx_south, slat_idx_south] * 1e9
-    dato3_atpoint = dat_o3[184:, slat_idx_south, slat_idx_south] * 1e9
-    t2m_atpoint = t2m_overpass[184:, slat_idx_south, slat_idx_south]
+    o3_atpoint = o3[184:, slat_idx_south, slon_idx_south] * 1e9
+    dato3_atpoint = dat_o3[184:, slat_idx_south, slon_idx_south] * 1e9
+    t2m_atpoint = t2m_overpass[184:, slat_idx_south, slon_idx_south]
     # calculate correlation coefficients/sensitivity
     print('r(Transport O3, + Chemistry O3) = %.3f' 
           %(np.corrcoef(o3_atpoint, dato3_atpoint)[0, 1]))
@@ -5032,9 +5052,9 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
     print('(%.3f, %.3f) is chosen coordinate point in Montana...' 
           %(gmi_lat[slat_idx_mt], gmi_lon[slon_idx_mt]))   
     # select values at point
-    o3_mt = o3[184:, slat_idx_mt, slat_idx_mt] * 1e9
-    dato3_mt = dat_o3[184:, slat_idx_mt, slat_idx_mt] * 1e9
-    t2m_mt = t2m_overpass[184:, slat_idx_mt, slat_idx_mt]
+    o3_mt = o3[184:, slat_idx_mt, slon_idx_mt] * 1e9
+    dato3_mt = dat_o3[184:, slat_idx_mt, slon_idx_mt] * 1e9
+    t2m_mt = t2m_overpass[184:, slat_idx_mt, slon_idx_mt]
     # calculate correlation coefficients/sensitivity
     print('r(Transport O3, + Chemistry O3) = %.3f' 
           %(np.corrcoef(o3_mt, dato3_mt)[0, 1]))
@@ -5050,13 +5070,13 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
           %(np.mean(o3_mt), np.std(o3_mt)))
     # indices of grid cell in California
     slon_idx_ca = 7
-    slat_idx_ca = 14
+    slat_idx_ca = 15
     print('(%.3f, %.3f) is chosen coordinate point in California...' 
           %(gmi_lat[slat_idx_ca], gmi_lon[slon_idx_ca]))   
     # select values at point
-    o3_ca = o3[184:, slat_idx_ca, slat_idx_ca] * 1e9
-    dato3_ca = dat_o3[184:, slat_idx_ca, slat_idx_ca] * 1e9
-    t2m_ca = t2m_overpass[184:, slat_idx_ca, slat_idx_ca]
+    o3_ca = o3[184:, slat_idx_ca, slon_idx_ca] * 1e9
+    dato3_ca = dat_o3[184:, slat_idx_ca, slon_idx_ca] * 1e9
+    t2m_ca = t2m_overpass[184:, slat_idx_ca, slon_idx_ca]
     # calculate correlation coefficients/sensitivity
     print('r(Transport O3, + Chemistry O3) = %.3f' 
           %(np.corrcoef(o3_ca, dato3_ca)[0, 1]))
@@ -5080,10 +5100,15 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
     axlt.set_title('(a) Montana', fontsize = 16, x = 0.2, y = 1.03)
     lns1 = axlt.plot(o3_mt, lw = 2., 
                    c = pollutants_constants.COLOR_CHEMISTRY, 
-                   label = 'Transport', zorder = 10)
+                   label = '$\mathregular{+}$Chemistry', zorder = 10)
     lns2 = axlt.plot(dato3_mt, lw = 2., 
                    c = pollutants_constants.COLOR_TRANSPORT,
-                   label = '+ Chemistry', zorder = 5)
+                   label = 'Transport', zorder = 5)
+    axlt.text(0.96, 0.05, '%.2f, %.2f, %.2f'
+              %(np.corrcoef(o3_mt, t2m_mt)[0, 1],
+                np.polyfit(t2m_mt, o3_mt, 1)[0],
+                np.polyfit(t2m_mt, dato3_mt, 1)[0]), 
+              transform=axlt.transAxes,fontsize=14, ha='right')        
     for t in axlt.get_yticklabels():
         t.set_fontsize(12)   
     axlt.set_ylabel('O$_{\mathregular{3}}$ [ppbv]', fontsize = 16)
@@ -5100,6 +5125,11 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
     lns2 = axlb.plot(dato3_ca, lw = 2., 
                      c = pollutants_constants.COLOR_TRANSPORT,
                      zorder = 5)
+    axlb.text(0.96, 0.05, '%.2f, %.2f, %.2f'
+              %(np.corrcoef(o3_ca, t2m_ca)[0, 1],
+                np.polyfit(t2m_ca, o3_ca, 1)[0],
+                np.polyfit(t2m_ca, dato3_ca, 1)[0]), 
+              transform=axlb.transAxes,fontsize=14, ha='right')    
     for t in axlb.get_yticklabels():
         t.set_fontsize(12)   
     for t in axlb.get_xticklabels():
@@ -5119,6 +5149,11 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
     lns2 = axrt.plot(dato3_atpoint_north, lw = 2., 
                    c = pollutants_constants.COLOR_TRANSPORT,
                    label = '+ Chemistry', zorder = 5)
+    axrt.text(0.96, 0.05, '%.2f, %.2f, %.2f'
+              %(np.corrcoef(o3_atpoint_north, t2m_atpoint_north)[0, 1],
+                np.polyfit(t2m_atpoint_north, o3_atpoint_north, 1)[0],
+                np.polyfit(t2m_atpoint_north, dato3_atpoint_north, 1)[0]), 
+              transform=axrt.transAxes,fontsize=14, ha='right')        
     axrt.set_yticklabels([])
     axrtb = axrt.twinx()
     lns3 = axrtb.plot(t2m_atpoint_north, lw = 2., color = '#ff7f00',
@@ -5147,6 +5182,11 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
                          fontsize = 16)
     axrbb.set_ylabel('T [K]', rotation = 270, fontsize = 16, color = '#ff7f00')
     axrbb.get_yaxis().set_label_coords(1.2, 0.53)
+    axrb.text(0.96, 0.05, '%.2f, %.2f, %.2f'
+              %(np.corrcoef(o3_atpoint, t2m_atpoint)[0, 1],
+                np.polyfit(t2m_atpoint, o3_atpoint, 1)[0],
+                np.polyfit(t2m_atpoint, dato3_atpoint, 1)[0]), 
+              transform=axrb.transAxes,fontsize=14, ha='right')            
     for t in axrb.get_xticklabels():
         t.set_fontsize(12)
     for t in axrbb.get_yticklabels():
@@ -5159,9 +5199,9 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
         ax.set_xlim([0, 91]) 
         ax.set_ylim([285, 315])               
     # Adjust subplots so that a map can be fit in the middle
-    plt.subplots_adjust(hspace = 0.3, wspace = 0.4) # or wspace = 0.6   
+    plt.subplots_adjust(hspace = 0.3, wspace = 0.5)
     # add inset map showing location of cells
-    left, bottom, width, height = [0.412-0.02, 0.36, 0.2+0.04, 0.26]
+    left, bottom, width, height = [0.445, 0.36, 0.135, 0.26]
     axi = fig.add_axes([left, bottom, width, height])        
     m_small = Basemap(projection = 'merc', llcrnrlon = -126., 
                       llcrnrlat = 24., urcrnrlon = -66.3, 
@@ -5188,74 +5228,74 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
                 'timeseries_transportchemistryo3_atpoints.eps', dpi = 300)
 # # # # # # # # # # # # #    
-#import numpy as np
-#import pandas as pd
-#import matplotlib.pyplot as plt
-#from mpl_toolkits.basemap import Basemap
-#import sys
-#sys.path.append('/Users/ghkerr/phd/')
-#import pollutants_constants
-#sys.path.append('/Users/ghkerr/phd/GMI/')
-#import commensurability 
-#years = [2008, 2009, 2010]
-## # # # load CASTNet O3 
-#castnet = find_conus_castnet(years)
-## # # # load MERRA-2 meteorology
-#t2m, t10m, u2m, u10m, v2m, v10m, ps, merra_lat, merra_lon, times_all = \
-#commensurability.load_MERRA2(years)
-## # # # load CTM simulations 
-## from Transport simulation
-#(gmi_lat, gmi_lon, eta, times, dat_co, dat_no, dat_no2, dat_o3, 
-# dat_cloudfraction, dat_gridboxheight) = \
-#commensurability.open_overpass2('HindcastMR2-DiurnalAvgT', years)
-## from + Chemistry simulation 
-#(gmi_lat, gmi_lon, eta, times, mr2_co, mr2_no, mr2_no2, mr2_o3, 
-# mr2_cloudfraction, mr2_gridboxheight) = \
-# commensurability.open_overpass2('HindcastMR2', years)
-## from + Emissions simulation
-#(gmi_lat, gmi_lon, eta, times, emiss_co, emiss_no, emiss_no2, emiss_o3, 
-# emiss_cloudfraction, emiss_gridboxheight) = \
-#commensurability.open_overpass2('GHKerr-DailyEmiss', years)
-#gmi_lon = np.mod(gmi_lon - 180.0, 360.0) - 180.0
-## # # # determine ozone-temperature sensitivity/correlations
-## from CASTNet sites
-#(r_castnet, do3dt2m_castnet, lat_castnet, lon_castnet, t_castnet, o3_castnet, 
-# sites_castnet) = castnet_r_do3d2t(castnet, t2m, merra_lat, merra_lon, 
-# times_all)
-## from Transport simulation
-#dat_sens, dat_tls, dat_r, dat_t2m_overpass, dat_ps_overpass, dat_p = \
-#calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, dat_o3, 
-#    ps)
-## from + Chemistry simulation 
-#mr2_sens, mr2_tls, mr2_r, mr2_t2m_overpass, mr2_ps_overpass, mr2_p = \
-#calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, mr2_o3, 
-#    ps)
-## from + Emissions simulation
-#emiss_sens, emiss_tls, emiss_r, emiss_t2m_overpass, emiss_ps_overpass, emiss_p = \
-#calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, emiss_o3, 
-#    ps)
-## # # # calculate regionally-averaged fields
-#m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
-#            urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
-#            area_thresh = 1000)
-#neus_states = pollutants_constants.NORTHEAST_STATES
-#neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
-## for CASTNet
-#neus_castnet = ['ASH', 'HOW', 'ACA', 'WST', 'HWF', 'ABT', 'WSP', 'CTH', 
-#                'MKG', 'KEF', 'PSU', 'ARE', 'LRL', 'CDR', 'PAR', 'VPI', 
-#                'PED', 'SHN', 'BWR', 'BEL']
-#castnet_sens_neus, castnet_r_neus, castnet_t2m_neus, castnet_o3_neus = \
-#calculate_castnet_r_do3dt2m_regionmean(t_castnet, o3_castnet, 
-#    sites_castnet, neus_castnet)
-## for Transport simulation
-#dat_sens_neus, dat_r_neus, dat_t2m_neus, dat_o3_neus = \
-#calculate_gmi_r_do3dt2m_regionmean(dat_t2m_overpass, dat_o3, neus, 'Transport')
-## for + Chemistry simulation
-#mr2_sens_neus, mr2_r_neus, mr2_t2m_neus, mr2_o3_neus = \
-#calculate_gmi_r_do3dt2m_regionmean(mr2_t2m_overpass, mr2_o3, neus, '+ Chemistry')
-## for + Emissions simulation
-#emiss_sens_neus, emiss_r_neus, emiss_t2m_neus, emiss_o3_neus = \
-#calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+ Emissions')
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+import sys
+sys.path.append('/Users/ghkerr/phd/')
+import pollutants_constants
+sys.path.append('/Users/ghkerr/phd/GMI/')
+import commensurability 
+years = [2008, 2009, 2010]
+# # # # load CASTNet O3 
+castnet = find_conus_castnet(years)
+# # # # load MERRA-2 meteorology
+t2m, t10m, u2m, u10m, v2m, v10m, ps, merra_lat, merra_lon, times_all = \
+commensurability.load_MERRA2(years)
+# # # # load CTM simulations 
+# from Transport simulation
+(gmi_lat, gmi_lon, eta, times, dat_co, dat_no, dat_no2, dat_o3, 
+ dat_cloudfraction, dat_gridboxheight) = \
+commensurability.open_overpass2('HindcastMR2-DiurnalAvgT', years)
+# from + Chemistry simulation 
+(gmi_lat, gmi_lon, eta, times, mr2_co, mr2_no, mr2_no2, mr2_o3, 
+ mr2_cloudfraction, mr2_gridboxheight) = \
+ commensurability.open_overpass2('HindcastMR2', years)
+# from + Emissions simulation
+(gmi_lat, gmi_lon, eta, times, emiss_co, emiss_no, emiss_no2, emiss_o3, 
+ emiss_cloudfraction, emiss_gridboxheight) = \
+commensurability.open_overpass2('GHKerr-DailyEmiss', years)
+gmi_lon = np.mod(gmi_lon - 180.0, 360.0) - 180.0
+# # # # determine ozone-temperature sensitivity/correlations
+# from CASTNet sites
+(r_castnet, do3dt2m_castnet, lat_castnet, lon_castnet, t_castnet, o3_castnet, 
+ sites_castnet) = castnet_r_do3d2t(castnet, t2m, merra_lat, merra_lon, 
+ times_all)
+# from Transport simulation
+dat_sens, dat_tls, dat_r, dat_t2m_overpass, dat_ps_overpass, dat_p = \
+calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, dat_o3, 
+    ps)
+# from + Chemistry simulation 
+mr2_sens, mr2_tls, mr2_r, mr2_t2m_overpass, mr2_ps_overpass, mr2_p = \
+calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, mr2_o3, 
+    ps)
+# from + Emissions simulation
+emiss_sens, emiss_tls, emiss_r, emiss_t2m_overpass, emiss_ps_overpass, emiss_p = \
+calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, emiss_o3, 
+    ps)
+# # # # calculate regionally-averaged fields
+m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
+            urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
+            area_thresh = 1000)
+neus_states = pollutants_constants.NORTHEAST_STATES
+neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
+# for CASTNet
+neus_castnet = ['ASH', 'HOW', 'ACA', 'WST', 'HWF', 'ABT', 'WSP', 'CTH', 
+                'MKG', 'KEF', 'PSU', 'ARE', 'LRL', 'CDR', 'PAR', 'VPI', 
+                'PED', 'SHN', 'BWR', 'BEL']
+castnet_sens_neus, castnet_r_neus, castnet_t2m_neus, castnet_o3_neus = \
+calculate_castnet_r_do3dt2m_regionmean(t_castnet, o3_castnet, 
+    sites_castnet, neus_castnet)
+# for Transport simulation
+dat_sens_neus, dat_r_neus, dat_t2m_neus, dat_o3_neus = \
+calculate_gmi_r_do3dt2m_regionmean(dat_t2m_overpass, dat_o3, neus, 'Transport')
+# for + Chemistry simulation
+mr2_sens_neus, mr2_r_neus, mr2_t2m_neus, mr2_o3_neus = \
+calculate_gmi_r_do3dt2m_regionmean(mr2_t2m_overpass, mr2_o3, neus, '+ Chemistry')
+# for + Emissions simulation
+emiss_sens_neus, emiss_r_neus, emiss_t2m_neus, emiss_o3_neus = \
+calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+ Emissions')
 ## # # # load AQS MDA8 O3
 #sc = list(pollutants_constants.EPA_DICT.values()    
 #ozone_mean_mda8, ozone_nomean_mda8, ozone_mda8 = find_conus_aqsmda8(sc)
@@ -5313,7 +5353,7 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
 ## plot coefficient of determination between O3 and T2m
 #map_r2o3t2m_conus(lat_castnet, lon_castnet, r_castnet, gmi_lat, gmi_lon, 
 #    emiss_r, 'GHKerr-DailyEmiss')
-## maps of the 90th percentile of O3
+# maps of the 90th percentile of O3
 #map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 #    neus)
 ## maps of the O3-climate penalty 
@@ -5326,9 +5366,8 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
 #    gmi_lat, gmi_lon)    
 ## plot Strode et al. (2015) simulations to compare with + Emissions/
 ## + Chemistry simulations
-#strode_inventory, strode_o3 = scatter_inventorynonox_noxo3(mr2_t2m_overpass, 
-#    mr2_no, mr2_no2, mr2_o3, emiss_no, emiss_no2, emiss_o3, neus_states, 
-#    gmi_lat, gmi_lon)
+#strode_inventory, strode_o3 = scatter_noxo3(mr2_o3, emiss_o3, mr2_no, 
+#    emiss_no, mr2_no2, emiss_no2, neus_states, gmi_lat, gmi_lon)
 ## plot boxplots of CEMS NOx and CASTNet O3
 #boxplot_cemsnox_castneto3_neus(neus_castnet, strode_inventory, 
 #    strode_o3)
@@ -5341,4 +5380,16 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
 #    emiss_o3_neus, gmi_lat, gmi_lon, 2010, years)   
 #timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
 #    2010, years)
-#scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon)s
+#scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+
+
