@@ -73,8 +73,10 @@ REVISION HISTORY
                 output mean O3 and bias plots as a two-panel figure
     21022019 -- function 'scatter_inventorynoo3' added to replace, in effect, 
                 'scatter_inventorynonox_noxo3' (simplified version)
-    22022018 -- function 'timeseries_transportchemistryo3_atpoints' added
-    25022018 -- function 'scatter_inventorynoo3' changed to focus on O3 vs. NOx
+    22022019 -- function 'timeseries_transportchemistryo3_atpoints' added
+    25022019 -- function 'scatter_inventorynoo3' changed to focus on O3 vs. NOx
+    22042019 -- function 'map_allgmio3_do3dt_byprecip' added to start dealing
+                with reviewers' comments...
 """
 # # # # # # # # # # # # #
 # change font
@@ -2979,7 +2981,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     return 
 # # # # # # # # # # # # #    
 def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat, 
-    gmi_lon):
+    gmi_lon, fstr):
     """plot maps of the O3-climate penalty from Transport, + Chemistry, and
     + Emissions simulatios. Outline regions where the O3-T correlation (from
     + Emissions simulation) falls below r = 0.3.
@@ -3003,6 +3005,8 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
         GMI CTM latitude coordinates, units of degrees north, [lat,]      
     gmi_lon : numpy.ndarray
         GMI CTM longitude coordinates, units of degrees east, [lon,]  
+    fstr : str
+        Output filename suffix
         
     Returns
     ----------      
@@ -3112,8 +3116,8 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     cb.set_ticks(np.linspace(vmin, vmax, 5))
     cb.set_label(label = '[%]', size = 16)
     cb.ax.tick_params(labelsize = 12)    
-    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 'map_allgmio3_do3dt.eps', 
-                dpi = 300)         
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/' + 
+                'map_allgmio3_do3dt%s.eps' %fstr, dpi = 300)         
     return        
 # # # # # # # # # # # # #  
 def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, dat_o3_neus, 
@@ -4352,7 +4356,7 @@ def boxplot_cemsnox_castneto3_neus(neus_castnet, std_inventory_daily,
     ax1b.set_ylim([2.5, 5.0])
     ax1b.set_ylabel('CTM '+
                     '[kg s$^{\mathregular{-1}}$ grid cell'+
-                    's$^{\mathregular{-1}}$]', color = '#666666', fontsize = 16, 
+                    ' s$^{\mathregular{-1}}$]', color = '#666666', fontsize = 16, 
                     rotation = 270)
     ax1b.get_yaxis().set_label_coords(1.21, 0.50)
     # add results from Strode et al. (2015) for O3
@@ -5227,75 +5231,227 @@ def timeseries_transportchemistryo3_atpoints(t2m_overpass, o3, dat_o3, gmi_lat,
     leg.get_frame().set_linewidth(0.0)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
                 'timeseries_transportchemistryo3_atpoints.eps', dpi = 300)
+# # # # # # # # # # # # #
+def map_allgmio3_do3dt_byprecip(merra_lat, merra_lon, gmi_lat, gmi_lon, 
+    t2m_overpass, dat_o3, mr2_o3, emiss_sens, emiss_r):
+    """find precipitation in NEUS from MERRA and then calculate dO3/dT 
+    on days with high (> 50%-ile) and low (< 50%-ile) regionally-averaged 
+    precipitation.
+
+    Parameters
+    ----------  
+    merra_lat : numpy.ndarray
+        MERRA-2 latitude coordinates, units of degrees north, [lat,]
+    merra_lon : numpy.ndarray
+        MERRA-2 longitude coordinates, units of degrees east, [lon,]       
+    gmi_lat : numpy.ndarray
+        GMI CTM latitude coordinates, units of degrees north, [lat,]      
+    gmi_lon : numpy.ndarray
+        GMI CTM longitude coordinates, units of degrees east, [lon,]  
+    t2m_overpass : numpy.ndarray
+        MERRA-2 2-meter temperatures at overpass2 time interpolated to the 
+        resolution of the CTM, units of K, [time, lat, lon]
+    dat_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        HindcastMR2-DiurnalAvgT, units of volume mixing ratio, [time, lat, lon] 
+    mr2_o3 : numpy.ndarray
+        GMI CTM surface-level ozone at overpass time, for model case 
+        HindcastMR2, units of volume mixing ratio, [time, lat, lon] 
+    emiss_sens : numpy.ndarray    
+        The O3-climate penalty at each GMI grid cell from the + Emissions 
+        simulation, units of ppbv K^-1, [lat, lon]         
+    emiss_r : numpy.ndarray
+        The Pearson product-moment correlation coefficient calculated between 
+        MERRA-2 2-meter temperatures and ozone at each GMI grid cell from the 
+        + Emissions simulation, [lat, lon]
+
+    Returns
+    ----------         
+    None    
+    """
+    import datetime
+    import numpy as np
+    import netCDF4 as nc
+    import sys
+    sys.path.append('/Users/ghkerr/phd/')
+    import pollutants_constants
+    sys.path.append('/Users/ghkerr/phd/globalo3/')
+    import globalo3_open
+    ncfile = nc.Dataset(pollutants_constants.PATH_CLIMATOLOGIES + 
+                        'climatology_2mmy.nc')
+    pr_all = ncfile.variables['pr'][:]
+    lat = ncfile.variables['lat'][:]
+    lon = ncfile.variables['lon'][:]
+    # create list of days ('%YYYY-%mm-%dd') in measuring period 
+    daysmy = []
+    # function uses a generator function to abstract the iteration over the 
+    # specified range of dates
+    def daterange(start_date, end_date):
+        for n in range(int ((end_date - start_date).days)):
+            yield start_date + datetime.timedelta(n)
+    for year in np.arange(pollutants_constants.START_YEAR, 
+                          pollutants_constants.END_YEAR + 1, 1):
+        start_date = datetime.date(year, 1, 1)
+        end_date = datetime.date(year, 12, 31)
+        days_ty = []
+        for single_date in daterange(start_date, end_date + 
+                                     datetime.timedelta(days = 1)):
+            days_ty.append(single_date.strftime("%Y-%m-%d"))
+        daysmy.append(days_ty)
+    # convert dates from string format to datetime.date type 
+    dtimes = []
+    dtimes = [datetime.datetime.strptime(date, '%Y-%m-%d').date() for 
+              date in np.hstack(daysmy)]
+    # months of dtime datetime.date objects
+    month_idxs = [day.month for day in dtimes]
+    month_idxs = np.array(month_idxs)
+    # find indices of summertime months (i.e. June, July, August) and summer 
+    # days, years
+    summonth_idx = np.where((month_idxs == 6) | (month_idxs == 7) | 
+            (month_idxs == 8))
+    sumdays = np.array(dtimes)[summonth_idx]    
+    sumdays_years = [day.year for day in np.array(dtimes)[summonth_idx]]
+    sumdays_years = np.array(sumdays_years)    
+    # Find days in measuring period 2008-2010
+    wheremp = np.where(np.in1d(sumdays_years, np.array([2008, 2009, 2010])) ==
+                       True)[0]
+    prmp = pr_all[wheremp]
+    # Reduce precipitation to same spatial domain as GMI results 
+    prmp_gmi = prmp[:, np.where(lat==merra_lat[0])[0][0]:
+        np.where(lat==merra_lat[-1])[0][0]+1, np.where(lon==merra_lon[0])[0][0]:
+        np.where(lon==merra_lon[-1])[0][0]+1]
+    prmp_lat = lat[np.where(lat==merra_lat[0])[0][0]:
+        np.where(lat==merra_lat[-1])[0][0]+1]
+    prmp_lon = lon[np.where(lon==merra_lon[0])[0][0]:
+        np.where(lon==merra_lon[-1])[0][0]+1]
+    # Interpolate MERRA-1 precipitation to GMI resolution 
+    prmp_gmi = globalo3_open.interpolate_merra_to_ctmresolution(gmi_lat, 
+        gmi_lon, prmp_lat, prmp_lon, prmp_gmi, checkplot='yes') 
+    # Recalculate dO3/dT for high precipitation days
+    dat_do3dt2m_high = np.empty(shape = t2m_overpass.shape[1:])
+    dat_do3dt2m_high[:] = np.nan
+    for i, ilat in enumerate(gmi_lat):
+        for j, jlon in enumerate(gmi_lon):
+            prmp_high = np.where(prmp_gmi[:,i,j] > np.percentile(
+                    prmp_gmi[:,i,j], 50))[0]
+            if prmp_high.shape[0] == 0:
+                dat_do3dt2m_high[i, j] = np.polyfit(t2m_overpass[
+                    :, i, j], (dat_o3*1e9)[:, i, j], 1)[0]
+            else:                 
+                dat_do3dt2m_high[i, j] = np.polyfit(t2m_overpass[
+                    prmp_high, i, j], (dat_o3*1e9)[prmp_high, i, j], 1)[0]
+    mr2_do3dt2m_high = np.empty(shape = t2m_overpass.shape[1:])
+    mr2_do3dt2m_high[:] = np.nan
+    for i, ilat in enumerate(gmi_lat):
+        for j, jlon in enumerate(gmi_lon):
+            prmp_high = np.where(prmp_gmi[:,i,j] > np.percentile(
+                    prmp_gmi[:,i,j], 50))[0]   
+            if prmp_high.shape[0] == 0:
+                mr2_do3dt2m_high[i, j] = np.polyfit(t2m_overpass[
+                        :, i, j], (mr2_o3*1e9)[:, i, j], 1)[0]                
+            else: 
+                mr2_do3dt2m_high[i, j] = np.polyfit(t2m_overpass[
+                        prmp_high, i, j], (mr2_o3*1e9)[prmp_high, i, j], 1)[0]
+    # For low precipitation days
+    dat_do3dt2m_low = np.empty(shape = t2m_overpass.shape[1:])
+    dat_do3dt2m_low[:] = np.nan
+    for i, ilat in enumerate(gmi_lat):
+        for j, jlon in enumerate(gmi_lon):
+            prmp_low = np.where(prmp_gmi[:,i,j] < np.percentile(
+                    prmp_gmi[:,i,j], 50))[0]
+            if prmp_low.shape[0] == 0:
+                dat_do3dt2m_low[i, j] = np.polyfit(t2m_overpass[
+                        :, i, j], (dat_o3*1e9)[:, i, j], 1)[0]                
+            else:
+                dat_do3dt2m_low[i, j] = np.polyfit(t2m_overpass[
+                        prmp_low, i, j], (dat_o3*1e9)[prmp_low, i, j], 1)[0]
+    mr2_do3dt2m_low = np.empty(shape = t2m_overpass.shape[1:])
+    mr2_do3dt2m_low[:] = np.nan
+    for i, ilat in enumerate(gmi_lat):
+        for j, jlon in enumerate(gmi_lon):
+            prmp_low = np.where(prmp_gmi[:,i,j] < np.percentile(
+                    prmp_gmi[:,i,j], 50))[0]            
+            if prmp_low.shape[0] == 0:
+                mr2_do3dt2m_low[i, j] = np.polyfit(t2m_overpass[
+                        :, i, j], (mr2_o3*1e9)[:, i, j], 1)[0]                
+            else: 
+                mr2_do3dt2m_low[i, j] = np.polyfit(t2m_overpass[
+                        prmp_low, i, j], (mr2_o3*1e9)[prmp_low, i, j], 1)[0]
+    # Plotting 
+    map_allgmio3_do3dt(dat_do3dt2m_high, mr2_do3dt2m_high, 
+        emiss_sens, emiss_r, gmi_lat, gmi_lon, '_highprecip')
+    map_allgmio3_do3dt(dat_do3dt2m_low, mr2_do3dt2m_low, 
+        emiss_sens, emiss_r, gmi_lat, gmi_lon, '_lowprecip')
+    return 
 # # # # # # # # # # # # #    
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
-import sys
-sys.path.append('/Users/ghkerr/phd/')
-import pollutants_constants
-sys.path.append('/Users/ghkerr/phd/GMI/')
-import commensurability 
-years = [2008, 2009, 2010]
-# # # # load CASTNet O3 
-castnet = find_conus_castnet(years)
-# # # # load MERRA-2 meteorology
-t2m, t10m, u2m, u10m, v2m, v10m, ps, merra_lat, merra_lon, times_all = \
-commensurability.load_MERRA2(years)
-# # # # load CTM simulations 
-# from Transport simulation
-(gmi_lat, gmi_lon, eta, times, dat_co, dat_no, dat_no2, dat_o3, 
- dat_cloudfraction, dat_gridboxheight) = \
-commensurability.open_overpass2('HindcastMR2-DiurnalAvgT', years)
-# from + Chemistry simulation 
-(gmi_lat, gmi_lon, eta, times, mr2_co, mr2_no, mr2_no2, mr2_o3, 
- mr2_cloudfraction, mr2_gridboxheight) = \
- commensurability.open_overpass2('HindcastMR2', years)
-# from + Emissions simulation
-(gmi_lat, gmi_lon, eta, times, emiss_co, emiss_no, emiss_no2, emiss_o3, 
- emiss_cloudfraction, emiss_gridboxheight) = \
-commensurability.open_overpass2('GHKerr-DailyEmiss', years)
-gmi_lon = np.mod(gmi_lon - 180.0, 360.0) - 180.0
-# # # # determine ozone-temperature sensitivity/correlations
-# from CASTNet sites
-(r_castnet, do3dt2m_castnet, lat_castnet, lon_castnet, t_castnet, o3_castnet, 
- sites_castnet) = castnet_r_do3d2t(castnet, t2m, merra_lat, merra_lon, 
- times_all)
-# from Transport simulation
-dat_sens, dat_tls, dat_r, dat_t2m_overpass, dat_ps_overpass, dat_p = \
-calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, dat_o3, 
-    ps)
-# from + Chemistry simulation 
-mr2_sens, mr2_tls, mr2_r, mr2_t2m_overpass, mr2_ps_overpass, mr2_p = \
-calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, mr2_o3, 
-    ps)
-# from + Emissions simulation
-emiss_sens, emiss_tls, emiss_r, emiss_t2m_overpass, emiss_ps_overpass, emiss_p = \
-calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, emiss_o3, 
-    ps)
-# # # # calculate regionally-averaged fields
-m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
-            urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
-            area_thresh = 1000)
-neus_states = pollutants_constants.NORTHEAST_STATES
-neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
-# for CASTNet
-neus_castnet = ['ASH', 'HOW', 'ACA', 'WST', 'HWF', 'ABT', 'WSP', 'CTH', 
-                'MKG', 'KEF', 'PSU', 'ARE', 'LRL', 'CDR', 'PAR', 'VPI', 
-                'PED', 'SHN', 'BWR', 'BEL']
-castnet_sens_neus, castnet_r_neus, castnet_t2m_neus, castnet_o3_neus = \
-calculate_castnet_r_do3dt2m_regionmean(t_castnet, o3_castnet, 
-    sites_castnet, neus_castnet)
-# for Transport simulation
-dat_sens_neus, dat_r_neus, dat_t2m_neus, dat_o3_neus = \
-calculate_gmi_r_do3dt2m_regionmean(dat_t2m_overpass, dat_o3, neus, 'Transport')
-# for + Chemistry simulation
-mr2_sens_neus, mr2_r_neus, mr2_t2m_neus, mr2_o3_neus = \
-calculate_gmi_r_do3dt2m_regionmean(mr2_t2m_overpass, mr2_o3, neus, '+ Chemistry')
-# for + Emissions simulation
-emiss_sens_neus, emiss_r_neus, emiss_t2m_neus, emiss_o3_neus = \
-calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+ Emissions')
+#import numpy as np
+#import pandas as pd
+#import matplotlib.pyplot as plt
+#from mpl_toolkits.basemap import Basemap
+#import sys
+#sys.path.append('/Users/ghkerr/phd/')
+#import pollutants_constants
+#sys.path.append('/Users/ghkerr/phd/GMI/')
+#import commensurability 
+#years = [2008, 2009, 2010]
+## # # # load CASTNet O3 
+#castnet = find_conus_castnet(years)
+## # # # load MERRA-2 meteorology
+#t2m, t10m, u2m, u10m, v2m, v10m, ps, merra_lat, merra_lon, times_all = \
+#commensurability.load_MERRA2(years)
+## # # # load CTM simulations 
+## from Transport simulation
+#(gmi_lat, gmi_lon, eta, times, dat_co, dat_no, dat_no2, dat_o3, 
+# dat_cloudfraction, dat_gridboxheight) = \
+#commensurability.open_overpass2('HindcastMR2-DiurnalAvgT', years)
+## from + Chemistry simulation 
+#(gmi_lat, gmi_lon, eta, times, mr2_co, mr2_no, mr2_no2, mr2_o3, 
+# mr2_cloudfraction, mr2_gridboxheight) = \
+# commensurability.open_overpass2('HindcastMR2', years)
+## from + Emissions simulation
+#(gmi_lat, gmi_lon, eta, times, emiss_co, emiss_no, emiss_no2, emiss_o3, 
+# emiss_cloudfraction, emiss_gridboxheight) = \
+#commensurability.open_overpass2('GHKerr-DailyEmiss', years)
+#gmi_lon = np.mod(gmi_lon - 180.0, 360.0) - 180.0
+## # # # determine ozone-temperature sensitivity/correlations
+## from CASTNet sites
+#(r_castnet, do3dt2m_castnet, lat_castnet, lon_castnet, t_castnet, o3_castnet, 
+# sites_castnet) = castnet_r_do3d2t(castnet, t2m, merra_lat, merra_lon, 
+# times_all)
+## from Transport simulation
+#dat_sens, dat_tls, dat_r, dat_t2m_overpass, dat_ps_overpass, dat_p = \
+#calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, dat_o3, 
+#    ps)
+## from + Chemistry simulation 
+#mr2_sens, mr2_tls, mr2_r, mr2_t2m_overpass, mr2_ps_overpass, mr2_p = \
+#calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, mr2_o3, 
+#    ps)
+## from + Emissions simulation
+#emiss_sens, emiss_tls, emiss_r, emiss_t2m_overpass, emiss_ps_overpass, emiss_p = \
+#calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, emiss_o3, 
+#    ps)
+## # # # calculate regionally-averaged fields
+#m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
+#            urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
+#            area_thresh = 1000)
+#neus_states = pollutants_constants.NORTHEAST_STATES
+#neus = find_grid_in_region(m, neus_states, gmi_lat, gmi_lon)
+## for CASTNet
+#neus_castnet = ['ASH', 'HOW', 'ACA', 'WST', 'HWF', 'ABT', 'WSP', 'CTH', 
+#                'MKG', 'KEF', 'PSU', 'ARE', 'LRL', 'CDR', 'PAR', 'VPI', 
+#                'PED', 'SHN', 'BWR', 'BEL']
+#castnet_sens_neus, castnet_r_neus, castnet_t2m_neus, castnet_o3_neus = \
+#calculate_castnet_r_do3dt2m_regionmean(t_castnet, o3_castnet, 
+#    sites_castnet, neus_castnet)
+## for Transport simulation
+#dat_sens_neus, dat_r_neus, dat_t2m_neus, dat_o3_neus = \
+#calculate_gmi_r_do3dt2m_regionmean(dat_t2m_overpass, dat_o3, neus, 'Transport')
+## for + Chemistry simulation
+#mr2_sens_neus, mr2_r_neus, mr2_t2m_neus, mr2_o3_neus = \
+#calculate_gmi_r_do3dt2m_regionmean(mr2_t2m_overpass, mr2_o3, neus, '+ Chemistry')
+## for + Emissions simulation
+#emiss_sens_neus, emiss_r_neus, emiss_t2m_neus, emiss_o3_neus = \
+#calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+ Emissions')
 ## # # # load AQS MDA8 O3
 #sc = list(pollutants_constants.EPA_DICT.values()    
 #ozone_mean_mda8, ozone_nomean_mda8, ozone_mda8 = find_conus_aqsmda8(sc)
@@ -5358,7 +5514,7 @@ calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+ Emissi
 #    neus)
 ## maps of the O3-climate penalty 
 #map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat, 
-#    gmi_lon)
+#    gmi_lon, '')
 # plot timeseries of O3, T at grid cells with high and low O3-T correlations
 #timeseries_mr2o3dato3t2m_atpoint(mr2_t2m_overpass, dat_o3, mr2_o3, gmi_lat, 
 #    gmi_lon)
@@ -5381,15 +5537,7 @@ calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+ Emissi
 #timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
 #    2010, years)
 #scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-
+# # # # Reviewer comments   
+# Plot maps of dO3/dT on days with above versus below average precipitation 
+#map_allgmio3_do3dt_byprecip(merra_lat, merra_lon, gmi_lat, gmi_lon, 
+#    emiss_t2m_overpass, dat_o3, mr2_o3, emiss_sens, emiss_r)
