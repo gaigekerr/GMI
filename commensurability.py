@@ -83,6 +83,8 @@ REVISION HISTORY
     19082018 -- function 'open_overpass2' added
     10102018 -- functions 'load_MERRA2' and 'commensurate_MERRA2' edited to 
                 also extract surface pressure
+    28042019 -- edit function 'open_overpass2' to read output from HindcastMR2-
+                CCMI simulation. Add function 'open_geoschem'
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -239,7 +241,7 @@ def open_castnet_singyear(year, sampling_months, sampling_hours, timezone):
     # options for timezones can be found by pytz.all_timezones. Code is set 
     # up to handle any UTC offset (i.e. 'GMT+4', 'GMT+5', etc.)
     timezone = pytz.timezone('Etc/%s' %timezone)
-    castnet['DATE_TIME'] = castnet['DATE_TIME'].dt.values.tz_localize(timezone).tz_convert(pytz.utc)   
+    castnet['DATE_TIME'] = pd.DatetimeIndex(castnet['DATE_TIME'].dt.values).tz_localize(timezone).tz_convert(pytz.utc)   
     # strip off trailing +00:00 from index
     # sample CASTNET observations only during hours in variable 
     # 'sampling_hours'; n.b. values in 'sampling_hours' are in UTC
@@ -3314,11 +3316,17 @@ def open_overpass2(case, years):
     times = []
     # loop through years of interest
     for year in years: 
-        # latitudinal/longitudinal bounds of file are hard-coded; would have
-        # to change if examining other regions
-        infile = Dataset(pollutants_constants.PATH_GMI + 'overpass2/' + 
-                         '%s/gmic_%s_%d_jja_23N_230E_50N_300E.overpass2.nc'
-                         %(case, case, year), 'r')
+        # latitudinal/longitudinal bounds of simulations at coarser resolution
+        # (i.e. 2.5 x 2 deg) are different
+        if (case == 'Hindcast3Igac2') or (case == 'HindcastFFIgac2') or \
+        (case == 'HindcastMR2-CCMI'):
+            infile = Dataset(pollutants_constants.PATH_GMI + 'overpass2/' + 
+                '%s/gmic_%s_%d_jja_22N_230E_50N_300E.overpass2.nc'
+                %(case, case, year), 'r')       
+        else: 
+            infile = Dataset(pollutants_constants.PATH_GMI + 'overpass2/' + 
+                '%s/gmic_%s_%d_jja_23N_230E_50N_300E.overpass2.nc'
+                %(case, case, year), 'r')
         # extract dimensional information only on the first iteration of year
         # loop 
         if year == years[0]:
@@ -3543,3 +3551,60 @@ def commensurate_aqstracegas_overpass2(df, gmi_lat, gmi_lon):
                             all_grid[:, i, j] = np.nanmean(np.vstack(all_t), axis = 0)
     return suburban_grid, urban_grid, rural_grid, all_grid
 # # # # # # # # # # # # #    
+def open_geoschem(): 
+    """open August-September 2013 2-hourly GEOS-Chem output detailed in Travis
+    et al. [2015] and extract O3 at the time of satellite overpass. 
+    
+    Parameters
+    ----------  
+    None
+
+    Returns
+    ----------         
+    lat : numpy.ndarray
+        GEOS-Chem latitude coordinates, units of degrees north, [lat,]      
+    lng : numpy.ndarray
+        GEOS-Chem longitude coordinates, units of degrees east, [lon,]  
+    o3_atoverpass : numpy.ndarray
+        GEOS-Chem O3 mixing ratio at the approximate time of satellite 
+        overpass, units of ppbv, [time, lat, lon]
+    """
+    import numpy as np
+    import xarray as xr
+    import datetime
+    import pytz
+    import timezonefinder
+    geos = xr.open_dataset('/Users/ghkerr/phd/GMI/data/'+
+                           'ts2013_concat.bpch.nc')
+    o3 = geos.o3.data
+    lat = geos.latitude_dim.data
+    lng = geos.longitude_dim.data
+    print('finding UTC offset...')
+    geos_tz = np.empty(shape = o3[0].shape)
+    geos_tz[:] = np.nan
+    for i, ilat in enumerate(lat):
+        for j, jlng in enumerate(lng):        
+            tf = timezonefinder.TimezoneFinder()
+            timezone_str = tf.closest_timezone_at(lat=ilat, lng=jlng)
+            if not timezone_str:
+                timezone_str = tf.closest_timezone_at(lat=ilat, 
+                    lng = jlng, delta_degree = 11)
+            tz = pytz.timezone(timezone_str)
+            dt = datetime.datetime.strptime('2010-06-01', '%Y-%m-%d')
+            offset = int(tz.utcoffset(dt).total_seconds() / 3600.0)
+            geos_tz[i, j] = offset
+    print('finding fields at overpass time...')        
+    o3_atoverpass = np.empty(shape=(int(o3.shape[0]/12), 
+        o3.shape[1], o3.shape[2]))
+    o3_atoverpass[:] = np.nan
+    for i, ilat in enumerate(lat):
+        for j, jlng in enumerate(lng):
+            # Given a grid cell's UTC offset, calculate the time (UTC) of
+            # satellite overpass
+            overpassutc = np.abs(geos_tz[i, j]) + 13
+            # Since GEOS-Chem output if 2 hourly, index GEOS-Chem O3 output 
+            # at the overpass index/2
+            o3_atoverpass[:, i, j] = o3[np.arange(int(np.round(
+                overpassutc/1.99)), len(o3), 12), i, j]  
+    return lat, lng, o3_atoverpass
+# # # # # # # # # # # # #
