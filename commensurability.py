@@ -85,6 +85,7 @@ REVISION HISTORY
                 also extract surface pressure
     28042019 -- edit function 'open_overpass2' to read output from HindcastMR2-
                 CCMI simulation. Add function 'open_geoschem'
+    02052019 -- function 'open_castnet_metdata' added
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -256,6 +257,103 @@ def open_castnet_singyear(year, sampling_months, sampling_hours, timezone):
     print('CASTNet data for %s loaded!' %year)
     return castnet
 # # # # # # # # # # # # #
+def open_castnet_metdata(years, months, hours, var, csites):
+    """function opens CASTNet meteorological data for the time period of 
+    interest and extracts the specified variable at specified sites. 
+    
+    Parameters
+    ---------- 
+    years : list
+        Years in measuring period
+    months : list 
+        Months of interest; function assumes that months are continuous, 
+        i.e., [6, 7, 8] not [5, 7, 10]
+    hours : list 
+        Hours (local time) during which met data are fetched and averaged over
+    var : list 
+        Variable of interest; must match DataFrame columns (n.b. function 
+        will clunk out midway through if len(var) > 1; however, this function 
+        could be adapted to find multiple met variables)/
+    csites : list
+        CASTNet site names from function 'castnet_r_do3d2t' (why was this 
+        function name misspelled months ago and not corrected?!?); these 
+        sites and their ordering is how relevant met data is fetched, [sites,]   
+
+    Returns
+    ----------   
+    var_all : list
+        Met data of interest for the years and months specified in the input
+        parameters and daily averaged over the hours specified; each list 
+        item is a numpy.ndarray of a time series at a particular CASTNet site, 
+        [sites, ]
+    """
+    import numpy as np
+    import time
+    import pandas as pd
+    print('# # # # # # # # # # # # # # # # # # # # # # # # # #\n'+
+        'Loading CASTNet %s met data...' %var[0])
+    start = time.time()
+    # Define date range, aggregated over years
+    date_idx = []
+    for year in np.arange(years[0], years[-1]+1, 1):
+        date_idx.append(pd.date_range('%.2d-01-%d' %(months[0], year), 
+                                      '%.2d-31-%d' %(months[-1], year)))
+    date_idx = np.hstack(date_idx)
+    # Path to CASTNet meteorology
+    PATH_CMET = '/Users/ghkerr/Desktop/metdata/'
+    # List for all years' worth of CASTNet observations
+    castnet_allyears = []
+    # Loop through years in measuring period
+    for year in years:
+        castnet = pd.read_csv(PATH_CMET+'metdata_%d.csv'%year, dtype='str')
+        # Convert 'DATE_TIME' column to datetime64
+        castnet['DATE_TIME'] = pd.DatetimeIndex(castnet['DATE_TIME'])
+        # store DataFrame in list
+        castnet_allyears.append(castnet)
+    # Concatenate into a single DataFrame
+    castnet = pd.concat(castnet_allyears, axis=0)
+    # Select months of interest
+    castnet = castnet.query('DATE_TIME.dt.month >= %d'%months[0]+
+        '& DATE_TIME.dt.month <= %d'%months[-1])
+    # Select hours of interest; note that CASTNet
+    # hours are in local time...this info comes from the 
+    # metdata_YYYY_columninfo.csv files
+    castnet = castnet.query('DATE_TIME.dt.hour >= %d'%hours[0]+
+        '& DATE_TIME.dt.hour <= %d'%hours[-1])
+    # remove trailing numbers from SITE_ID
+    castnet.SITE_ID = castnet.SITE_ID.map(lambda x: str(x)[:3])
+    # Loop through CASTNet sites, saving off site's variable of interest 
+    # at each loop interaction
+    var_all = []
+    for site in csites:
+        # Filter data for site of interest with query method
+        castnet_atsite = castnet.query('SITE_ID == "%s"'%site)
+        # Sort by time
+        castnet_atsite = castnet_atsite.sort_values(by = 'DATE_TIME')
+        # Make time information DataFrame index
+        castnet_atsite.index = pd.DatetimeIndex(castnet_atsite.DATE_TIME)
+        # Convert variable(s) of interest from string to float
+        castnet_atsite[var] = castnet_atsite[var].astype(float)
+        # Select variable(s) of interest and time information 
+        castnet_atsite = castnet_atsite[var]
+        # Some measurements for temperature appear to be wonky (i.e., -300C
+        # in the middle summer); set these to NaN
+        if var[0] == 'TEMPERATURE':
+            castnet_atsite[var[0]][castnet_atsite[var[0]] < 0] = np.nan
+        # Calculate daily average (over hours specified in variable 'hours') 
+        castnet_atsite = castnet_atsite.groupby(castnet_atsite.index.date).mean()
+        # Some readings are 
+        # Fill in missing days
+        if castnet_atsite.shape[0] != 276:
+            castnet_atsite = castnet_atsite.reindex(date_idx, 
+                fill_value = np.nan)
+        # Add daily values at site to list 
+        var_all.append(np.hstack(castnet_atsite[[var[0]]].values))
+    print('# # # # # # # # # # # # # # # # # # # # # # # # # # \n'+
+        'CASTNet %s met data for %d-%d loaded in %.2f seconds' %(var[0], 
+        years[0], years[-1], (time.time()-start)))
+    return var_all
+# # # # # # # # # # # # #    
 def open_castnetsiting():
     """function opens CASTNet site information file
 
