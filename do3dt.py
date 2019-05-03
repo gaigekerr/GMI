@@ -78,6 +78,10 @@ REVISION HISTORY
     22042019 -- function 'map_allgmio3_do3dt_byprecip' added to start dealing
                 with reviewers' comments...
     26042019 -- function 'cmap_discretize' migrated from other code to here
+    30042019 -- function 'scatter_castnetmetrics_ctmmetrics' added
+    02052019 -- edit 'calculate_castnet_r_do3dt2m_regionmean' to handle 
+                temperature observations from CASTNet (not just MERRA-2 
+                temperature data)
 """
 # # # # # # # # # # # # #
 # change font
@@ -1005,7 +1009,7 @@ def calculate_castnet_r_do3dt2m_regionmean(t_castnet, o3_castnet,
     t2m_region = np.array(t_castnet)[where_region]
     # find daily regional average
     o3_region = np.nanmean(o3_region, axis = 0)
-    t2m_region = np.mean(t2m_region, axis = 0)
+    t2m_region = np.nanmean(t2m_region, axis = 0)
     r = np.corrcoef(t2m_region, o3_region)[0, 1]
     do3dt2m = np.polyfit(t2m_region, o3_region, 1)[0]
     Model = scipy.odr.Model(fit_func)
@@ -2053,7 +2057,8 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
         # O3 at GMI grid cell 
         gmi_near_castnet = o3[:, lat_gmi_near, lon_gmi_near] * 1e9
         castnet_atsite = o3_castnet[i]
-        bias_atsite = np.nanmean(gmi_near_castnet)  - np.nanmean(castnet_atsite)
+        bias_atsite = (np.nanmean(gmi_near_castnet)-np.nanmean(
+                castnet_atsite))/np.nanmean(castnet_atsite)*100.
         bias_all.append(bias_atsite)
         i = i + 1
     print('Max bias of %.3f ppbv at %s' %(np.max(bias_all),
@@ -2062,7 +2067,7 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
           sites_castnet[np.where(np.array(bias_all) == np.min(bias_all))[0][0]]))    
     ax2 = plt.subplot2grid((2, 1), (1, 0))
     ax2.set_title('(b)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')
-    vmin = -12; vmax = 12
+    vmin = -30; vmax = 30
     cmap = plt.get_cmap('RdBu_r', 12)
     clevs = np.linspace(vmin, vmax, 13, endpoint = True)
     sc = m.scatter(x_castnet, y_castnet, c = np.array(bias_all), s = 20, 
@@ -2077,7 +2082,7 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     cax = fig.add_axes([0.21, 0.13, 0.6, 0.03])
     cb = fig.colorbar(sc, cax=cax, orientation='horizontal', extend = 'both')
     cb.set_ticks(np.linspace(vmin, vmax, 7, endpoint = True))
-    cb.set_label(label = 'Bias [ppbv]', size = 16)
+    cb.set_label(label = 'Relative bias [%]', size = 16)
     cb.ax.tick_params(labelsize = 12)
     plt.subplots_adjust(bottom = 0.18, hspace=0.6)
     print('mean nationwide bias (GMI - CASTNet) = %.4f ppbv' 
@@ -2089,7 +2094,7 @@ def map_meanmr2o3meancastneto3_conus(o3, o3_castnet, gmi_lat, gmi_lon,
     print('mean bias in region (GMI - CASTNet) = %.4f ppbv'
           %np.mean(bias_region))
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'
-                'map_meanemisso3meancastneto3_withbias_conus.eps', dpi = 300)
+                'map_meanemisso3meancastneto3_withrelativebias_conus.eps', dpi = 300)
     return
 # # # # # # # # # # # # #  
 def scatter_castnett2mo3_gmit2mo3_slopes(castnet_o3_region, castnet_t2m_region, 
@@ -5423,7 +5428,7 @@ def map_allgmio3_do3dt_byprecip(merra_lat, merra_lon, gmi_lat, gmi_lon,
         emiss_sens, emiss_r, gmi_lat, gmi_lon, '_lowprecip')
     return 
 # # # # # # # # # # # # #
-def calculatefields_atcastnet(lat_castnet, lon_castnet, gmi_lat, gmi_lon, 
+def calculatefields_atcastnet(lat_castnet, lon_castnet, ctm_lat, ctm_lon, 
     o3, o3_castnet, r, do3dt2m): 
     """for a given CTM simulation at a given resolution, function finds 
     the CTM grid cell(s) nearest to CASTNet sites (n.b., the list of CASTNet
@@ -5473,34 +5478,246 @@ def calculatefields_atcastnet(lat_castnet, lon_castnet, gmi_lat, gmi_lon,
         The slope of the linear regression of O3 versus temperature for
         each CTM grid cell and interpolated MERRA-2 grid cells closest to 
         CASTNet sites, [sites,]    
-    r_castnet_gmi : list 
-        The Pearson correlation coefficient between CASTNet O3 and CTM O3 at 
-        the nearest grid cell, [sites,]
     """
     import numpy as np
-    o3_atcastnet, r_atcastnet, do3dt_atcastnst = [], [], []
+    o3_atcastnet, r_atcastnet, do3dt_atcastnet = [], [], []
     lat_atcastnet, lon_atcastnet = [], []
     # Find nearest CTM grid cell to CASTNet sites
     for lat, lon in zip(lat_castnet, lon_castnet):
-        latclose = np.abs(lat-gmi_lat).argmin()
-        lonclose = np.abs(lon-gmi_lon).argmin()
-        # Index quantities 
-        o3_atcastnet.append(o3[:,latclose,lonclose]*1e9)
-        r_atcastnet.append(r[latclose,lonclose])
-        do3dt_atcastnet.append(do3dt2m[latclose,lonclose])    
-        # Save off closest lat/lon of GMI grid cell to CASTNet sites
-        lat_atcastnet.append(gmi_lat[latclose])
-        lon_atcastnet.append(gmi_lon[lonclose])
-    # Correlation coefficient between CASTNet and GMI O3 at each site 
-    r_castnet_gmi = []
-    for csite, gsite in zip(o3_castnet, o3_atcastnet):
-        mask = ~np.isnan(csite) & ~np.isnan(gsite)  
-        # Mask array is now true where ith rows of df and dg are NOT nan.
-        csite_mask = csite[mask] # This returns a 1D array of length mask.sum()
-        gsite_mask = gsite[mask]
-        r_castnet_gmi.append(np.corrcoef(csite_mask, gsite_mask)[0,1])
+        latclose = np.abs(lat-ctm_lat).argmin()
+        lonclose = np.abs(lon-ctm_lon).argmin()
+        # If a CASTNet site is outside the CTM domain, value for metrics will 
+        # be NaN (n.b., the threshold for what is classified as "outside" is 
+        # arbitrarily set to 2.5 deg. This could be fine-tuned.)
+        nanfiller = np.empty(shape=o3.shape[0])
+        nanfiller[:] = np.nan
+        if (np.abs(lat-ctm_lat[latclose]) > 2.5) or (np.abs(
+            lon-ctm_lon[lonclose]) > 2.5):
+            o3_atcastnet.append(nanfiller)
+            r_atcastnet.append(np.nan)
+            do3dt_atcastnet.append(np.nan)
+            lat_atcastnet.append(np.nan)
+            lon_atcastnet.append(np.nan)        
+        else: 
+            # Index quantities 
+            o3_atcastnet.append(o3[:,latclose,lonclose])
+            r_atcastnet.append(r[latclose,lonclose])
+            do3dt_atcastnet.append(do3dt2m[latclose,lonclose])    
+            # Save off closest lat/lon of GMI grid cell to CASTNet sites
+            lat_atcastnet.append(ctm_lat[latclose])
+            lon_atcastnet.append(ctm_lon[lonclose])
     return (lat_atcastnet, lon_atcastnet, o3_atcastnet, r_atcastnet, 
-        do3dt_atcastnet, r_castnet_gmi)
+        do3dt_atcastnet)
+# # # # # # # # # # # # #    
+def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet, 
+    o3_atcastnet, r_castnet, r_atcastnet, do3dt2m_castnet, do3dt_atcastnet, 
+    fstr):
+    """plot quantities (i.e., mean O3, O3 variability, r(T, O3), and dO3/dT)
+    at individual CASTNet sites and their co-located CTM grid cell. Top and 
+    bottom role of subplots are the same; the top (bottom) is colored by the 
+    latitude (longitude) of the CASTNet site/grid cell. The slope of the linear
+    regression of the CTM versus the CASTNet quantity is printed on the 
+    subplot.
+    
+    Parameters
+    ----------  
+    lat_castnet : list
+        Latitudes of CASTNet sites, units of degrees north, [sites,]
+    lon_castnet : list
+        Longitudes of CASTNet sites, units of degrees west, [sites,]
+    o3_castnet : list
+        Daily 1300 hours local time O3 at each CASTNet site, units of ppbv, 
+        [sites,]  
+    o3_atcastnet : list
+        Arrays within list correspond to daily O3 concentrations from CTM 
+        at overpass time at the grid cell closest to CASTNet sites, units of 
+        ppbv, [sites,]
+    r_castnet : list
+        Pearson correlation coefficients between MERRA-2 2 meter temperatures
+        and CASTNet ozone at each CASTNet site, [sites,]
+    r_atcastnet : list
+        The Pearson correlation coefficient between tempeature and O3 for 
+        each CTM grid cell and interpolated MERRA-2 grid cells closest to 
+        CASTNet sites, [sites,]
+    do3dt2m_castnet : list
+        The O3-T2m sensitivity (slope of linear regression fit between O3 
+        versus T2m) at each CASTNet site, units of ppbv K^-1, [sites,]
+    do3dt_atcastnet : list 
+        The slope of the linear regression of O3 versus temperature for
+        each CTM grid cell and interpolated MERRA-2 grid cells closest to 
+        CASTNet sites, [sites,]    
+    fstr : str
+        Output filename suffix
+        
+    Returns
+    ----------   
+    None
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.colorbar import ColorbarBase
+    from matplotlib.colors import Normalize    
+    clevs_lat = np.linspace(28, 48, 6)
+    clevs_lon = np.linspace(-122, -68, 10)
+    s = 14
+    cmap = plt.get_cmap('copper', 9)
+    fig = plt.figure(figsize=(8,8))
+    # # # # Colored by latitude
+#    # Mean O3 
+#    ax1 = plt.subplot2grid((2,4),(0,0))
+#    mb = ax1.scatter(np.nanmean(np.array(o3_castnet), axis=1), 
+#        np.mean(o3_atcastnet, axis=1), c=lat_castnet, s=s, vmin=clevs_lat[0], 
+#        vmax=clevs_lat[-1], cmap=cmap_discretize(plt.get_cmap(cmap), 
+#        len(clevs_lat)-1), zorder=10)
+#    idx = np.isfinite(np.nanmean(o3_atcastnet, axis=1))
+#    ax1.text(0.1, 0.8, '%.2f'%np.polyfit(np.nanmean(np.array(o3_castnet)[idx], 
+#        axis=1), np.nanmean(o3_atcastnet, axis=1)[idx], deg=1)[0], 
+#        transform=ax1.transAxes)
+#    ax1.plot(np.linspace(ax1.get_xlim()[0], ax1.get_xlim()[1], 50), 
+#        np.linspace(ax1.get_xlim()[0], ax1.get_xlim()[1], 50), '--k', zorder=2)
+#    ax1.set_xlabel(r'$\mu(\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
+#    ax1.set_ylabel(r'$\mu(\mathregular{O}_\mathregular{3,\:CTM}}$)')
+#    # O3 standard deviation
+#    ax2 = plt.subplot2grid((2,4),(0,1))
+#    ax2.scatter(np.nanstd(np.array(o3_castnet), axis=1), 
+#        np.std(o3_atcastnet, axis=1), c=lat_castnet, s=s, vmin=clevs_lat[0], 
+#        vmax=clevs_lat[-1], cmap=cmap_discretize(plt.get_cmap(cmap), 
+#        len(clevs_lat)-1), zorder=10)
+#    idx = np.isfinite(np.std(o3_atcastnet, axis=1))
+#    ax2.text(0.1, 0.8, '%.2f'%np.polyfit(np.nanstd(np.array(o3_castnet)[idx],
+#        axis=1), np.std(o3_atcastnet, axis=1)[idx], deg=1)[0], 
+#        transform=ax2.transAxes)
+#    ax2.plot(np.linspace(ax2.get_xlim()[0], ax2.get_xlim()[1], 50), 
+#             np.linspace(ax2.get_xlim()[0], ax2.get_xlim()[1], 50), '--k', 
+#             zorder=2)
+#    ax2.set_xlabel(r'$\sigma(\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
+#    ax2.set_ylabel(r'$\sigma(\mathregular{O}_\mathregular{3,\:CTM}}$)')
+#    # r(T, O3)
+#    ax3 = plt.subplot2grid((2,4),(0,2))
+#    mb = ax3.scatter(r_castnet, r_atcastnet, c=lat_castnet, s=s, vmin=clevs_lat[0], 
+#        vmax=clevs_lat[-1], cmap=cmap_discretize(plt.get_cmap(cmap), 
+#        len(clevs_lat)-1), zorder=10)
+#    idx = np.isfinite(r_atcastnet)
+#    ax3.text(0.1, 0.8, '%.2f'%np.polyfit(np.array(r_castnet)[idx], 
+#        np.array(r_atcastnet)[idx], deg=1)[0], transform=ax3.transAxes)
+#    ax3.plot(np.linspace(ax3.get_xlim()[0], ax3.get_xlim()[1], 50), 
+#        np.linspace(ax3.get_xlim()[0], ax3.get_xlim()[1], 50), '--k', zorder=2)
+#    ax3.set_xlabel(r'$r(\mathregular{T,}\:\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
+#    ax3.set_ylabel(r'$r(\mathregular{T,}\:\mathregular{O}_\mathregular{3,\:CTM}}$)')
+#    # dO3/dT
+#    ax4 = plt.subplot2grid((2,4),(0,3))
+#    mb = ax4.scatter(do3dt2m_castnet, do3dt_atcastnet, c=lat_castnet, s=s, 
+#        vmin=clevs_lat[0], vmax=clevs_lat[-1], 
+#        cmap=cmap_discretize(plt.get_cmap(cmap), len(clevs_lat)-1), zorder=10)
+#    idx = np.isfinite(do3dt_atcastnet)
+#    ax4.text(0.1, 0.8, '%.2f'%np.polyfit(np.array(do3dt2m_castnet)[idx], 
+#        np.array(do3dt_atcastnet)[idx], deg=1)[0], transform=ax4.transAxes)
+#    ax4.plot(np.linspace(ax4.get_xlim()[0], ax4.get_xlim()[1], 50), 
+#        np.linspace(ax4.get_xlim()[0], ax4.get_xlim()[1], 50), '--k', zorder=2)
+#    plt.colorbar(mb, extend='both', ticks=clevs_lat, label='$^{\circ}$N')
+#    ax4.set_xlabel('$\mathregular{d}$O$_{\mathregular{3,\:CASTNet}}/\mathregular{d}$T')
+#    ax4.set_ylabel('$\mathregular{d}$O$_{\mathregular{3,\:CTM}}/\mathregular{d}$T')
+    # # # # Colored by longitude
+    # Mean O3 
+    ax5 = plt.subplot2grid((2,2),(0,0))
+    ax5.set_title('(a)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')    
+    idx = np.isfinite(np.nanmean(o3_atcastnet, axis=1))
+    ax5.text(0.04, 0.9, 'm = %.2f'%np.polyfit(np.nanmean(np.array(o3_castnet)[idx], 
+        axis=1), np.nanmean(o3_atcastnet, axis=1)[idx], deg=1)[0], 
+        transform=ax5.transAxes, fontsize=14)
+    ax5.text(0.04, 0.80, 'R$^\mathregular{2}$ = %.2f'%np.corrcoef(np.nanmean(
+        np.array(o3_castnet)[idx], axis=1), np.nanmean(o3_atcastnet, 
+        axis=1)[idx])[0,1]**2, transform=ax5.transAxes, fontsize = 14)        
+    mb = ax5.scatter(np.nanmean(np.array(o3_castnet), axis=1), 
+        np.mean(o3_atcastnet, axis=1), c=lon_castnet, vmin=clevs_lon[0], 
+        vmax=clevs_lon[-1], s=s, cmap=cmap, zorder=10)
+    ax5.plot(np.linspace(ax5.get_xlim()[0], ax5.get_xlim()[1], 50), 
+        np.linspace(ax5.get_xlim()[0], ax5.get_xlim()[1], 50), '--k', zorder=2)
+    ax5.set_xticks(np.arange(25, 95, 15))
+    ax5.set_yticks(np.arange(25, 95, 15))
+    ax5.set_xlabel(r'$\mathregular{\mu}(\mathregular{O}_\mathregular{3,\:'+
+        'CASTNet}}$)', fontsize = 16)
+    ax5.set_ylabel(r'$\mathregular{\mu}(\mathregular{O}_\mathregular{3,\:'
+        'GMI}}$)', fontsize = 16)
+    # O3 standard deviation
+    ax6 = plt.subplot2grid((2,2),(0,1))
+    ax6.set_title('(b)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')        
+    ax6.text(0.04, 0.9, 'm = %.2f'%np.polyfit(np.nanstd(np.array(o3_castnet)[idx],
+        axis=1), np.std(o3_atcastnet, axis=1)[idx], deg=1)[0], 
+        transform=ax6.transAxes, fontsize=14)
+    ax6.text(0.04, 0.8, 'R$^\mathregular{2}$ = %.2f'%np.corrcoef(np.nanstd(np.array(o3_castnet)[idx],
+        axis=1), np.std(o3_atcastnet, axis=1)[idx])[0,1]**2, 
+        transform=ax6.transAxes, fontsize=14)        
+    ax6.scatter(np.nanstd(np.array(o3_castnet), axis=1), 
+        np.std(o3_atcastnet, axis=1), c=lon_castnet, vmin=clevs_lon[0], 
+        vmax=clevs_lon[-1], s=s, cmap=cmap, zorder=10)
+    ax6.plot(np.linspace(ax6.get_xlim()[0], ax6.get_xlim()[1], 50), 
+             np.linspace(ax6.get_xlim()[0], ax6.get_xlim()[1], 50), '--k', 
+             zorder=2)
+    ax6.set_xticks(np.arange(5, 19, 2))
+    ax6.set_yticks(np.arange(5, 19, 2))
+    ax6.set_xlabel(r'$\mathregular{\sigma}(\mathregular{O}_\mathregular{3,'+
+        '\:CASTNet}}$)', fontsize = 16)
+    ax6.set_ylabel(r'$\mathregular{\sigma}(\mathregular{O}_\mathregular{'+
+        '3,\:GMI}}$)', fontsize = 16)
+    # r(T, O3)
+    ax7 = plt.subplot2grid((2,2),(1,0))
+    ax7.set_title('(c)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')        
+    idx = np.isfinite(r_atcastnet)
+    ax7.text(0.04, 0.9, 'm = %.2f'%np.polyfit(np.array(r_castnet)[idx], 
+        np.array(r_atcastnet)[idx], deg=1)[0], transform=ax7.transAxes, 
+        fontsize=14)
+    ax7.text(0.04, 0.8, 'R$^\mathregular{2}$ = %.2f'%np.corrcoef(np.array(
+        r_castnet)[idx], np.array(r_atcastnet)[idx])[0,1]**2, transform=
+        ax7.transAxes, fontsize=14)        
+    mb = ax7.scatter(r_castnet, r_atcastnet, c=lon_castnet, vmin=clevs_lon[0], 
+        vmax=clevs_lon[-1], s=s, cmap=cmap, zorder=10)
+    ax7.plot(np.linspace(ax7.get_xlim()[0], ax7.get_xlim()[1], 50), 
+        np.linspace(ax7.get_xlim()[0], ax7.get_xlim()[1], 50), '--k', zorder=2)
+    ax7.set_xticks(np.arange(-0.2, 1.0, 0.2))
+    ax7.set_yticks(np.arange(-0.2, 1.0, 0.2))    
+    ax7.set_xlabel(r'$r(\mathregular{T_\mathregular{CASTNet},}\:\mathregular'+
+        '{O}_\mathregular{3,\:CASTNet}}$)', fontsize = 16)
+    ax7.set_ylabel(r'$r(\mathregular{T_{\mathregular{MERRA-2}},}\:'+
+        '\mathregular{O}_\mathregular{3,\:GMI}}$)', fontsize = 16)
+    # dO3/dT
+    ax8 = plt.subplot2grid((2,2),(1,1))
+    ax8.set_title('(d)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')        
+    idx = np.isfinite(do3dt_atcastnet)
+    ax8.text(0.04, 0.9, 'm = %.2f'%np.polyfit(np.array(do3dt2m_castnet)[idx], 
+        np.array(do3dt_atcastnet)[idx], deg=1)[0], transform=ax8.transAxes, 
+        fontsize=14)
+    ax8.text(0.04, 0.8, 'R$^{\mathregular{2}}$ = %.2f'%np.corrcoef(
+        np.array(do3dt2m_castnet)[idx], 
+        np.array(do3dt_atcastnet)[idx])[0,1]**2, transform=ax8.transAxes, 
+        fontsize=14)    
+    mb = ax8.scatter(do3dt2m_castnet, do3dt_atcastnet, c=lon_castnet, 
+        vmin=clevs_lon[0], vmax=clevs_lon[-1], s=s, cmap=cmap)
+    ax8.plot(np.linspace(ax8.get_xlim()[0], ax8.get_xlim()[1], 50), 
+        np.linspace(ax8.get_xlim()[0], ax8.get_xlim()[1], 50), '--k', zorder=2)
+    ax8.set_xlabel('$\mathregular{d}$O$_{\mathregular{3,\:CASTNet}}/'+
+        '\mathregular{d}$T$_{\mathregular{CASTNet}}$', fontsize = 16)
+    ax8.set_ylabel('$\mathregular{d}$O$_{\mathregular{3,\:GMI}}/'+
+        '\mathregular{d}$T$_{\mathregular{MERRA-2}}$', fontsize = 16)
+    plt.subplots_adjust(wspace=0.35, hspace=0.30, right = 0.8)
+    # Colorbar for first two plots 
+    norm = Normalize(vmin=clevs_lon[0], vmax=clevs_lon[-1])
+    caxt = fig.add_axes([0.84, 0.2, 0.03, 0.6])
+    cb = ColorbarBase(caxt, cmap=cmap, norm=norm,  
+                      orientation='vertical', extend='both')
+    cb.set_label(label = r'[$^{\circ}$E]', size = 16)
+    cb.ax.tick_params(labelsize = 12)
+    cb.set_ticks(clevs_lon)
+    # Change size of axis tick labels, aspect ratio of plots
+    for ax in [ax5, ax6, ax7, ax8]:
+        for t in ax.get_xticklabels():
+            t.set_fontsize(12)
+        for t in ax.get_yticklabels():
+            t.set_fontsize(12) 
+        ax.set_aspect('equal', 'box')            
+    plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
+                'scatter_castnetmetrics_ctmmetrics_%s.eps' %fstr, dpi = 300) 
+    return 
 # # # # # # # # # # # # #    
 import numpy as np
 import pandas as pd
@@ -5511,7 +5728,7 @@ sys.path.append('/Users/ghkerr/phd/')
 import pollutants_constants
 sys.path.append('/Users/ghkerr/phd/GMI/')
 import commensurability 
-#years = [2008, 2009, 2010]
+years = [2008, 2009, 2010]
 ## # # # load CASTNet O3 
 #castnet = find_conus_castnet(years)
 ## # # # load MERRA-2 meteorology
@@ -5541,6 +5758,21 @@ import commensurability
 #(r_castnet, do3dt2m_castnet, lat_castnet, lon_castnet, t_castnet, o3_castnet, 
 # sites_castnet) = castnet_r_do3d2t(castnet, t2m, merra_lat, merra_lon, 
 # times_all)
+## met data from CASTNet sites
+#t_castnet_obs = commensurability.open_castnet_metdata(years, [6, 7, 8],
+#    [13, 14], ['TEMPERATURE'], sites_castnet)
+## recalculate dO3/dT and r(T, O3) at CASTNet sites using observed, not MERRA-2
+## temperatures 
+#r_castnet_obs, do3dt2m_castnet_obs = [], []
+#for sitei in np.arange(0, len(sites_castnet), 1):
+#    # mask missing values 
+#    mask = ~np.isnan(t_castnet_obs[sitei]) & ~np.isnan(o3_castnet[sitei])
+#    do3dt2m_sitei = np.polyfit(t_castnet_obs[sitei][mask], 
+#                               o3_castnet[sitei][mask], 1)
+#    do3dt2m_castnet_obs.append(do3dt2m_sitei[0])
+#    r_sitei = np.corrcoef(t_castnet_obs[sitei][mask], 
+#                          o3_castnet[sitei][mask])[0,1]
+#    r_castnet_obs.append(r_sitei)
 ## from Transport simulation
 #dat_sens, dat_tls, dat_r, dat_t2m_overpass, dat_ps_overpass, dat_p = \
 #calculate_gmi_r_do3dt2m(merra_lat, merra_lon, gmi_lat, gmi_lon, t2m, dat_o3, 
@@ -5568,7 +5800,7 @@ import commensurability
 #                'MKG', 'KEF', 'PSU', 'ARE', 'LRL', 'CDR', 'PAR', 'VPI', 
 #                'PED', 'SHN', 'BWR', 'BEL']
 #castnet_sens_neus, castnet_r_neus, castnet_t2m_neus, castnet_o3_neus = \
-#calculate_castnet_r_do3dt2m_regionmean(t_castnet, o3_castnet, 
+#calculate_castnet_r_do3dt2m_regionmean(t_castnet_obs, o3_castnet, 
 #    sites_castnet, neus_castnet)
 ## for Transport simulation
 #dat_sens_neus, dat_r_neus, dat_t2m_neus, dat_o3_neus = \
@@ -5595,7 +5827,8 @@ import commensurability
 #map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, mr2_sens, mr2_r, lat_castnet, 
 #    lon_castnet, r_castnet, do3dt2m_castnet, 'MR2')
 #map_ro3t2m_do3dt2m_conus_gmi(gmi_lat, gmi_lon, emiss_sens, emiss_r, 
-#    lat_castnet, lon_castnet, r_castnet, do3dt2m_castnet, 'GHKerr-DailyEmiss')
+#    lat_castnet, lon_castnet, r_castnet_obs, do3dt2m_castnet_obs, 
+#    'GHKerr-DailyEmiss')
 ## ratio of O3-T2m sensitivities from Transport and + Chemistry simulations
 #map_sensitivityratio_conus(gmi_lat, gmi_lon, dat_r, dat_sens, mr2_sens)
 ## standard deviations of various fields
@@ -5614,10 +5847,10 @@ import commensurability
 ## timeseries of regionally-averaged O3 from observations and simulations
 #timeseries_castneto3allgmio3(dat_o3_neus, mr2_o3_neus, emiss_o3_neus, 
 #    castnet_o3_neus, 'neus', 2010, [2008, 2009, 2010])
-# scatterplots and KDES of 2-meter temperature and O3 from different 
-# simulations
+## scatterplots and KDES of 2-meter temperature and O3 from different 
+## simulations
 #scatterhist_castneto3allgmio3(dat_o3_neus, mr2_o3_neus, emiss_o3_neus, 
-#    castnet_o3_neus, mr2_t2m_neus, castnet_t2m_neus, 'neus')
+#    castnet_o3_neus, mr2_t2m_neus, castnet_t2m_neus+273.15, 'neus')
 ## scatterplot of the O3-climate penalty from the Transport vs. + Chemistry 
 ## simulations with colors corresponding to the correlation coefficient between
 ## 2-meter temperatures and O3 from the + Emissions simulation
@@ -5661,19 +5894,14 @@ import commensurability
 ## plot comparison of hourly GMI output with overpass2 output
 #timeseries_map_hourlyvsoverpass_neus(emiss_o3*1e9, castnet_o3_neus, 
 #    emiss_o3_neus, gmi_lat, gmi_lon, 2010, years)   
-#timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
-#    2010, years)
+timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
+    2010, years)
 #scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon)
 # # # # Reviewer comments   
-# Plot maps of dO3/dT on days with above versus below average precipitation 
+"""Maps of dO3/dT on days with above versus below average precipitation""" 
 #map_allgmio3_do3dt_byprecip(merra_lat, merra_lon, gmi_lat, gmi_lon, 
 #    emiss_t2m_overpass, dat_o3, mr2_o3, emiss_sens, emiss_r)
-
-
-
-
-
-
+"""Comparison of metrics at 2x2.5˚, 1x1.25˚, and 0.25x0.3125˚ resolution"""
 ## load GEOS-Chem output from Travis et al. [2016] simulation
 #gc_lat, gc_lng, gc_o3_atoverpass = commensurability.open_geoschem()
 ## load MERRA-2 meteorology commensurate with GEOS-Chem
@@ -5683,237 +5911,39 @@ import commensurability
 #gc_sens, gc_tls, gc_r, gc_t2m_overpass, gc_ps_overpass, gc_p = \
 #calculate_gmi_r_do3dt2m(merra_latgc, merra_longc, gc_lat, gc_lng, t2mgc, 
 #    gc_o3_atoverpass/1e9, psgc)
-
-
-
-
-
-
-
-import numpy as np
-o3_atcastnet, r_atcastnet, do3dt_atcastnet = [], [], []
-lat_atcastnet, lon_atcastnet = [], []
-# Find nearest CTM grid cell to CASTNet sites
-for lat, lon in zip(lat_castnet, lon_castnet):
-    latclose = np.abs(lat-gmi_lat).argmin()
-    lonclose = np.abs(lon-gmi_lon).argmin()
-    # Index quantities 
-    o3_atcastnet.append(o3[:,latclose,lonclose]*1e9)
-    r_atcastnet.append(r[latclose,lonclose])
-    do3dt_atcastnet.append(do3dt2m[latclose,lonclose])    
-    # Save off closest lat/lon of GMI grid cell to CASTNet sites
-    lat_atcastnet.append(gmi_lat[latclose])
-    lon_atcastnet.append(gmi_lon[lonclose])
-# Correlation coefficient between CASTNet and GMI O3 at each site 
-r_castnet_gmi = []
-for csite, gsite in zip(o3_castnet, o3_atcastnet):
-    mask = ~np.isnan(csite) & ~np.isnan(gsite)  
-    # Mask array is now true where ith rows of df and dg are NOT nan.
-    csite_mask = csite[mask] # This returns a 1D array of length mask.sum()
-    gsite_mask = gsite[mask]
-
-
-
-#import matplotlib.pyplot as plt
-#import cartopy.crs as ccrs
-#import cartopy.feature as cfeature
-#plt.figure()
-#axt=plt.subplot2grid((1,1), (0,0), colspan=1,
-#                     projection=ccrs.Robinson(central_longitude=0.))
-#clevs = np.linspace(-1., 1., 11)
-#cmap = plt.get_cmap('bwr')
-## Northern Hemisphere
-#mb = axt.contourf(gc_lng, gc_lat, gc_r, clevs, cmap=cmap, 
-#             transform=ccrs.PlateCarree(), extend='both')
-##axt.add_feature(cfeature.OCEAN, zorder=10, lw = 0.0, color='lightgrey')
-#axt.add_feature(cfeature.STATES, zorder=10, lw = 1.)
-#axt.coastlines(resolution='50m', lw=0.25)
-#plt.colorbar(mb)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## Find fields at each CASTNet site 
+## Find metrics at each CASTNet site 
 ## for MR2
-#(lat_acmr2, lon_acmr2, o3_acmr2, r_acmr2, do3dt_acmr2, r_castnet_acmr2) = \
+#(lat_acmr2, lon_acmr2, o3_acmr2, r_acmr2, do3dt_acmr2) = \
 # calculatefields_atcastnet(lat_castnet, lon_castnet, gmi_lat, gmi_lon, 
-#    mr2_o3, o3_castnet, mr2_r, mr2_sens)
+#    mr2_o3*1e9, o3_castnet, mr2_r, mr2_sens)
 ## for MR2-CCMI
-#(lat_acmr2_c, lon_acmr2_c, o3_acmr2_c, r_acmr2_c, do3dt_acmr2_c, 
-# r_castnet_acmr2_c) = calculatefields_atcastnet(lat_castnet, lon_castnet, 
-#    gmi_lat_c, gmi_lon_c, mr2_o3_c, o3_castnet, mr2_r_c, mr2_sens_c)
-
-
-
-
-
-
-
-            
-            
-            
-            
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#o3_atcastnet = o3_acmr2
-#r_atcastnet = r_acmr2 
-#do3dt_atcastnet = do3dt_acmr2
-#
-#
-#
-#o3_atcastnet = o3_acmr2_c
-#r_atcastnet = r_acmr2_c
-#do3dt_atcastnet = do3dt_acmr2_c
-#
-#
-#   
-#clevs_lat = np.linspace(28, 48, 6)
-#clevs_lon = np.linspace(-122, -68, 7)
-#cmap = 'copper'
-#fig = plt.figure(figsize=(12,4))
-## # # # Colored by latitude
-## Mean O3 
-#ax1 = plt.subplot2grid((2,4),(0,0))
-#mb = ax1.scatter(np.nanmean(np.array(o3_castnet), axis=1), 
-#    np.mean(o3_atcastnet, axis=1), c=lat_castnet, 
-#    cmap=cmap_discretize(plt.get_cmap(cmap), len(clevs_lat)-1), 
-#    zorder=10)
-#ax1.plot(np.linspace(ax1.get_xlim()[0], ax1.get_xlim()[1], 50), 
-#    np.linspace(ax1.get_xlim()[0], ax1.get_xlim()[1], 50), '--k', zorder=2)
-#ax1.set_xlabel(r'$\mu(\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
-#ax1.set_ylabel(r'$\mu(\mathregular{O}_\mathregular{3,\:GMI}}$)')
-## O3 standard deviation
-#ax2 = plt.subplot2grid((2,4),(0,1))
-#ax2.scatter(np.nanstd(np.array(o3_castnet), axis=1), 
-#    np.std(o3_atcastnet, axis=1), c=lat_castnet, cmap=cmap_discretize(
-#    plt.get_cmap(cmap), len(clevs_lat)-1), zorder=10)
-#ax2.plot(np.linspace(ax2.get_xlim()[0], ax2.get_xlim()[1], 50), 
-#         np.linspace(ax2.get_xlim()[0], ax2.get_xlim()[1], 50), '--k', 
-#         zorder=2)
-#ax2.set_xlabel(r'$\sigma(\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
-#ax2.set_ylabel(r'$\sigma(\mathregular{O}_\mathregular{3,\:GMI}}$)')
-## r(T, O3)
-#ax3 = plt.subplot2grid((2,4),(0,2))
-#mb = ax3.scatter(r_castnet, r_atcastnet, c=lat_castnet, 
-#    cmap=cmap_discretize(plt.get_cmap(cmap), len(clevs_lat)-1), 
-#    zorder=10)
-#ax3.plot(np.linspace(ax3.get_xlim()[0], ax3.get_xlim()[1], 50), 
-#    np.linspace(ax3.get_xlim()[0], ax3.get_xlim()[1], 50), '--k', zorder=2)
-#ax3.set_xlabel(r'$r(\mathregular{T,}\:\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
-#ax3.set_ylabel(r'$r(\mathregular{T,}\:\mathregular{O}_\mathregular{3,\:GMI}}$)')
-## dO3/dT
-#ax4 = plt.subplot2grid((2,4),(0,3))
-#mb = ax4.scatter(do3dt2m_castnet, do3dt_atcastnet, c=lat_castnet, 
-#    cmap=cmap_discretize(plt.get_cmap(cmap), len(clevs_lat)-1), 
-#    zorder=10)
-#ax4.plot(np.linspace(ax4.get_xlim()[0], ax4.get_xlim()[1], 50), 
-#    np.linspace(ax4.get_xlim()[0], ax4.get_xlim()[1], 50), '--k', zorder=2)
-#plt.colorbar(mb, extend='both', ticks=clevs_lat, label='$^{\circ}$N')
-#ax4.set_xlabel('$\mathregular{d}$O$_{\mathregular{3,\:CASTNet}}/\mathregular{d}$T')
-#ax4.set_ylabel('$\mathregular{d}$O$_{\mathregular{3,\:GMI}}/\mathregular{d}$T')
-## # # # Colored by longitude
-## Mean O3 
-#ax5 = plt.subplot2grid((2,4),(1,0))
-#mb = ax5.scatter(np.nanmean(np.array(o3_castnet), axis=1), 
-#    np.mean(o3_atcastnet, axis=1), c=lon_castnet, 
-#    cmap=cmap_discretize(plt.get_cmap(cmap), len(clevs_lon)-1), 
-#    zorder=10)
-#ax5.plot(np.linspace(ax5.get_xlim()[0], ax5.get_xlim()[1], 50), 
-#    np.linspace(ax5.get_xlim()[0], ax5.get_xlim()[1], 50), '--k', zorder=2)
-#ax5.set_xlabel(r'$\mu(\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
-#ax5.set_ylabel(r'$\mu(\mathregular{O}_\mathregular{3,\:GMI}}$)')
-## O3 standard deviation
-#ax6 = plt.subplot2grid((2,4),(1,1))
-#ax6.scatter(np.nanstd(np.array(o3_castnet), axis=1), 
-#    np.std(o3_atcastnet, axis=1), c=lon_castnet, cmap=cmap_discretize(
-#    plt.get_cmap(cmap), len(clevs_lon)-1), zorder=10)
-#ax6.plot(np.linspace(ax6.get_xlim()[0], ax6.get_xlim()[1], 50), 
-#         np.linspace(ax6.get_xlim()[0], ax6.get_xlim()[1], 50), '--k', 
-#         zorder=2)
-#ax6.set_xlabel(r'$\sigma(\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
-#ax6.set_ylabel(r'$\sigma(\mathregular{O}_\mathregular{3,\:GMI}}$)')
-## r(T, O3)
-#ax7 = plt.subplot2grid((2,4),(1,2))
-#mb = ax7.scatter(r_castnet, r_atcastnet, c=lon_castnet, 
-#    cmap=cmap_discretize(plt.get_cmap(cmap), len(clevs_lon)-1), 
-#    zorder=10)
-#ax7.plot(np.linspace(ax7.get_xlim()[0], ax7.get_xlim()[1], 50), 
-#    np.linspace(ax7.get_xlim()[0], ax7.get_xlim()[1], 50), '--k', zorder=2)
-#ax7.set_xlabel(r'$r(\mathregular{T,}\:\mathregular{O}_\mathregular{3,\:CASTNet}}$)')
-#ax7.set_ylabel(r'$r(\mathregular{T,}\:\mathregular{O}_\mathregular{3,\:GMI}}$)')
-## dO3/dT
-#ax8 = plt.subplot2grid((2,4),(1,3))
-#mb = ax8.scatter(do3dt2m_castnet, do3dt_atcastnet, c=lon_castnet, 
-#    cmap=cmap_discretize(plt.get_cmap(cmap), len(clevs_lon)-1), 
-#    zorder=10)
-#ax8.plot(np.linspace(ax8.get_xlim()[0], ax8.get_xlim()[1], 50), 
-#    np.linspace(ax8.get_xlim()[0], ax8.get_xlim()[1], 50), '--k', zorder=2)
-#plt.colorbar(mb, extend='both', ticks=clevs_lon, label='$^{\circ}$E')
-#ax8.set_xlabel('$\mathregular{d}$O$_{\mathregular{3,\:CASTNet}}/\mathregular{d}$T')
-#ax8.set_ylabel('$\mathregular{d}$O$_{\mathregular{3,\:GMI}}/\mathregular{d}$T')
-#plt.subplots_adjust(wspace=0.35)
-#plt.savefig('/Users/ghkerr/Desktop/trial.png', dpi=300)
-#plt.show()
-#
-#
-#
-#import numpy as np
-#from matplotlib.colors import Normalize
-#from matplotlib.colorbar import ColorbarBase
-#import matplotlib.pyplot as plt
-#from mpl_toolkits.basemap import Basemap    
-#import sys
-#sys.path.append('/Users/ghkerr/phd/')
-#import pollutants_constants
-#from geo_idx import geo_idx    
-#m = Basemap(projection = 'merc', llcrnrlon = -126., llcrnrlat = 24., 
-#        urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'l', 
-#        area_thresh = 1000)
-#fig = plt.figure(figsize=(5, 4))
-#ax = plt.subplot2grid((1, 1), (0, 0))
-##ax.set_title('(a)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')    
-#vmin = 0.2; vmax = 0.8
-#cmap = plt.get_cmap('bwr', 15)
-#norm = Normalize(vmin = vmin, vmax = vmax)
-#clevs = np.linspace(vmin, vmax, 16, endpoint = True)
-#fill_oceans(ax, m)
-#x_castnet, y_castnet = m(lon_castnet, lat_castnet)
-#m.scatter(x_castnet, y_castnet, c = r_castnet_gmi, s = 20, cmap = cmap, 
-#          vmin = vmin, vmax = vmax, zorder = 30, linewidth = 1., 
-#          edgecolor = 'k')    
-## add countries, states, etc here so they sit atop the gridlines
-#m.drawstates(color = 'k', linewidth = 0.5, zorder = 10)
-#m.drawcountries(color = 'k', linewidth = 1.0, zorder = 10)
-#m.drawcoastlines(color = 'k', linewidth = 1.0, zorder = 10)  
-#outline_region(ax, m, pollutants_constants.NORTHEAST_STATES)    
-#cax = fig.add_axes([0.21, 0.13, 0.6, 0.03])
-##cb = fig.colorbar(sc, cax=cax, orientation='horizontal', extend = 'both')
-#cb = ColorbarBase(cax, cmap = cmap, norm = norm, 
-#                  orientation = 'horizontal', extend = 'both')
-#cb.set_ticks(np.linspace(vmin, vmax, 6))
-#cb.set_label(label = '$\mathregular{O}_3}$ [ppbv]', size=16)
-#cb.ax.tick_params(labelsize = 12)
+#(lat_acmr2_c, lon_acmr2_c, o3_acmr2_c, r_acmr2_c, do3dt_acmr2_c) = \
+# calculatefields_atcastnet(lat_castnet, lon_castnet, gmi_lat_c, gmi_lon_c, 
+#    mr2_o3_c*1e9, o3_castnet, mr2_r_c, mr2_sens_c)
+## for GEOS-Chem
+#(lat_acgc, lon_acgc, o3_acgc, r_acgc, do3dt_acgc) = \
+# calculatefields_atcastnet(lat_castnet, lon_castnet, gc_lat, gc_lng, 
+#    gc_o3_atoverpass, o3_castnet, gc_r, gc_sens)
+## Show obs/model metrics at CASTNet sites for simulations of different
+## resolutions
+#scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet, 
+#    o3_acmr2, r_castnet_obs, r_acmr2, do3dt2m_castnet_obs, do3dt_acmr2, 
+#    'mr2_tcastnetobs')
+#scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet, 
+#    o3_acmr2_c, r_castnet, r_acmr2_c, do3dt2m_castnet, do3dt_acmr2_c, 
+#    'mr2-ccmi')
+#scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet, 
+#    o3_acgc, r_castnet, r_acgc, do3dt2m_castnet, do3dt_acgc, 'geoschem')
+## Select only CASTNet sites/GMI CTM grid cells within the GEOS-Chem domain
+## and recalculate obs/model metrics
+#nogc = np.isfinite(r_acgc)
+#scatter_castnetmetrics_ctmmetrics(np.array(lat_castnet)[nogc], 
+#    np.array(lon_castnet)[nogc], np.array(o3_castnet)[nogc], 
+#    np.array(o3_acmr2)[nogc], np.array(r_castnet)[nogc], 
+#    np.array(r_acmr2)[nogc], np.array(do3dt2m_castnet)[nogc], 
+#    np.array(do3dt_acmr2)[nogc], 'mr2_atgeos-chem')
+#scatter_castnetmetrics_ctmmetrics(np.array(lat_castnet)[nogc], 
+#    np.array(lon_castnet)[nogc], np.array(o3_castnet)[nogc], 
+#    np.array(o3_acmr2_c)[nogc], np.array(r_castnet)[nogc], 
+#    np.array(r_acmr2_c)[nogc], np.array(do3dt2m_castnet)[nogc], 
+#    np.array(do3dt_acmr2_c)[nogc], 'mr2-ccmi_atgeos-chem')
