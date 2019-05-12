@@ -86,6 +86,7 @@ REVISION HISTORY
     28042019 -- edit function 'open_overpass2' to read output from HindcastMR2-
                 CCMI simulation. Add function 'open_geoschem'
     02052019 -- function 'open_castnet_metdata' added
+    11052019 -- function 'open_replay_specifieddomain' added
 """
 # # # # # # # # # # # # # 
 def open_gmi_singyear(case, year, sampling_months, sampling_hours):
@@ -300,7 +301,7 @@ def open_castnet_metdata(years, months, hours, var, csites):
                                       '%.2d-31-%d' %(months[-1], year)))
     date_idx = np.hstack(date_idx)
     # Path to CASTNet meteorology
-    PATH_CMET = '/Users/ghkerr/Desktop/metdata/'
+    PATH_CMET = '/Users/ghkerr/phd/GMI/data/CASTNet/metdata/'
     # List for all years' worth of CASTNet observations
     castnet_allyears = []
     # Loop through years in measuring period
@@ -3705,4 +3706,64 @@ def open_geoschem():
             o3_atoverpass[:, i, j] = o3[np.arange(int(np.round(
                 overpassutc/1.99)), len(o3), 12), i, j]  
     return lat, lng, o3_atoverpass
+# # # # # # # # # # # # #
+def open_replay_specifieddomain(case, llat, ulat, llng, rlng): 
+    """open overpass2 O3 output from GMI Replay simulation of interest over 
+    the specified region; n.b., as of 11 May 2019, only Replay simulations for 
+    JJA 2010 are downloaded locally, so this timestamp is hard-coded in the 
+    input file names in the function. 
+
+    Parameters
+    ----------  
+    case : str
+        The name of the Replay simulation (e.g., 'M2G_c90', 'MERRA2_GMI', 
+        'T53_r1')
+    llat : float    
+        Latitude (degrees north) of bottom edge of bounding box for focus 
+        region. For this parameter and others defining the bounding box, 
+        function finds the closest index to bounding box edges
+    ulat : float
+        Latitude (degrees north) of upper edge of bounding box for focus region
+    llng : float
+        Longitude (degrees east, -180-180) of left edge of bounding box for 
+        focus region        
+    rlng : float
+        Longitude (degrees east, -180-180) of right edge of bounding box for 
+        focus region
+        
+    Returns
+    -------
+    lat : numpy.ndarray
+        GMI latitude coordinates, units of degrees north, [lat,]
+    lng : numpy.ndarray
+        GMI longitude coordinates, units of degrees east, [lng,]
+    ro3 : numpy.ndarray
+        GMI O3 over specified region, units of volume mixing ratio, [time, lat, 
+        lng]
+    """
+    import time
+    start_time = time.time()    
+    import xarray as xr
+    import sys
+    sys.path.append('/Users/ghkerr/phd/GMI/')
+    from geo_idx import geo_idx
+    PATH_GMI = '/Users/ghkerr/phd/GMI/data/overpass2/Replay/'
+    replay = xr.open_dataset(PATH_GMI+
+        '%s.inst0_3d_ovp_Nv.2010JJA_OVP14_O3.nc' %(case))
+    lat = replay.lat.data
+    lng = replay.lon.data
+    # Select appropriate model level
+    ro3 = replay.OVP14_O3.data[:,0]
+    # Reduce fields to area of interest
+    llat = geo_idx(llat, lat)
+    ulat = geo_idx(ulat, lat)
+    llng = geo_idx(llng, lng)
+    rlng = geo_idx(rlng, lng)
+    ro3 = ro3[:, llat:ulat+1, llng:rlng+1]
+    lat = lat[llat:ulat+1]
+    lng = lng[llng:rlng+1]
+    print('# # # # # # # # # # # # # # # # # # # # # # # # # # \n'+
+          'GMI Replay %s O3 loaded in %.2f seconds' 
+          %(case,(time.time()-start_time)))
+    return lat, lng, ro3
 # # # # # # # # # # # # #
