@@ -82,6 +82,8 @@ REVISION HISTORY
     02052019 -- edit 'calculate_castnet_r_do3dt2m_regionmean' to handle 
                 temperature observations from CASTNet (not just MERRA-2 
                 temperature data)
+    11052019 -- edit 'castnet_r_do3d2t' to include starting/ending year 
+                parameters
 """
 # # # # # # # # # # # # #
 # change font
@@ -663,7 +665,7 @@ def find_conus_castnet(years):
     print('CASTNet data loaded in %.1f minutes!' %((toc - tic)/60.))
     return castnet_all
 # # # # # # # # # # # # #     
-def castnet_r_do3d2t(castnet, t2m, lat, lon, times_all):
+def castnet_r_do3d2t(castnet, t2m, lat, lon, times_all, syear, eyear):
     """function groups CASTNet observations by station, finds the afternoon 
     (1100-1600 local time) average ozone concentration and then finds the 
     nearest MERRA-2 grid node. The Pearson correlation coefficient and 
@@ -706,6 +708,10 @@ def castnet_r_do3d2t(castnet, t2m, lat, lon, times_all):
         [no. sites,]
     sites_all : list
         CASTNet site names, [no. sites,]
+    syear : int
+        Starting year of measuring period
+    eyear : int
+        Starting year of measuring period        
     """
     import numpy as np
     import pandas as pd
@@ -719,7 +725,7 @@ def castnet_r_do3d2t(castnet, t2m, lat, lon, times_all):
     castnet['DATE_TIME'] = pd.to_datetime(castnet['DATE_TIME'])
     # define date range
     date_idx = []
-    for year in np.arange(2008, 2011, 1):
+    for year in np.arange(syear, eyear+1, 1):
         date_idx.append(pd.date_range('06-01-%d' %year, '08-31-%d' %year))
     # aggregate over years
     date_idx = np.hstack(date_idx)
@@ -740,7 +746,8 @@ def castnet_r_do3d2t(castnet, t2m, lat, lon, times_all):
             # find daily average
             castnet_atsite = castnet_atsite.groupby(castnet_atsite['DATE_TIME'].dt.date).mean()
             # add missing values             
-            if castnet_atsite.shape[0] != 276:
+            if (castnet_atsite.shape[0] != 276) or \
+                (castnet_atsite.shape[0] != 92):
                 castnet_atsite = castnet_atsite.reindex(date_idx, 
                     fill_value = np.nan)
             # find closest MERRA-2 grid cell
@@ -4986,14 +4993,15 @@ def timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
     #axt.set_title('(a)', fontsize = 16, x = -0.07, y = 1.03)
     # Overpass approach
     axt.plot(castnet_o3_neus[whereyear*92:(whereyear+1)*92], '-', 
-             color='#d95f02', lw=2)
+             color='#d95f02', lw=2, label='CASTNet$_{\:\mathregular{overpass}}$')
     axt.plot(emiss_o3_neus[whereyear*92:(whereyear+1)*92], '--', 
-             color='#d95f02', lw=0.75)
+             color='#d95f02', lw=0.75, label='CTM$_{\:\mathregular{overpass}}$')
     # Hourly approach
     axt.plot(np.nanmean(mr2_castnet[whereyear], axis=0), '-', color='#1b9e77',
-                         lw=2, zorder = 10)
+                         lw=2, zorder = 10, 
+                         label='CASTNet$_{\:\mathregular{hourly}}$')
     axt.plot(meandaily['EGU_T O3'][whereyear], '--', color='#1b9e77', lw=0.75, 
-             zorder = 10)
+             zorder = 10, label='CTM$_{\:\mathregular{hourly}}$')
     axt.set_xlim([0, 91])
     axt.set_ylim([30, 70])
     axt.set_yticks([30, 40, 50, 60, 70])
@@ -5006,15 +5014,17 @@ def timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
     axt.tick_params(right = True, left = True, top = True, bottom = True,
                     labelbottom = True, labeltop = False)
     # create legend
-    colors = ['black', 'black', '#1b9e77', '#d95f02']
-    sizes = [2, 0.75, 2, 2]
-    linestyles = ['-', '--', '-', '-']
-    labels = ['CASTNet', 'CTM', 'Hourly', 'Overpass']
-    lines = []
-    for c, s, l in zip(colors, sizes, linestyles):
-        lines.append(Line2D([0], [0], color=c, linewidth=s, linestyle=l))
-    plt.legend(lines, labels, loc = 9, frameon = False, fontsize = 16, 
-               ncol = 2, bbox_to_anchor = (0.5, 1.48))
+#    colors = ['black', 'black', '#1b9e77', '#d95f02']
+#    sizes = [2, 0.75, 2, 2]
+#    linestyles = ['-', '--', '-', '-']
+#    labels = ['CASTNet', 'CTM', 'Hourly', 'Overpass']
+#    lines = []
+#    for c, s, l in zip(colors, sizes, linestyles):
+#        lines.append(Line2D([0], [0], color=c, linewidth=s, linestyle=l))
+#    plt.legend(lines, labels, loc = 9, frameon = False, fontsize = 16, 
+#               ncol = 2, bbox_to_anchor = (0.5, 1.48))
+    plt.legend(loc = 9, frameon = False, fontsize = 16, 
+               ncol = 2, bbox_to_anchor = (0.5, 1.55))    
     plt.subplots_adjust(top=0.7)
     plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
                 'timeseries_map_hourlyvsoverpass_neus_nomap.eps', dpi=300)
@@ -5639,6 +5649,8 @@ def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet,
         'CASTNet}}$)', fontsize = 16)
     ax5.set_ylabel(r'$\mathregular{\mu}(\mathregular{O}_\mathregular{3,\:'
         'GMI}}$)', fontsize = 16)
+    x1,x2 = ax5.get_xlim()
+    ax5.set_ylim([x1,x2])        
     # O3 standard deviation
     ax6 = plt.subplot2grid((2,2),(0,1))
     ax6.set_title('(b)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')        
@@ -5660,6 +5672,8 @@ def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet,
         '\:CASTNet}}$)', fontsize = 16)
     ax6.set_ylabel(r'$\mathregular{\sigma}(\mathregular{O}_\mathregular{'+
         '3,\:GMI}}$)', fontsize = 16)
+    x1,x2 = ax6.get_xlim()
+    ax6.set_ylim([x1,x2])        
     # r(T, O3)
     ax7 = plt.subplot2grid((2,2),(1,0))
     ax7.set_title('(c)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')        
@@ -5680,6 +5694,8 @@ def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet,
         '{O}_\mathregular{3,\:CASTNet}}$)', fontsize = 16)
     ax7.set_ylabel(r'$r(\mathregular{T_{\mathregular{MERRA-2}},}\:'+
         '\mathregular{O}_\mathregular{3,\:GMI}}$)', fontsize = 16)
+    x1,x2 = ax7.get_xlim()
+    ax7.set_ylim([x1,x2])    
     # dO3/dT
     ax8 = plt.subplot2grid((2,2),(1,1))
     ax8.set_title('(d)', fontsize = 16, x = 0.03, y = 1.03, ha = 'left')        
@@ -5699,6 +5715,8 @@ def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet,
         '\mathregular{d}$T$_{\mathregular{CASTNet}}$', fontsize = 16)
     ax8.set_ylabel('$\mathregular{d}$O$_{\mathregular{3,\:GMI}}/'+
         '\mathregular{d}$T$_{\mathregular{MERRA-2}}$', fontsize = 16)
+    x1,x2 = ax8.get_xlim()
+    ax8.set_ylim([x1,x2])
     plt.subplots_adjust(wspace=0.35, hspace=0.30, right = 0.8)
     # Colorbar for first two plots 
     norm = Normalize(vmin=clevs_lon[0], vmax=clevs_lon[-1])
@@ -5757,7 +5775,7 @@ years = [2008, 2009, 2010]
 ## from CASTNet sites
 #(r_castnet, do3dt2m_castnet, lat_castnet, lon_castnet, t_castnet, o3_castnet, 
 # sites_castnet) = castnet_r_do3d2t(castnet, t2m, merra_lat, merra_lon, 
-# times_all)
+# times_all, 2008, 2010)
 ## met data from CASTNet sites
 #t_castnet_obs = commensurability.open_castnet_metdata(years, [6, 7, 8],
 #    [13, 14], ['TEMPERATURE'], sites_castnet)
@@ -5808,7 +5826,7 @@ years = [2008, 2009, 2010]
 ## for + Chemistry simulation
 #mr2_sens_neus, mr2_r_neus, mr2_t2m_neus, mr2_o3_neus = \
 #calculate_gmi_r_do3dt2m_regionmean(mr2_t2m_overpass, mr2_o3, neus, '+ Chemistry')
-## for + Emissions simulation
+# for + Emissions simulation
 #emiss_sens_neus, emiss_r_neus, emiss_t2m_neus, emiss_o3_neus = \
 #calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+ Emissions')
 ## # # # load AQS MDA8 O3
@@ -5894,8 +5912,8 @@ years = [2008, 2009, 2010]
 ## plot comparison of hourly GMI output with overpass2 output
 #timeseries_map_hourlyvsoverpass_neus(emiss_o3*1e9, castnet_o3_neus, 
 #    emiss_o3_neus, gmi_lat, gmi_lon, 2010, years)   
-timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
-    2010, years)
+#timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
+#    2010, years)
 #scatter_inventorynoo3(mr2_o3, emiss_o3, neus_states, gmi_lat, gmi_lon)
 # # # # Reviewer comments   
 """Maps of dO3/dT on days with above versus below average precipitation""" 
@@ -5947,3 +5965,64 @@ timeseries_map_hourlyvsoverpass_neus_nomap(castnet_o3_neus, emiss_o3_neus,
 #    np.array(o3_acmr2_c)[nogc], np.array(r_castnet)[nogc], 
 #    np.array(r_acmr2_c)[nogc], np.array(do3dt2m_castnet)[nogc], 
 #    np.array(do3dt_acmr2_c)[nogc], 'mr2-ccmi_atgeos-chem')
+"""Find differences in metrics between different Replay simulations"""
+#import sys
+#sys.path.append('/Users/ghkerr/phd/globalo3/')
+#import globalo3_open, globalo3_calculate
+## # # # load CASTNet O3 
+#castnet_2010 = find_conus_castnet([2010])
+## Calculate CASTNet metrics for only 2010
+#(r_castnet_2010, do3dt2m_castnet_2010, lat_castnet_2010, lon_castnet_2010, 
+#    t_castnet_2010, o3_castnet_2010, sites_castnet_2010) = \
+#    castnet_r_do3d2t(castnet_2010, t2m[-2208:], merra_lat, merra_lon, times_all[-2208:], 2010, 2010)
+## For 2 deg latitude x 2.5 deg longitude Replay simulation
+#lat_2_25, lng_2_25, ro3_2_25 = commensurability.open_replay_specifieddomain(
+#    'T53_r1', 23, 50, -130, -60)
+## For 1 deg latitude x 1.25 deg longitude Replay simulation
+#lat_1_125, lng_1_125, ro3_1_125 = commensurability.open_replay_specifieddomain(
+#    'M2G_c90', 23, 50, -130, -60)
+## For 0.5 deg latitude x 0.625 deg longitude Replay simulation
+#lat_05_0625, lng_05_0625, ro3_05_0625 = \
+#    commensurability.open_replay_specifieddomain('MERRA2_GMI', 23, 50, -130, 
+#    -60)
+## Interpolate MERRA-2 2-meter temperatures at overpass2 time to the resolution
+## of Replay simulation
+#t2m_2_25 = globalo3_open.interpolate_merra_to_ctmresolution(lat_2_25, lng_2_25, 
+#    gmi_lat, gmi_lon, mr2_t2m_overpass[-92:], checkplot='yes')
+#t2m_1_125 = globalo3_open.interpolate_merra_to_ctmresolution(lat_1_125, 
+#    lng_1_125, gmi_lat, gmi_lon, mr2_t2m_overpass[-92:], checkplot='yes')
+#t2m_05_0625 = globalo3_open.interpolate_merra_to_ctmresolution(lat_05_0625, 
+#    lng_05_0625, gmi_lat, gmi_lon, mr2_t2m_overpass[-92:], checkplot='yes')
+## Calculate metrics at difference resolutions
+#do3dt_2_25 = globalo3_calculate.calculate_do3dt(t2m_2_25, ro3_2_25*1e9, 
+#    lat_2_25, lng_2_25)
+#r_2_25 = globalo3_calculate.calculate_r(t2m_2_25, ro3_2_25*1e9, lat_2_25, 
+#    lng_2_25)
+#do3dt_1_125 = globalo3_calculate.calculate_do3dt(t2m_1_125, ro3_1_125*1e9, 
+#    lat_1_125, lng_1_125)
+#r_1_125 = globalo3_calculate.calculate_r(t2m_1_125, ro3_1_125*1e9, lat_1_125, 
+#    lng_1_125)
+#do3dt_05_0625 = globalo3_calculate.calculate_do3dt(t2m_05_0625, ro3_05_0625*1e9, 
+#    lat_05_0625, lng_05_0625)
+#r_05_0625 = globalo3_calculate.calculate_r(t2m_05_0625, ro3_05_0625*1e9, lat_05_0625, 
+#    lng_05_0625)
+## Find metrics at each CASTNet site 
+#(lat_ac_2_25, lon_ac_2_25, o3_ac_2_25, r_ac_2_25, do3dt_ac_2_25) = \
+# calculatefields_atcastnet(lat_castnet_2010, lon_castnet_2010, lat_2_25, lng_2_25, 
+#    ro3_2_25*1e9, o3_castnet_2010, r_2_25, do3dt_2_25)
+#(lat_ac_1_125, lon_ac_1_125, o3_ac_1_125, r_ac_1_125, do3dt_ac_1_125) = \
+# calculatefields_atcastnet(lat_castnet_2010, lon_castnet_2010, lat_1_125, lng_1_125, 
+#    ro3_1_125*1e9, o3_castnet_2010, r_1_125, do3dt_1_125)
+#(lat_ac_05_0625, lon_ac_05_0625, o3_ac_05_0625, r_ac_05_0625, do3dt_ac_05_0625) = \
+# calculatefields_atcastnet(lat_castnet_2010, lon_castnet_2010, lat_05_0625, lng_05_0625,
+#    ro3_05_0625*1e9, o3_castnet_2010, r_05_0625, do3dt_05_0625)
+## Plot results
+#scatter_castnetmetrics_ctmmetrics(lat_castnet_2010, lon_castnet_2010, o3_castnet_2010, 
+#    o3_ac_2_25, r_castnet_2010, r_ac_2_25, do3dt2m_castnet_2010, do3dt_ac_2_25, 
+#    'replay_T53_r1')
+#scatter_castnetmetrics_ctmmetrics(lat_castnet_2010, lon_castnet_2010, o3_castnet_2010, 
+#    o3_ac_1_125, r_castnet_2010, r_ac_1_125, do3dt2m_castnet_2010, do3dt_ac_1_125, 
+#    'replay_M2G_c90')
+#scatter_castnetmetrics_ctmmetrics(lat_castnet_2010, lon_castnet_2010, o3_castnet_2010, 
+#    o3_ac_05_0625, r_castnet_2010, r_ac_05_0625, do3dt2m_castnet_2010, do3dt_ac_05_0625, 
+#    'replay_MERRA2_GMI')
