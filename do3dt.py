@@ -2955,7 +2955,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
-    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
+    m.contour(x, y, emiss_r, levels = [0.25], colors = ('orange',),
               linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
@@ -3018,7 +3018,7 @@ def map_allgmio3_hotcold(dat_o3, mr2_o3, emiss_o3, t2m_overpass, gmi_lat,
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
-    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
+    m.contour(x, y, emiss_r, levels = [0.25], colors = ('orange',),
               linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
@@ -3159,7 +3159,7 @@ def map_allgmio3_do3dt(dat_sens, mr2_sens, emiss_sens, emiss_r, gmi_lat,
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
-    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
+    m.contour(x, y, emiss_r, levels = [0.25], colors = ('orange',),
               linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
@@ -4551,7 +4551,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
-    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
+    m.contour(x, y, emiss_r, levels = [0.25], colors = ('orange',),
               linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
@@ -4611,7 +4611,7 @@ def map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
     m.drawcountries(color = 'k', linewidth = 1.0)
     m.drawcoastlines(color = 'k', linewidth = 1.0)    
     fill_oceans(ax3, m)    
-    m.contour(x, y, emiss_r, levels = [0.4], colors = ('orange',),
+    m.contour(x, y, emiss_r, levels = [0.25], colors = ('orange',),
               linestyles = ('--',), linewidths = (1,), zorder = 1)     
     cbar_ax = fig.add_axes([0.75, 0.16, 0.05, 0.16])
     cb = ColorbarBase(cbar_ax, cmap = cmap, norm = norm, extend = 'both',
@@ -5825,10 +5825,10 @@ years = [2008, 2009, 2010]
 #calculate_gmi_r_do3dt2m_regionmean(dat_t2m_overpass, dat_o3, neus, 'Transport')
 ## for + Chemistry simulation
 #mr2_sens_neus, mr2_r_neus, mr2_t2m_neus, mr2_o3_neus = \
-#calculate_gmi_r_do3dt2m_regionmean(mr2_t2m_overpass, mr2_o3, neus, '+ Chemistry')
-# for + Emissions simulation
+#calculate_gmi_r_do3dt2m_regionmean(mr2_t2m_overpass, mr2_o3, neus, '+Chemistry')
+## for + Emissions simulation
 #emiss_sens_neus, emiss_r_neus, emiss_t2m_neus, emiss_o3_neus = \
-#calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+ Emissions')
+#calculate_gmi_r_do3dt2m_regionmean(emiss_t2m_overpass, emiss_o3, neus, '+AEmissions')
 ## # # # load AQS MDA8 O3
 #sc = list(pollutants_constants.EPA_DICT.values()    
 #ozone_mean_mda8, ozone_nomean_mda8, ozone_mda8 = find_conus_aqsmda8(sc)
@@ -5887,7 +5887,7 @@ years = [2008, 2009, 2010]
 ## plot coefficient of determination between O3 and T2m
 #map_r2o3t2m_conus(lat_castnet, lon_castnet, r_castnet, gmi_lat, gmi_lon, 
 #    emiss_r, 'GHKerr-DailyEmiss')
-# maps of the 90th percentile of O3
+## maps of the 90th percentile of O3
 #map_allgmio3_p90p10(dat_o3, mr2_o3, emiss_o3, emiss_r, gmi_lat, gmi_lon,
 #    neus)
 ## maps of the O3-climate penalty 
