@@ -84,6 +84,9 @@ REVISION HISTORY
                 temperature data)
     11052019 -- edit 'castnet_r_do3d2t' to include starting/ending year 
                 parameters
+    01072019 -- code added to check CASTNet-GMI O3 correlation at each CASTNet
+                site
+    02072019 -- changes labels for "+AEmissions" simulation to "+AnthroNO"
 """
 # # # # # # # # # # # # #
 # change font
@@ -2423,7 +2426,7 @@ def scatterhist_castneto3allgmio3(transport, chemistry, emissions, obs, t2m,
                       color = pollutants_constants.COLOR_TRANSPORT, zorder = 9)
     axScatter.scatter(t2m, chemistry, label = '$\mathregular{+}$Chemistry', s = 20, 
                       color = pollutants_constants.COLOR_CHEMISTRY, zorder = 6)
-    axScatter.scatter(t2m, emissions, label = '$\mathregular{+}$AEmissions', s = 20, 
+    axScatter.scatter(t2m, emissions, label = '$\mathregular{+}$AnthroNO', s = 20, 
                       color = pollutants_constants.COLOR_EMISSIONS, zorder = 3)
     # add in lines of best fit 
     obs_m = np.poly1d(np.polyfit(castnet_t2m, obs, 1))[1]
@@ -3243,7 +3246,7 @@ def timeseries_t2m_castneto3_cemsnox(castnet_o3, castnet_t2m, dat_o3_neus,
     ax2.plot(castnet_o3_ty, lw = 2., color = '#999999', label = 'CASTNet')
     ax2.plot(emiss_o3_neus[yearpos*92:(yearpos+1)*92], '-', 
             color = pollutants_constants.COLOR_EMISSIONS, 
-            label = '$\mathregular{+}$AEmissions')
+            label = '$\mathregular{+}$AnthroNO')
     ax2.plot(mr2_o3_neus[yearpos*92:(yearpos+1)*92],
             '-', color = pollutants_constants.COLOR_CHEMISTRY, 
             label = '$\mathregular{+}$Chemistry')
@@ -3926,7 +3929,7 @@ def NO_inventory_atpoint(t2m_overpass, ilat, ilon, year, gmi_lat, gmi_lon):
              zorder = 2)
     ax.plot(np.concatenate([NO_total_prime_jun, NO_total_prime_jul, NO_total_prime_aug]), 
             linewidth = 1.5, clip_on = True, label = '$\mathregular{' +
-            r'\partial}$Emissions $\mathregular{\partial}$T$^{\mathregular{-1}}\neq$0', 
+            r'\partial}$AnthroNO $\mathregular{\partial}$T$^{\mathregular{-1}}\neq$0', 
             color = '#377eb8', linestyle = ':')
     ax.plot(np.arange(0, 30, 1), np.repeat(np.mean(NO_total_prime_jun), 30), 
             linewidth = 2., clip_on = True,  color = '#377eb8', zorder = 6)
@@ -3934,7 +3937,7 @@ def NO_inventory_atpoint(t2m_overpass, ilat, ilon, year, gmi_lat, gmi_lon):
             linewidth = 2., clip_on = True, color = '#377eb8', zorder = 6)
     ax.plot(np.arange(61, 92, 1), np.repeat(np.mean(NO_total_prime_aug), 31), 
             linewidth = 2., clip_on = True, label = '$\mathregular{' +
-            r'\partial}$Emissions $\mathregular{\partial}$T$^{\mathregular{-1}}=$0', 
+            r'\partial}$AnthroNO $\mathregular{\partial}$T$^{\mathregular{-1}}=$0', 
             color = '#377eb8')
     ax.set_xlim([0, 91])
     ax.set_xticks([0, 14, 30, 44, 61, 75])    
@@ -5635,9 +5638,9 @@ def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet,
     ax5.text(0.04, 0.9, 'm = %.2f'%np.polyfit(np.nanmean(np.array(o3_castnet)[idx], 
         axis=1), np.nanmean(o3_atcastnet, axis=1)[idx], deg=1)[0], 
         transform=ax5.transAxes, fontsize=14)
-    ax5.text(0.04, 0.80, 'R$^\mathregular{2}$ = %.2f'%np.corrcoef(np.nanmean(
+    ax5.text(0.04, 0.80, '$r$ = %.2f'%np.corrcoef(np.nanmean(
         np.array(o3_castnet)[idx], axis=1), np.nanmean(o3_atcastnet, 
-        axis=1)[idx])[0,1]**2, transform=ax5.transAxes, fontsize = 14)        
+        axis=1)[idx])[0,1], transform=ax5.transAxes, fontsize = 14)        
     mb = ax5.scatter(np.nanmean(np.array(o3_castnet), axis=1), 
         np.mean(o3_atcastnet, axis=1), c=lon_castnet, vmin=clevs_lon[0], 
         vmax=clevs_lon[-1], s=s, cmap=cmap, zorder=10)
@@ -5657,8 +5660,8 @@ def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet,
     ax6.text(0.04, 0.9, 'm = %.2f'%np.polyfit(np.nanstd(np.array(o3_castnet)[idx],
         axis=1), np.std(o3_atcastnet, axis=1)[idx], deg=1)[0], 
         transform=ax6.transAxes, fontsize=14)
-    ax6.text(0.04, 0.8, 'R$^\mathregular{2}$ = %.2f'%np.corrcoef(np.nanstd(np.array(o3_castnet)[idx],
-        axis=1), np.std(o3_atcastnet, axis=1)[idx])[0,1]**2, 
+    ax6.text(0.04, 0.8, '$r$ = %.2f'%np.corrcoef(np.nanstd(np.array(o3_castnet)[idx],
+        axis=1), np.std(o3_atcastnet, axis=1)[idx])[0,1], 
         transform=ax6.transAxes, fontsize=14)        
     ax6.scatter(np.nanstd(np.array(o3_castnet), axis=1), 
         np.std(o3_atcastnet, axis=1), c=lon_castnet, vmin=clevs_lon[0], 
@@ -5681,8 +5684,8 @@ def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet,
     ax7.text(0.04, 0.9, 'm = %.2f'%np.polyfit(np.array(r_castnet)[idx], 
         np.array(r_atcastnet)[idx], deg=1)[0], transform=ax7.transAxes, 
         fontsize=14)
-    ax7.text(0.04, 0.8, 'R$^\mathregular{2}$ = %.2f'%np.corrcoef(np.array(
-        r_castnet)[idx], np.array(r_atcastnet)[idx])[0,1]**2, transform=
+    ax7.text(0.04, 0.8, '$r$ = %.2f'%np.corrcoef(np.array(
+        r_castnet)[idx], np.array(r_atcastnet)[idx])[0,1], transform=
         ax7.transAxes, fontsize=14)        
     mb = ax7.scatter(r_castnet, r_atcastnet, c=lon_castnet, vmin=clevs_lon[0], 
         vmax=clevs_lon[-1], s=s, cmap=cmap, zorder=10)
@@ -5703,9 +5706,9 @@ def scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet,
     ax8.text(0.04, 0.9, 'm = %.2f'%np.polyfit(np.array(do3dt2m_castnet)[idx], 
         np.array(do3dt_atcastnet)[idx], deg=1)[0], transform=ax8.transAxes, 
         fontsize=14)
-    ax8.text(0.04, 0.8, 'R$^{\mathregular{2}}$ = %.2f'%np.corrcoef(
+    ax8.text(0.04, 0.8, '$r$ = %.2f'%np.corrcoef(
         np.array(do3dt2m_castnet)[idx], 
-        np.array(do3dt_atcastnet)[idx])[0,1]**2, transform=ax8.transAxes, 
+        np.array(do3dt_atcastnet)[idx])[0,1], transform=ax8.transAxes, 
         fontsize=14)    
     mb = ax8.scatter(do3dt2m_castnet, do3dt_atcastnet, c=lon_castnet, 
         vmin=clevs_lon[0], vmax=clevs_lon[-1], s=s, cmap=cmap)
@@ -5746,7 +5749,7 @@ sys.path.append('/Users/ghkerr/phd/')
 import pollutants_constants
 sys.path.append('/Users/ghkerr/phd/GMI/')
 import commensurability 
-years = [2008, 2009, 2010]
+#years = [2008, 2009, 2010]
 ## # # # load CASTNet O3 
 #castnet = find_conus_castnet(years)
 ## # # # load MERRA-2 meteorology
@@ -5934,6 +5937,9 @@ years = [2008, 2009, 2010]
 #(lat_acmr2, lon_acmr2, o3_acmr2, r_acmr2, do3dt_acmr2) = \
 # calculatefields_atcastnet(lat_castnet, lon_castnet, gmi_lat, gmi_lon, 
 #    mr2_o3*1e9, o3_castnet, mr2_r, mr2_sens)
+#(lat_acemiss, lon_acemiss, o3_acemiss, r_acemiss, do3dt_acemiss) = \
+# calculatefields_atcastnet(lat_castnet, lon_castnet, gmi_lat, gmi_lon, 
+#    emiss_o3*1e9, o3_castnet, emiss_r, emiss_sens)
 ## for MR2-CCMI
 #(lat_acmr2_c, lon_acmr2_c, o3_acmr2_c, r_acmr2_c, do3dt_acmr2_c) = \
 # calculatefields_atcastnet(lat_castnet, lon_castnet, gmi_lat_c, gmi_lon_c, 
@@ -5944,6 +5950,9 @@ years = [2008, 2009, 2010]
 #    gc_o3_atoverpass, o3_castnet, gc_r, gc_sens)
 ## Show obs/model metrics at CASTNet sites for simulations of different
 ## resolutions
+#scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet, 
+#    o3_acemiss, r_castnet_obs, r_acemiss, do3dt2m_castnet_obs, do3dt_acemiss,
+#    'GHKerr-DailyEmiss_tcastnetobs')
 #scatter_castnetmetrics_ctmmetrics(lat_castnet, lon_castnet, o3_castnet, 
 #    o3_acmr2, r_castnet_obs, r_acmr2, do3dt2m_castnet_obs, do3dt_acmr2, 
 #    'mr2_tcastnetobs')
@@ -5969,7 +5978,7 @@ years = [2008, 2009, 2010]
 #import sys
 #sys.path.append('/Users/ghkerr/phd/globalo3/')
 #import globalo3_open, globalo3_calculate
-## # # # load CASTNet O3 
+# # # # load CASTNet O3 
 #castnet_2010 = find_conus_castnet([2010])
 ## Calculate CASTNet metrics for only 2010
 #(r_castnet_2010, do3dt2m_castnet_2010, lat_castnet_2010, lon_castnet_2010, 
@@ -6026,3 +6035,161 @@ years = [2008, 2009, 2010]
 #scatter_castnetmetrics_ctmmetrics(lat_castnet_2010, lon_castnet_2010, o3_castnet_2010, 
 #    o3_ac_05_0625, r_castnet_2010, r_ac_05_0625, do3dt2m_castnet_2010, do3dt_ac_05_0625, 
 #    'replay_MERRA2_GMI')
+
+"""INVESTIGATE LIGHTNING NO-O3-TEMPERATURE RELATIONSHIP"""
+#import numpy as np
+#import netCDF4 as nc
+#import matplotlib.pyplot as plt
+#from mpl_toolkits.basemap import Basemap
+#PATH_LIGHT='/Users/ghkerr/Downloads/'
+#cntrl = nc.Dataset(PATH_LIGHT+'gmic_MERRA_cntl_djf07_200802.overpass2.nc')
+#light = nc.Dataset(PATH_LIGHT+'gmic_MERRA_nolght_djf07_200802.overpass2.nc')
+#lng_cntrl = cntrl.variables['longitude_dim'][:]
+#lat_cntrl = cntrl.variables['latitude_dim'][:]
+#lng_cntrl = np.mod(lng_cntrl - 180.0, 360.0) - 180.0
+#species_raw = cntrl.variables['overpass_labels'][:]
+#species = []
+#for row in np.arange(0, np.shape(species_raw)[0]):
+#    temp = []
+#    for element in species_raw[row]:
+#        temp.append(element.decode('UTF-8'))
+#    si = ''.join(temp)
+#    si = si.rstrip()
+#    species.append(si[:])      
+#del species_raw
+## Find position of desired trace gas 
+#gas_where = np.where(np.array(species) == 'O3')[0][0]
+## Extract trace gas concentrations for month 
+#o3_cntrl = cntrl.variables['const_overpass'][:,gas_where,0]
+#o3_light = light.variables['const_overpass'][:,gas_where,0]
+#diff = np.mean((o3_cntrl - o3_light), axis=0)*1e9
+## Find states in NEUS
+#m = Basemap(projection = 'merc', llcrnrlon = -130., llcrnrlat = 24.0, 
+#            urcrnrlon = -66.3, urcrnrlat = 50., resolution = 'c', 
+#            area_thresh = 1000)
+#neus_states = pollutants_constants.NORTHEAST_STATES
+#neus_c = find_grid_in_region(m, neus_states, lat_cntrl, lng_cntrl) 
+#o3_cntrl_neus = np.nanmean((o3_cntrl*neus_c), axis=tuple((1,2)))*1e9
+#o3_light_neus = np.nanmean((o3_light*neus_c), axis=tuple((1,2)))*1e9
+## Find CASTNet temperature observations 
+#t_castnet_obs = commensurability.open_castnet_metdata([2008], [2],
+#    [13, 14], ['TEMPERATURE'], sites_castnet)
+#neus_castnet = ['ASH', 'HOW', 'ACA', 'WST', 'HWF', 'ABT', 'WSP', 'CTH', 
+#                'MKG', 'KEF', 'PSU', 'ARE', 'LRL', 'CDR', 'PAR', 'VPI', 
+#                'PED', 'SHN', 'BWR', 'BEL']
+#
+#where_region = np.in1d(sites_castnet, neus_castnet)
+#where_region = np.where(where_region == True)[0]
+## T2m at CASTNet sites in region
+#t_castnet_obs_neus = np.array(t_castnet_obs)[where_region]
+## find daily regional average
+#t_castnet_obs_neus = np.nanmean(t_castnet_obs_neus, axis = 0)
+#plt.title('NEUS average')
+#plt.plot(t_castnet_obs_neus, '-r', label='2-meter temperature') 
+#plt.ylabel('2-meter temperature [C]')
+#plt.xlabel('Days in February 2008')
+#plt.legend()
+#plt.twinx()
+#plt.plot(o3_light_neus, '-b', label = 'O3 no lightning')
+#plt.plot(o3_cntrl_neus, '-k', label = 'O3 control')
+#plt.ylabel('O3 [ppbv]')
+#plt.legend()
+#plt.xlabel('Days in February 2008')
+#plt.savefig('/Users/ghkerr/Downloads/gmi_o3_lightning_neus022008.png', dpi=300)
+
+"""PLOT CASTNET O3-GMI O3 CORRELATIONS"""
+#o3_gmi = emiss_o3*1e9
+#import numpy as np
+#from matplotlib.colors import Normalize
+#from matplotlib.colorbar import ColorbarBase
+#import matplotlib.pyplot as plt
+#from mpl_toolkits.basemap import Basemap
+#import sys
+#sys.path.append('/Users/ghkerr/phd/')
+#import pollutants_constants
+#sys.path.append('/Users/ghkerr/phd/')
+#from geo_idx import geo_idx
+#r_castnetgmi = []
+#r_castnetgmi_lat = []
+#r_castnetgmi_lon = []
+#for site in sites_castnet:
+#    # Find site's coordinates and O3 at site
+#    where_site = np.where(np.array(sites_castnet) == site)[0][0]
+#    lat_site = lat_castnet[where_site]
+#    lon_site = lon_castnet[where_site]
+#    o3_site = o3_castnet[where_site]
+#    # Find closest GMI CTM grid cell and O3
+#    lat_gmi_near = geo_idx(lat_site, gmi_lat)
+#    lon_gmi_near = geo_idx(lon_site, gmi_lon)
+#    o3_gmi_near = o3_gmi[:, lat_gmi_near, lon_gmi_near]
+#    # Mask out missing CASTNet values
+#    mask = ~np.isnan(o3_site) & ~np.isnan(o3_gmi_near)
+#    # Correlation between CASTNet-GMI O3 
+#    r = np.corrcoef(o3_site[mask], o3_gmi_near[mask])[0,1]
+#    r_castnetgmi.append(r)
+#    r_castnetgmi_lat.append(lat_site)
+#    r_castnetgmi_lon.append(lon_site)
+## Based on JJA 2008-2010 values, sites with r(O3-CASTNET, O3-GMI) < 0.5 
+## are ALH, BWR, CDZ, KEF, SAL, YEL
+## ALH: Alhambra, IL
+## BWR: Blackwater NWR, MD
+## CDZ: Cadiz, KY    
+## KEF: Kane Experimental Forest, PA
+## SAL: Salamonie Reservoir, IN
+## YEL: Yellowstone, WY
+## Histogram of CASTNet-GMI correlation
+#fig = plt.figure(figsize=(8,6))
+#ax = plt.subplot2grid((1, 1), (0, 0))    
+#nbins = 12
+#n, bins, patches = ax.hist(r_castnetgmi, nbins, fc = 'grey', ec = 'white')
+#ax.set_xlim([0, 1.])
+#ax.spines['top'].set_color(None)
+#ax.spines['left'].set_color(None)
+#ax.spines['right'].set_color(None)    
+#for t in ax.get_xticklabels():
+#    t.set_fontsize(12)
+#for t in ax.get_yticklabels():
+#    t.set_fontsize(12)
+#ax.tick_params('both', length=7, width=1.5, which='major')
+#ax.set_xlabel(r'$r(\mathregular{O_\mathregular{3,\:CASTNet},}\:\mathregular'+
+#                   '{O}_\mathregular{3,\:GMI}}$)', fontsize = 16)    
+#ax.set_ylabel('Frequency', fontsize = 16)    
+#plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
+#            'historgram_ro3gmio3dastnet_conus.eps', dpi = 300)
+#plt.show()
+## Map of CASTNet-GMI correlation
+#llcrnrlon = -126.
+#llcrnrlat = 24.0
+#urcrnrlon = -66.3
+#urcrnrlat = 50.
+#fig = plt.figure()
+## O3-T2m correlation map
+#m = Basemap(projection = 'merc', llcrnrlon = llcrnrlon, 
+#            llcrnrlat = llcrnrlat, urcrnrlon = urcrnrlon, 
+#            urcrnrlat = urcrnrlat, resolution = 'h', area_thresh = 1000)
+#fig = plt.figure(figsize=(8,6))
+#ax = plt.subplot2grid((1, 1), (0, 0))
+#vmin = 0; vmax = 0.75
+#cmap = plt.get_cmap('PuBu', 10)
+#norm = Normalize(vmin = vmin, vmax = vmax)
+#clevs = np.linspace(vmin, vmax, 11, endpoint = True)
+#m.drawstates(color = 'k', linewidth = 0.5)
+#m.drawcountries(color = 'k', linewidth = 1.0)
+#m.drawcoastlines(color = 'k', linewidth = 1.0)    
+## superimpose O3-T2m sensitivity from observations
+#x_castnet, y_castnet = m(r_castnetgmi_lon, r_castnetgmi_lat)
+#m.scatter(x_castnet, y_castnet, c = r_castnetgmi, s = 20, cmap = cmap, 
+#          vmin = vmin, vmax = vmax, zorder = 30, linewidth = 1., 
+#          edgecolor = 'grey')    
+#fill_oceans(ax, m)    
+#outline_region(ax, m, pollutants_constants.NORTHEAST_STATES)    
+#caxt = fig.add_axes([0.21, 0.17, 0.6, 0.03]) 
+#cb = ColorbarBase(caxt, cmap = cmap, norm = norm, 
+#                  orientation = 'horizontal', extend = 'both')
+#cb.set_label(label=r'$r(\mathregular{O_\mathregular{3,\:CASTNet},}\:\mathregular'+
+#                   '{O}_\mathregular{3,\:GMI}}$)', size = 16, y = 0.25)    
+#cb.ax.tick_params(labelsize = 12)
+#cb.set_ticks(np.linspace(vmin, vmax, 6))    
+#plt.subplots_adjust(bottom=0.2)
+#plt.savefig('/Users/ghkerr/phd/GMI/figs/'+
+#            'map_ro3gmio3dastnet_conus.eps', dpi = 300)
