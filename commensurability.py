@@ -2179,7 +2179,7 @@ def open_unperturbed_emissions(prefix):
         IAVanthGFED4; for FFIgac2 run prefix is 'IAVanthGFED3gcEF')
 
     Returns
-    ----------      
+    ----------
     NO_ff_all : list
         JJA 2008-2010 NO from fossil fuels emissions inventory; emissions
         scale with temperature. Every element in list (numpy.ndarray) 
