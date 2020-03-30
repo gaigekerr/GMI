@@ -27,7 +27,7 @@ def scatter_controlnoeguno_bysite(mr2, egu, castnet_sites_fr, years, region):
     """function plots the percentage change in NO between perturbed NOx 
     emissions and control GMI CTMs runs versus NO concentrations from the 
     control run for every site in variable 'castnet_sites_fr.' Also plotted are 
-    the lines of best fit from linear regression and the fitted slope/
+    the lines of best fit from linear regression and the fitte\d slope/
     intercept. 
   
     Parameters
@@ -1468,7 +1468,7 @@ def scatter_dEmissdNOxdO3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss,
     # # # # for dO3/dEmiss
     ax = plt.subplot2grid((1, 1), (0, 0))
     # for Strode et al. (2015) simulation daily values 
-    ax.plot(no_emiss_strode, o3_strode, 'o', markersize = 1, color = COLOR_MR2)        
+    ax.plot(no_emiss_strode, o3_strode, 'o', markersize = 1, color = COLOR_FFIGAC2)        
     # for MR2-CEMS simulation daily values 
     ax.plot(no_emiss, o3, 'o', markersize = 1, color = COLOR_MR2)      
     # for Strode et al. (2015) simulation monthly values 
@@ -1480,7 +1480,7 @@ def scatter_dEmissdNOxdO3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss,
     ax.plot(no_emiss_monthly, o3_monthly, 's', markersize = 8, markerfacecolor = 'w', 
             markeredgecolor = COLOR_MR2)  
     ax.plot(no_emiss_monthly, o3_monthly, 'o', markersize = 3, color = COLOR_MR2, 
-            label = 'Daily-varying NO')        
+            label = 'Daily varying NO')        
     # fit linear regression through seasonal means
     x = np.hstack((no_emiss_monthly, no_emiss_strode_monthly))
     y = np.hstack((o3_monthly, o3_strode_monthly))
@@ -1524,7 +1524,7 @@ def scatter_dEmissdNOxdO3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss,
     ax.plot(no_emiss_monthly, nox_monthly, 's', markersize = 8, markerfacecolor = 'w', 
             markeredgecolor = COLOR_MR2)  
     ax.plot(no_emiss_monthly, nox_monthly, 'o', markersize = 3, color = COLOR_MR2, 
-            label = 'Daily-varying NO')    
+            label = 'Daily varying NO')    
     x = np.hstack((no_emiss_monthly, no_emiss_strode_monthly))
     y = np.hstack((nox_monthly, nox_strode_monthly))
     fit = np.polyfit(x, y, 1)
@@ -1550,7 +1550,7 @@ def scatter_dEmissdNOxdO3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss,
     ax.plot(nox_monthly, o3_monthly, 's', markersize = 8, markerfacecolor = 'w', 
             markeredgecolor = COLOR_MR2)  
     ax.plot(nox_monthly, o3_monthly, 'o', markersize = 3, color = COLOR_MR2, 
-            label = 'Daily-varying NO')    
+            label = 'Daily varying NO')    
     x = np.hstack((nox_monthly, nox_strode_monthly))
     y = np.hstack((o3_monthly, o3_strode_monthly))
     fit = np.polyfit(x, y, 1)
@@ -1695,153 +1695,151 @@ def timeseries_controlo3eguo3(egu_o3, mr2_o3, year, years, region):
     plt.savefig('/Users/ghkerr/phd/GMI/figs/' +
                 'timeseries_controlo3eguo3_%s.eps' %(year), dpi = 300)    
     return 
-# # # # # # # # # # # # #    
-import numpy as np
-import sys
-sys.path.append('/Users/ghkerr/phd/GMI/')
-import commensurability
-from calculate_regional_average import calculate_regional_average
-import sys
-sys.path.append('/Users/ghkerr/phd/emissions/')
-import AQSCEMSobs
-years = [2008, 2009, 2010]            
-years_strode = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010]
-sampling_months = [6, 7, 8]
-sampling_hours = [15, 16, 17, 18, 19, 20]  
-castnet_sites_fr = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
-                    'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
-                    'CDR', 'VPI', 'MKG', 'KEF']
-region = 'northeast'
-# # # # open CTM output # # # #
-# open HindcastMR2 run
-mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
-commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
-                                          years, sampling_months, 
-                                          sampling_hours)
-# open HindcastMR2 run with temperature-dependent emissions 
-egu_castnet, egu_o3, egu_no, egu_no2, egu_co, egu_gmi_sites_fr = \
-commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'EGU_T', years, 
-                                          sampling_months, sampling_hours)    
-# open HindcastFFIgac2 (emissions variable) run 
-ffigac2_castnet, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
-commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', 
-                                          years_strode, sampling_months, 
-                                          sampling_hours)
-# open Hindcast3Igac2 (emissions fixed at 2000 levels) run 
-emfix_castnet, emfix_o3, emfix_no, emfix_no2, emfix_co, emfix_gmi_sites_fr = \
-commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'Hindcast3Igac2', 
-                                          years_strode, sampling_months, 
-                                          sampling_hours)
-# # # # open emissions inventories (NO from fossil fuel sector) # # # #
-# for HindcastMR2 run
-mr2_no_emiss = \
-commensurability.commensurate_emiss_unperturbed(mr2_castnet, castnet_sites_fr, 
-                                                years, sampling_months, 
-                                                '1x1.25_IAVanthGFED4')
-# for HindcastMR2 run with temperature-dependent emissions run
-egu_no_emiss, emiss_lats_fr, emiss_lons_fr = \
-commensurability.commensurate_emiss_perturbed(mr2_castnet, castnet_sites_fr, 
-                                              years, sampling_months)
-# for FFIgac2 run 
-ffigac2_no_emiss = \
-commensurability.commensurate_emiss_unperturbed(ffigac2_castnet, castnet_sites_fr, 
-                                                years_strode, sampling_months, 
-                                                '2x2.5_IAVanthGFED3gcEF')
-# # # # open 2 meter temperature from MERRA # # # #
-t2m, merra_lats_fr, merra_lons_fr = \
-commensurability.commensurate_t2m(mr2_castnet, castnet_sites_fr, years, 
-                                  sampling_months)
-# # # # calculate regional averages # # # #
-# for HindcastMR2 run
-mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co = \
-calculate_regional_average(mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, 1)
-# for HindcastMR2 run with temperature-dependent emissions run
-egu_castnet, egu_o3, egu_no, egu_no2, egu_co = \
-calculate_regional_average(egu_castnet, egu_o3, egu_no, egu_no2, egu_co, 1)
-# for HindcastFFIgac2 (emissions variable) run 
-ffigac2_castnet, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co = \
-calculate_regional_average(ffigac2_castnet, ffigac2_o3, ffigac2_no, 
-                           ffigac2_no2, ffigac2_co, 1)
-# for Hindcast3Igac2 (emissions fixed at 2000 levels) run 
-emfix_castnet, emfix_o3, emfix_no, emfix_no2, emfix_co = \
-calculate_regional_average(emfix_castnet, emfix_o3, emfix_no, emfix_no2, 
-                           emfix_co, 1)
-# for emission inventories
-egu_no_emiss = np.nanmean(egu_no_emiss, axis = 1)
-mr2_no_emiss = np.nanmean(mr2_no_emiss, axis = 1)
-ffigac2_no_emiss = np.nanmean(ffigac2_no_emiss, axis = 1)
-# for regionally-averaged 2 meter temperatures 
-t2m = np.nanmean(t2m, axis = 1)
-# # # # load CEMS NOx for NEUS # # # #
-states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 
-             'RI', 'VA', 'VT', 'WV']
-cems, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
-        '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
- # # # visualizations for daily-average O3 # # # # 
-scatter_controlnoeguno_bysite(mr2_no, egu_no, castnet_sites_fr, years, region)
-scatter_controlno2egunno2_bysite(mr2_no2, egu_no2, castnet_sites_fr, years, region)
-scatter_controlo3eguno3_bysite(mr2_o3, egu_o3, castnet_sites_fr, years, region)
-scatter_inventory_ctm(egu_no_emiss, mr2_no_emiss, egu_no, 
-                      mr2_no, egu_no2, mr2_no2, egu_o3, mr2_o3, years, region)
-scatter_deltanoxdeltao3(egu_no, mr2_no, ffigac2_no, emfix_no, egu_no2, 
-                        mr2_no2, ffigac2_no2, emfix_no2, egu_o3, mr2_o3,
-                        ffigac2_o3, emfix_o3, years, region)
-scatter_deltanoxdeltao3_percent(egu_no, mr2_no, ffigac2_no, emfix_no, 
-                                egu_no2, mr2_no2, ffigac2_no2, emfix_no2, 
-                                egu_o3, mr2_o3, ffigac2_o3, emfix_o3, 
-                                years, region)
-timeseries_noemiss_t2m(egu_no_emiss, mr2_no_emiss, t2m, years, region)    
-scatter_dEmissdNOxdO3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss, 
-                      ffigac2_no, emfix_no, ffigac2_no2, emfix_no2, mr2_no, 
-                      egu_no, mr2_no2, egu_no2, ffigac2_o3, emfix_o3, mr2_o3, 
-                      egu_o3, years, years_strode, cems, ffigac2_castnet, t2m)
-pdf_controlo3eguo3(egu_o3, mr2_o3, mr2_castnet, years, region)
-timeseries_controlo3eguo3(egu_o3, mr2_o3, 2008, years, region)
-# # # # open time- and regionally-averaged diurnal trace gases # # # # 
-castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d = \
-commensurability.commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'HindcastMR2', 
-                                                  years, sampling_months)
-temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d = \
-commensurability.commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'EGU_T', 
-                                                  years, sampling_months)
-# # # # calculate regional averages of diurnal curves # # # #
-castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d = \
-calculate_regional_average(castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d, 
-                           1)
-temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d = \
-calculate_regional_average(temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d, 
-                           1)
-
-# # # # visualizations for diurnal curves
-diurnal_controlegunono2nox(mr2_no_d, mr2_no2_d, egu_no_d, egu_no2_d, 
-                           castnet_sites_fr, years, region)
-diurnal_controlegunono2o3(mr2_no_d, egu_no_d, mr2_no2_d, egu_no2_d, 
-                          mr2_o3_d, egu_o3_d, t2m, years, region)
-# # # # open HindcastFFIgac2 (emissions variable) run 
-temp, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
-commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', 
-                                          list(np.arange(2000, 2011, 1)), 
-                                          sampling_months, sampling_hours)
-# # # # open Hindcast3Igac2 (emissions fixed at 2000 levels) run 
-temp, emfix_o3, emfix_no, emfix_no2, emfix_co, emfix_gmi_sites_fr = \
-commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'Hindcast3Igac2', 
-                                          list(np.arange(2000, 2011, 1)), 
-                                          sampling_months, sampling_hours)
-del temp
-# find regionally-averaged trace gas concentrations from simulations
-# for NO
-emfix_no = np.nanmean(emfix_no, axis = 1)
-ffigac2_no = np.nanmean(ffigac2_no, axis = 1)
-# for NO2
-emfix_no2 = np.nanmean(emfix_no2, axis = 1)
-ffigac2_no2 = np.nanmean(ffigac2_no2, axis = 1)
-# for O3
-emfix_o3 = np.nanmean(emfix_o3, axis = 1)
-ffigac2_o3 = np.nanmean(ffigac2_o3, axis = 1)
-# # # # visualizations 
-scatter_deltanoxdeltao3_byyear(ffigac2_no, emfix_no, ffigac2_no2, emfix_no2, 
-                               ffigac2_o3, emfix_o3, list(np.arange(2000, 2011, 1)), region)
-timeseries_deltanoxdeltao3_percent(ffigac2_no, emfix_no, mr2_no, egu_no, 
-                                   ffigac2_no2, emfix_no2, mr2_no2, egu_no2, 
-                                   ffigac2_o3, emfix_o3, mr2_o3, egu_o3, t2m, 
-                                   list(np.arange(2000, 2011, 1)), region)
+## # # # # # # # # # # # #    
+#import numpy as np
+#import sys
+#sys.path.append('/Users/ghkerr/phd/GMI/')
+#import commensurability
+#from calculate_regional_average import calculate_regional_average
+#import sys
+#sys.path.append('/Users/ghkerr/phd/emissions/')
+#import AQSCEMSobs
+#years = [2008, 2009, 2010]            
+#years_strode = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010]
+#sampling_months = [6, 7, 8]
+#sampling_hours = [15, 16, 17, 18, 19, 20]  
+#castnet_sites_fr = ['ASH', 'WFM', 'WST', 'APT', 'SAR', 'CTH', 'WSP',
+#                    'ARE', 'BEL', 'PSU', 'LRL', 'PAR', 'PED', 'SHN', 
+#                    'CDR', 'VPI', 'MKG', 'KEF']
+#region = 'northeast'
+## # # # open CTM output # # # #
+## open HindcastMR2 run
+#mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, mr2_gmi_sites_fr = \
+#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastMR2', 
+#                                          years, sampling_months, 
+#                                          sampling_hours)
+## open HindcastMR2 run with temperature-dependent emissions 
+#egu_castnet, egu_o3, egu_no, egu_no2, egu_co, egu_gmi_sites_fr = \
+#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'EGU_T', years, 
+#                                          sampling_months, sampling_hours)    
+## open HindcastFFIgac2 (emissions variable) run 
+#ffigac2_castnet, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
+#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', 
+#                                          years_strode, sampling_months, 
+#                                          sampling_hours)
+## open Hindcast3Igac2 (emissions fixed at 2000 levels) run 
+#emfix_castnet, emfix_o3, emfix_no, emfix_no2, emfix_co, emfix_gmi_sites_fr = \
+#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'Hindcast3Igac2', 
+#                                          years_strode, sampling_months, 
+#                                          sampling_hours)
+## # # # open emissions inventories (NO from fossil fuel sector) # # # #
+## for HindcastMR2 run
+#mr2_no_emiss = \
+#commensurability.commensurate_emiss_unperturbed(mr2_castnet, castnet_sites_fr, 
+#                                                years, sampling_months, 
+#                                                '1x1.25_IAVanthGFED4')
+## for HindcastMR2 run with temperature-dependent emissions run
+#egu_no_emiss, emiss_lats_fr, emiss_lons_fr = \
+#commensurability.commensurate_emiss_perturbed(mr2_castnet, castnet_sites_fr, 
+#                                              years, sampling_months)
+## for FFIgac2 run 
+#ffigac2_no_emiss = \
+#commensurability.commensurate_emiss_unperturbed(ffigac2_castnet, castnet_sites_fr, 
+#                                                years_strode, sampling_months, 
+#                                                '2x2.5_IAVanthGFED3gcEF')
+## # # # open 2 meter temperature from MERRA # # # #
+#t2m, merra_lats_fr, merra_lons_fr = \
+#commensurability.commensurate_t2m(mr2_castnet, castnet_sites_fr, years, 
+#                                  sampling_months)
+## # # # calculate regional averages # # # #
+## for HindcastMR2 run
+#mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co = \
+#calculate_regional_average(mr2_castnet, mr2_o3, mr2_no, mr2_no2, mr2_co, 1)
+## for HindcastMR2 run with temperature-dependent emissions run
+#egu_castnet, egu_o3, egu_no, egu_no2, egu_co = \
+#calculate_regional_average(egu_castnet, egu_o3, egu_no, egu_no2, egu_co, 1)
+## for HindcastFFIgac2 (emissions variable) run 
+#ffigac2_castnet, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co = \
+#calculate_regional_average(ffigac2_castnet, ffigac2_o3, ffigac2_no, 
+#                           ffigac2_no2, ffigac2_co, 1)
+## for Hindcast3Igac2 (emissions fixed at 2000 levels) run 
+#emfix_castnet, emfix_o3, emfix_no, emfix_no2, emfix_co = \
+#calculate_regional_average(emfix_castnet, emfix_o3, emfix_no, emfix_no2, 
+#                           emfix_co, 1)
+## for emission inventories
+#egu_no_emiss = np.nanmean(egu_no_emiss, axis = 1)
+#mr2_no_emiss = np.nanmean(mr2_no_emiss, axis = 1)
+#ffigac2_no_emiss = np.nanmean(ffigac2_no_emiss, axis = 1)
+## for regionally-averaged 2 meter temperatures 
+#t2m = np.nanmean(t2m, axis = 1)
+## # # # load CEMS NOx for NEUS # # # #
+#states_ab = ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 
+#             'RI', 'VA', 'VT', 'WV']
+#cems, nox_lat, nox_lon = AQSCEMSobs.cems_specifystates_dailymean(
+#        '/Volumes/GAIGEKERR/emissions/CEMS/', states_ab, sampling_months)
+# # # # visualizations for daily-average O3 # # # # 
+#scatter_controlnoeguno_bysite(mr2_no, egu_no, castnet_sites_fr, years, region)
+#scatter_controlno2egunno2_bysite(mr2_no2, egu_no2, castnet_sites_fr, years, region)
+#scatter_controlo3eguno3_bysite(mr2_o3, egu_o3, castnet_sites_fr, years, region)
+#scatter_inventory_ctm(egu_no_emiss, mr2_no_emiss, egu_no, 
+#                      mr2_no, egu_no2, mr2_no2, egu_o3, mr2_o3, years, region)
+#scatter_deltanoxdeltao3(egu_no, mr2_no, ffigac2_no, emfix_no, egu_no2, 
+#                        mr2_no2, ffigac2_no2, emfix_no2, egu_o3, mr2_o3,
+#                        ffigac2_o3, emfix_o3, years, region)
+#scatter_deltanoxdeltao3_percent(egu_no, mr2_no, ffigac2_no, emfix_no, 
+#                                egu_no2, mr2_no2, ffigac2_no2, emfix_no2, 
+#                                egu_o3, mr2_o3, ffigac2_o3, emfix_o3, 
+#                                years, region)
+#timeseries_noemiss_t2m(egu_no_emiss, mr2_no_emiss, t2m, years, region)    
+#scatter_dEmissdNOxdO3(ffigac2_no_emiss, mr2_no_emiss, egu_no_emiss, 
+#                      ffigac2_no, emfix_no, ffigac2_no2, emfix_no2, mr2_no, 
+#                      egu_no, mr2_no2, egu_no2, ffigac2_o3, emfix_o3, mr2_o3, 
+#                      egu_o3, years, years_strode, cems, ffigac2_castnet, t2m)
+#pdf_controlo3eguo3(egu_o3, mr2_o3, mr2_castnet, years, region)
+#timeseries_controlo3eguo3(egu_o3, mr2_o3, 2008, years, region)
+## # # # open time- and regionally-averaged diurnal trace gases # # # # 
+#castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d = \
+#commensurability.commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'HindcastMR2', 
+#                                                  years, sampling_months)
+#temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d = \
+#commensurability.commensurate_castnet_gmi_diurnal(castnet_sites_fr, 'EGU_T', 
+#                                                  years, sampling_months)
+## # # # calculate regional averages of diurnal curves # # # #
+#castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d = \
+#calculate_regional_average(castnet_d, mr2_o3_d, mr2_no_d, mr2_no2_d, mr2_co_d, 
+#                           1)
+#temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d = \
+#calculate_regional_average(temp, egu_o3_d, egu_no_d, egu_no2_d, egu_co_d, 1)
+## # # # visualizations for diurnal curves
+#diurnal_controlegunono2nox(mr2_no_d, mr2_no2_d, egu_no_d, egu_no2_d, 
+#                           castnet_sites_fr, years, region)
+#diurnal_controlegunono2o3(mr2_no_d, egu_no_d, mr2_no2_d, egu_no2_d, 
+#                          mr2_o3_d, egu_o3_d, t2m, years, region)
+## # # # open HindcastFFIgac2 (emissions variable) run 
+#temp, ffigac2_o3, ffigac2_no, ffigac2_no2, ffigac2_co, ffigac2_gmi_sites_fr = \
+#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'HindcastFFIgac2', 
+#                                          list(np.arange(2000, 2011, 1)), 
+#                                          sampling_months, sampling_hours)
+## # # # open Hindcast3Igac2 (emissions fixed at 2000 levels) run 
+#temp, emfix_o3, emfix_no, emfix_no2, emfix_co, emfix_gmi_sites_fr = \
+#commensurability.commensurate_castnet_gmi(castnet_sites_fr, 'Hindcast3Igac2', 
+#                                          list(np.arange(2000, 2011, 1)), 
+#                                          sampling_months, sampling_hours)
+#del temp
+## find regionally-averaged trace gas concentrations from simulations
+## for NO
+#emfix_no = np.nanmean(emfix_no, axis = 1)
+#ffigac2_no = np.nanmean(ffigac2_no, axis = 1)
+## for NO2
+#emfix_no2 = np.nanmean(emfix_no2, axis = 1)
+#ffigac2_no2 = np.nanmean(ffigac2_no2, axis = 1)
+## for O3
+#emfix_o3 = np.nanmean(emfix_o3, axis = 1)
+#ffigac2_o3 = np.nanmean(ffigac2_o3, axis = 1)
+## # # # visualizations 
+#scatter_deltanoxdeltao3_byyear(ffigac2_no, emfix_no, ffigac2_no2, emfix_no2, 
+#                               ffigac2_o3, emfix_o3, list(np.arange(2000, 2011, 1)), region)
+#timeseries_deltanoxdeltao3_percent(ffigac2_no, emfix_no, mr2_no, egu_no, 
+#                                   ffigac2_no2, emfix_no2, mr2_no2, egu_no2, 
+#                                   ffigac2_o3, emfix_o3, mr2_o3, egu_o3, t2m, 
+#                                   list(np.arange(2000, 2011, 1)), region)
