@@ -609,9 +609,11 @@ def inst1_2d_asm_Nx_combine_dailymaxt2m(year, month):
     from netCDF4 import Dataset
     import glob
     # Path to MERRA-2 data holdings
-    PATH_MERRA = '/mnt/scratch1/gaige/data/MERRA-2/global/%s/' %(year) 
+#    PATH_MERRA = '/mnt/scratch1/gaige/data/MERRA-2/global/%s/' %(year) 
+    PATH_MERRA = '/Users/ghkerr/phd/globalo3/data/MERRA-2/'
     # File names with wildcard character for date
-    mfstring = 'MERRA2_300.inst1_2d_asm_Nx.%s%.2d*.SUB.nc*' %(year,month)
+#    mfstring = 'MERRA2_300.inst1_2d_asm_Nx.%s%.2d*.SUB.nc*' %(year,month)
+    mfstring = 'MERRA2_400.inst1_2d_asm_Nx.%s%.2d*.SUB.nc*' %(year,month)    
     infiles = []
     for file in glob.glob(PATH_MERRA + mfstring):
         infiles.append(file)
@@ -685,8 +687,7 @@ presslevel = 15
 #inst6_3d_ana_Np_combine(year, ulat, llat, llon, rlon)
 ## for inst1_2d_asm_Nx
 #inst1_2d_asm_Nx_combine(year, ulat, llat, llon, rlon)
-
-for year in np.arange(2005,2011,1):
-    for month in np.arange(1,13,1):
-        print('Finding daily maximum T2m for %.2d/%d...'%(month,year))
-        inst1_2d_asm_Nx_combine_dailymaxt2m(year, month)
+#for year in np.arange(2017,2018,1):
+#    for month in np.arange(1,13,1):
+#        print('Finding daily maximum T2m for %.2d/%d...'%(month,year))
+#        inst1_2d_asm_Nx_combine_dailymaxt2m(year, month)
